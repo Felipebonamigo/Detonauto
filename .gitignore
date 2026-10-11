@@ -1,0 +1,63 @@
+# Detonauto: arquivos que o Git ignora
+
+# Gerados pelo Unreal Engine
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+
+# Iluminação calculada: o editor gera de novo quando preciso
+*_BuiltData.uasset
+
+# Pasta Build: só os ícones e listas de empacotamento entram no Git
+Build/*
+!Build/*/
+Build/*/**
+!Build/**/*.ico
+!Build/*/PakBlacklist*.txt
+
+# Visual Studio e outras IDEs (os arquivos de projeto o Unreal gera de novo)
+.vs/
+*.sln
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+*.sdf
+*.opensdf
+.idea/
+.vscode/
+*.code-workspace
+
+# Saídas de compilação C++
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.pch
+*.gch
+
+# Projetos descartáveis de aprendizado ficam fora do Git
+Sandbox/
+
+# Pacotes completos baixados do Fab (City Sample e outros) ficam fora do Git.
+# Só os assets migrados para o projeto entram, via Content/.
+Downloads/
+Fab/
+
+# Backups automáticos do Blender
+*.blend1
+*.blend2
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Builds empacotadas e capturas
+Packaged/
+Captures/
