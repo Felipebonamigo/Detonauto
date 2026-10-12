@@ -31,8 +31,8 @@ serialização e integração com o editor.
 | `AGameStateBase` | O estado da partida visível a todos | Pontuação e tempo restante |
 | `APlayerState` | O estado de um jogador | Pontos e medalhas do jogador |
 
-Quando o jogo começa, o GameMode cria o PlayerController, e o PlayerController
-assume o Pawn. **Se o Blueprint do GameMode ou o do Pawn não carrega, o Unreal
+Quando o jogo começa, o Unreal cria o PlayerController da classe que o GameMode
+define, e o PlayerController assume o Pawn. **Se o Blueprint do GameMode ou o do Pawn não carrega, o Unreal
 cai num Pawn padrão, que é uma câmera livre.** Foi o que aconteceu no primeiro
 teste do VeiculoTeste. A causa real não foi o GameMode em si: 18 assets ainda
 apontavam para o nome antigo do módulo C++ do template, e as pastas do conteúdo
