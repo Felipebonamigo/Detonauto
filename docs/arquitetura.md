@@ -121,7 +121,52 @@ folga, não medidos.
 1. Seis módulos ou três no início? (ver a suposição acima)
 2. Técnica de dano: deformação por vértices, por física ou por malha
    pré-quebrada. Decide o teste das Sprints 12 e 13.
-3. Física do carro: Chaos Vehicles com camada própria de aderência ou um modelo
-   arcade próprio. Decide o projeto descartável 2 da Sprint 4.
+3. Física do carro: Chaos Vehicles com camada própria de forças ou um modelo
+   arcade próprio. Primeiro diagnóstico no fim deste documento. Falta o
+   Felipe jogar o carro de teste antes de decidir.
 4. Como guardar o replay do takedown sem custo alto de memória.
 5. Se o tráfego usa física completa ou um modelo simplificado até a batida.
+
+## Diagnóstico do Chaos Vehicles para o estilo arcade (Sprint 4)
+
+Resultado do projeto descartável 2, escrito pela sessão local a partir do código
+da engine e de testes sem janela. O Felipe ainda não jogou o carro. Tudo que não
+foi verificado está marcado como suposição.
+
+**Verificado no código:**
+
+- O Chaos Vehicles é uma simulação de veículo com pneus: curva de deslizamento
+  lateral, suspensão por raycast, motor e câmbio.
+- Em C++ dá para configurar rodas (raio, largura, atrito, freio, esterço),
+  massa, motor, transmissão, direção, arrasto, câmera e entrada.
+- Em tempo de execução existem setters para torque do motor, multiplicador de
+  atrito e de deslizamento das rodas, parâmetros de suspensão, ângulo máximo
+  de esterço, arrasto, downforce e divisão de tração.
+- Depende de asset, e criar exige o editor visual: a malha esquelética com ossos
+  de roda, o Physics Asset e o Anim Blueprint. O teste reaproveitou os do
+  template por caminho.
+
+**Leitura provisória, a validar jogando:**
+
+- Dá para chegar a um carro "arcade" só apertando parâmetros: aderência lateral
+  alta, centro de massa baixo, arrasto e ganho de direção.
+- Derrapada exagerada e giro no ar depois da batida, o que o Burnout faz, não se
+  resolvem com parâmetros de pneu. Vão exigir forças próprias sobre o chassi,
+  aplicadas a cada quadro, por cima do Chaos.
+
+**Suposições não testadas:**
+
+- Que a configuração de torque no chassi do Chaos serve para o aftertouch.
+- Que os setters em tempo de execução aguentam mudanças frequentes.
+- O custo por carro com 40 de tráfego.
+- A estabilidade com massa e aderência extremas.
+- Que a curva de deslizamento lateral só vale na criação do veículo.
+
+**Medição, sem valor de desempenho real:** média de cerca de 1 ms por quadro no
+Game thread, em execução sem janela e sem tráfego, sem render e sem dano. Não é
+o custo real nem prova de 60 fps.
+
+**Direção provisória:** começar com o Chaos Vehicles configurado por tabela e
+adicionar uma camada própria de forças só onde o parâmetro não chegar. Não
+construir um modelo de física do zero antes de o Felipe sentir o carro.
+
