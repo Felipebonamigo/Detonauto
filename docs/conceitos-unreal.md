@@ -32,9 +32,16 @@ serialização e integração com o editor.
 | `APlayerState` | O estado de um jogador | Pontos e medalhas do jogador |
 
 Quando o jogo começa, o GameMode cria o PlayerController, e o PlayerController
-assume o Pawn. **Se o Pawn do GameMode não carrega, o Unreal usa um Pawn
-padrão, que é uma câmera livre.** Foi o que aconteceu no primeiro teste do
-VeiculoTeste.
+assume o Pawn. **Se o Blueprint do GameMode ou o do Pawn não carrega, o Unreal
+cai num Pawn padrão, que é uma câmera livre.** Foi o que aconteceu no primeiro
+teste do VeiculoTeste. A causa real não foi o GameMode em si: 18 assets ainda
+apontavam para o nome antigo do módulo C++ do template, e as pastas do conteúdo
+compartilhado estavam no lugar errado.
+
+No template de veículo, a classe C++ do GameMode só define a classe do
+PlayerController. O Pawn padrão vem do Blueprint do GameMode
+(`BP_VehicleAdvGameMode`), e não do C++. Quando algo some do jogo, o erro pode
+estar no Blueprint ou nos assets, e não no código.
 
 ## Os quatro macros que você vai ver em tudo
 
@@ -56,11 +63,17 @@ public:
 };
 ```
 
-- **`UCLASS()`** marca uma classe que o Unreal gerencia.
+- **`UCLASS()`** marca uma classe que o Unreal gerencia. Aceita opções, e o
+  template de veículo usa duas: `abstract`, que impede criar o objeto direto
+  e obriga a derivar dele, e `Config="Game"`, que lê valores de arquivos de
+  configuração.
 - **`GENERATED_BODY()`** é obrigatório dentro dela. O Unreal gera código aqui.
 - **`UPROPERTY(...)`** expõe uma variável. `EditAnywhere` mostra no editor,
   `BlueprintReadWrite` deixa o Blueprint ler e escrever. Uma variável de
-  objeto sem `UPROPERTY` pode ser apagada pelo coletor de lixo.
+  objeto sem `UPROPERTY` pode ser apagada pelo coletor de lixo. Há exceção
+  segura: o template guarda o `ChaosVehicleMovement` do carro sem `UPROPERTY`,
+  porque ele é um componente do próprio Pawn e vive tanto quanto ele. A regra
+  vale para objetos que podem ser apagados por quem não é o dono.
 - **`UFUNCTION(...)`** expõe uma função. `BlueprintCallable` deixa o
   Blueprint chamá-la.
 
@@ -123,6 +136,9 @@ máxima de um carro editando o CSV, sem recompilar.
 ## Fontes e limites deste guia
 
 O guia foi escrito de memória a partir da arquitetura estável do Unreal 5, e
-não foi conferido contra a documentação da versão 5.8. Os conceitos centrais
+não foi conferido contra a documentação da versão 5.8. A sessão local
+conferiu contra o código real do template e apontou quatro pontos, que já
+estão corrigidos acima: a causa do carro invisível, o papel do GameMode do
+template, a exceção do `UPROPERTY` em componentes e as opções do `UCLASS`. Os conceitos centrais
 não mudam entre as versões 5.x. Nomes de classes e de macros de detalhe
 devem ser confirmados com o código real do projeto.
