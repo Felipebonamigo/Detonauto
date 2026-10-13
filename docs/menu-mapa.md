@@ -36,12 +36,20 @@ Contadores em cada nível, no formato feito/total.
 
 ## Dados em tabelas, como o resto do jogo
 
-| Tabela | Conteúdo |
+| Tabela | Colunas (a primeira é o id e a chave da linha) |
 |---|---|
-| `Data/Regions.csv` | Id, nome, país ou grupo, ordem, desbloqueio |
-| `Data/Cities.csv` | Id, nome, região, latitude, longitude, distrito do jogo, texto curto, desbloqueio |
-| `Data/Landmarks.csv` | Id, cidade, nome, tipo, texto curto, fonte do texto, necessita revisão |
-| `Data/Crossings.csv` | A tabela de cruzamentos, com a coluna `Cidade` |
+| `Data/Regions.csv` | `Id`, `Name`, `Order`, `Unlocked` |
+| `Data/Cities.csv` | `Id`, `Name`, `RegionId`, `Latitude`, `Longitude`, `District`, `Order`, `Unlocked`, `Playable` |
+| `Data/Landmarks.csv` | `Id`, `CityId`, `Name`, `Kind`, `ShortText`, `SourceNote`, `NeedsReview` |
+| `Data/Crossings.csv` | `Id`, `CityId`, `Order`, `Bronze`, `Silver`, `Gold` |
+| `Data/TrafficVehicles.csv` | `Id`, `Name`, `ValueCash`, `MassKg`, `Class` |
+
+**Os schemas oficiais são os do código**, em `Source/Detonauto/Core/Data/DNDataRows.h`
+(com as regras de cada campo e os validadores em `DNDataValidation.h`). Esta
+tabela só os resume. Duas diferenças em relação ao primeiro rascunho do
+conceito: `Cities.csv` não tem texto curto (só os pontos turísticos têm texto,
+em `Landmarks.csv`, e só depois de conferido), e `Regions.csv` não tem "país ou
+grupo".
 
 **Ids.** Dois ids que só diferem em maiúsculas e minúsculas são o mesmo id (como o
 `FName` da engine), e o validador os recusa como duplicados. Um id só pode ter

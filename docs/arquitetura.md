@@ -65,6 +65,17 @@ Cada CSV tem uma `struct` em C++ que herda de `FTableRowBase`. Um teste lê a
 tabela e confere se todas as linhas fazem sentido, por exemplo massa maior que
 zero.
 
+**Pendência antes do primeiro build empacotado:** `Data/` fica na raiz do
+projeto, fora de `Content/`, e a engine só copia para o jogo empacotado as
+pastas que a configuração manda. Adicionar `Data/` em `DirectoriesToAlwaysStageAsNonUFS`
+(seção `[/Script/UnrealEd.ProjectPackagingSettings]` do `DefaultGame.ini`). O
+caminho dessa propriedade é **relativo à pasta `Content/`** (confirmado no
+cabeçalho `ProjectPackagingSettings.h` da engine 5.8), então para `Data/` na
+raiz seria `../Data`. Falta decidir também entre copiar solto (`NonUFS`) e
+colocar dentro do pacote (`DirectoriesToAlwaysStageAsUFS`); os carregadores
+atuais leem com `FFileHelper`, e **não foi testado** qual das duas opções
+funciona num build empacotado. Não alterar o `DefaultGame.ini` antes disso.
+
 ## Testes
 
 - **Automation Spec** para as regras puras de `Core`. Rodam sem janela pelo
