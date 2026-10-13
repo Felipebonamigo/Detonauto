@@ -10,6 +10,8 @@ medido por um programa: são as impressões e os números que o Felipe informar.
 |---|---|---|
 | 13 out 2026 | Abrir o `VeiculoTeste.uproject`, apertar Alt+P com o carro do template | O carro aparece e anda. O Felipe achou o visual bonito |
 
+| 13 out 2026 | Dirigir o carro do template | O Felipe conseguiu andar e dar ré |
+
 Isso confirma que o conserto da cópia manual do template funcionou: os
 redirecionamentos do nome antigo do módulo e as pastas de conteúdo no lugar certo.
 

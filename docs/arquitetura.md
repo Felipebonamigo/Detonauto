@@ -118,7 +118,12 @@ folga, não medidos.
 
 ## Perguntas em aberto
 
-1. Seis módulos ou três no início? (ver a suposição acima)
+1. ~~Seis módulos ou três no início?~~ **Decidido em 13 out 2026:** um único
+   módulo, `Detonauto`, com subpastas que espelham os módulos planejados
+   (`Core`, `Vehicle`, `Damage`, `Crash`, `Traffic`, `UI`). As regras de
+   dependência valem por convenção de pasta: `Core` nunca inclui as outras. Um
+   módulo só tem build mais simples para uma pessoa. Dividir depois é barato se
+   alguma subpasta passar de uns 5 mil linhas ou se o tempo de build pedir.
 2. Técnica de dano: deformação por vértices, por física ou por malha
    pré-quebrada. Decide o teste das Sprints 12 e 13.
 3. Física do carro: Chaos Vehicles com camada própria de forças ou um modelo
