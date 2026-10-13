@@ -1,0 +1,81 @@
+# Regras do dano (parte pura)
+
+Contrato para `Source/Detonauto/Core/DNDamage.h/.cpp` (sem UObject, sem mundo,
+só `CoreMinimal`). Decide **quanto** dano um impacto causa e **o que** se solta.
+Como isso aparece na tela (amassado no material, malha, peças físicas) é outro
+lote, depois de medir (`docs/arquitetura.md`, pergunta 2). Referência de
+sensação pedida pelo Felipe: batida com reação visível, estilo Wreckfest.
+
+Todos os números abaixo são **valores iniciais a calibrar**; ficam em
+`Data/Damage.csv` (uma linha, id `padrao`, nomes de coluna iguais aos campos de
+`FDNDamageConfig`), com validador e teste de deriva como os outros CSVs.
+
+## Entrada de um impacto
+
+`FDNImpact`: `DeltaVMs` (variação de velocidade do veículo causada pelo impacto,
+m/s, >= 0; quem chama calcula como impulso normal / massa, para o resultado não
+depender da massa), `Zone` (`EDNDamageZone`: Front, Rear, Left, Right, Roof,
+Under) e `LocalPositionCm` (ponto no espaço do carro, para o amassado). NaN,
+infinito ou negativo em `DeltaVMs`: ignorado, sem dano.
+
+## Regras
+
+1. **Limiar:** `DeltaVMs < DentMinDeltaVMs` (2,0) não causa dano algum. `>=`
+   causa (inclusivo).
+2. **Dano da zona:** `ZoneDamage[Zone] += (DeltaVMs - DentMinDeltaVMs) /
+   ZoneDestroyDeltaVMs` com `ZoneDestroyDeltaVMs = 30,0`; saturado em 1,0.
+3. **Amassado:** gera um registro `{LocalPositionCm, DepthCm, RadiusCm}` com
+   `DepthCm = min(DentMaxDepthCm (25,0), (DeltaVMs - DentMinDeltaVMs) *
+   DentDepthPerMs (1,5))` e `RadiusCm = DentBaseRadiusCm (30,0) + DepthCm`.
+   Guarda no máximo `MaxDents` (8) por veículo. Amassado a menos de metade do
+   raio de um existente **funde** nele: mantém o centro do mais fundo, soma
+   profundidade (saturada em `DentMaxDepthCm`) e raio é o maior dos dois. Com o
+   limite cheio e sem fusão possível, substitui o **mais raso** (empate: o mais
+   antigo).
+4. **Peças:** cada peça (`EDNDamagePart`: Hood, Trunk, DoorLeft, DoorRight,
+   BumperFront, BumperRear, GlassFront) pertence a uma zona (tabela fixa no
+   código: Hood/BumperFront/GlassFront=Front, Trunk/BumperRear=Rear,
+   DoorLeft=Left, DoorRight=Right). Uma peça **solta** (uma única vez) quando,
+   após o impacto, vale uma de: `DeltaVMs >= PartDetachDeltaVMs` (12,0) e a
+   peça é da zona atingida; ou `ZoneDamage` da zona `>= PartDetachZoneDamage`
+   (0,6). Peça já solta nunca solta de novo. O resultado lista as peças soltas
+   **por este impacto**, em ordem fixa do enum.
+5. **Veículo destruído:** `TotalDamage = média de ZoneDamage das 5 zonas
+   (Front, Rear, Left, Right, Roof)` (Under não conta); destruído quando
+   `TotalDamage >= DestroyedTotalDamage` (0,5) **ou** qualquer zona == 1,0 em
+   Front ou Rear (motor/traseira) — decisão a confirmar, anote se achar
+   estranho. Destruído é permanente e o primeiro impacto que o causa devolve
+   `bJustDestroyed = true` (uma vez).
+6. Depois de destruído continua acumulando dano e amassados (para a carcaça),
+   mas nunca devolve `bJustDestroyed` de novo.
+
+## Pool de peças soltas (limite de corpos físicos)
+
+`FDNPartPool::Plan(MaxActive, Active, Requested)`: quantas peças novas podem
+virar corpo físico agora, e quantas das mais antigas devem ser **recicladas**.
+`MaxActive` (padrão 24, em `Damage.csv`): se `Active + Requested > MaxActive`,
+recicla `Active + Requested - MaxActive` (as mais antigas), nunca mais do que
+`Active`, e se `Requested > MaxActive` aceita só `MaxActive`. Entradas negativas
+valem 0.
+
+## Saída
+
+`FDNDamageResult`: `AddedZoneDamage` (float), `DentAdded` (bool) e o amassado
+(se houve), `DetachedParts` (lista), `bJustDestroyed`.
+
+## Dados e testes
+
+- `Data/Damage.csv` com os 14 números acima (nomes em inglês), validador:
+  tudo finito; limites `> 0`; `PartDetachZoneDamage` e `DestroyedTotalDamage`
+  em (0,1]; `MaxDents` e `MaxActive` inteiros `>= 1`.
+- Bordas: 1,99 / 2,0 / 2,01 m/s; saturação em 1,0; fusão a exatamente metade
+  do raio (conta como fusão, inclusivo); dano em zona Under (não entra no
+  total); NaN; peça solta duas vezes; destruído uma vez; pool com
+  `Requested` maior que `MaxActive`.
+- Vermelho por mutação como nos lotes anteriores. Se algo estiver ambíguo ou
+  contraditório, pergunte antes de codar.
+
+## Fora de escopo
+
+Como o amassado é desenhado, malhas, material, peças como atores, partículas,
+fogo, explosão. Isso depende de protótipo medido (Sprints 12 e 13).
