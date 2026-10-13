@@ -223,6 +223,21 @@ void FDNRecordsSubsystemSpec::Define()
 			TestEqual("arquivo antigo intacto", Read(Path), Old);
 		});
 
+		It("se a troca final falha, o .tmp nao fica sobrando e Save devolve falso", [this]()
+		{
+			FTempDir Temp;
+			const FString Path = Temp.File(TEXT("Detonauto.json"));
+			// Uma PASTA no lugar do arquivo final: gravar o .tmp funciona, trocar por cima nao.
+			IFileManager::Get().MakeDirectory(*Path, true);
+			UDNRecordsSubsystem* Sub = DNTest::NewSubsystem<UDNRecordsSubsystem>();
+			AddExpectedError(TEXT("Registro do jogador:"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("MoveFile was unable to move"), EAutomationExpectedErrorFlags::Contains, 0); // o motor loga as tentativas
+			AddExpectedError(TEXT("Error moving file"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->RegisterResult(TEXT("a"), 1);
+			TestFalse("Save falha", Sub->SaveToFile(Path));
+			TestEqual("nenhum .tmp sobrando", Find(Temp, TEXT("*.tmp")).Num(), 0);
+		});
+
 		It("arquivo corrompido: NAO e sobrescrito; vai para .corrompido-<data> com o conteudo original, e comeca vazio", [this]()
 		{
 			FTempDir Temp;
