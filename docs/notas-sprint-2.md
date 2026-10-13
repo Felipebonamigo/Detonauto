@@ -15,14 +15,30 @@ medido por um programa: são as impressões e os números que o Felipe informar.
 Isso confirma que o conserto da cópia manual do template funcionou: os
 redirecionamentos do nome antigo do módulo e as pastas de conteúdo no lugar certo.
 
-## Sensação de dirigir (a preencher)
+## Sensação de dirigir (respondido em 13 out 2026)
 
-1. A direção é mais pesada ou mais leve que a de um Burnout?
-2. A curva responde rápido demais, devagar demais ou na medida?
-3. Dá vontade de derrapar? A derrapada é fácil de controlar?
-4. A câmera ajuda a sentir velocidade, ou parece parada?
-5. Bater num muro tem peso, ou o carro parece de plástico?
-6. O que parece mais lento ou mais pesado do que o Burnout?
+Carro testado: o do template (`VeiculoTeste`), sem os ajustes do Detonauto. O
+Felipe notou que parece a mesma versão do teste anterior.
+
+1. **Mais pesada que a de um Burnout.** O carro parece duro.
+2. **Curva:** responde quase perfeitamente.
+3. **Derrapada:** o carro não derrapa; parece freio de mão duro, sem derrapagem.
+4. **Câmera:** em posição ruim; deveria ficar um pouco mais longe do carro.
+5. **Batida:** nenhuma reação, muito duro, o carro não quebra. Referência
+   sugerida pelo Felipe: algo parecido com o Wreckfest (deformação visível).
+6. **Geral:** o carro parece pesado, o nitro não foi encontrado (o template não
+   tem), muito duro. Parece mais simulador do que arcade.
+
+### O que isso muda no plano
+
+| Achado | Leitura | Ação |
+|---|---|---|
+| Duro, pesado, simulador | Suspensão, massa e aderência do template são de simulação | Lote 8: presets de ajuste arcade em `TestCars.csv` |
+| Sem derrapagem | Aderência lateral alta demais, freio de mão sem efeito | Lote 8: aderência traseira e freio de mão ajustáveis |
+| Câmera perto | Distância e altura da câmera do template | Lote 8: câmera ajustável por dados |
+| Sem nitro | O template não tem; o turbo do Detonauto só existe como regra e componente | Lote 8: tecla de turbo ligada ao componente |
+| Carro não quebra | Dano e deformação são o maior risco técnico e de desempenho | Sprint de dano: protótipo medido (deformação por malha, estilo Wreckfest) antes de aprovar |
+| Curva boa | Direção do template serve de base | Manter a resposta de curva ao ajustar o resto |
 
 ## Desempenho (a preencher)
 
