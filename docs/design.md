@@ -119,6 +119,22 @@ limites de medalha em CSV, no mesmo padrão dos outros contratos.
 | Versão 1.0 | nov 2029 | 30 cruzamentos, Road Rage, corrida, 2 distritos, 10 carros, mais 4 idiomas |
 | PS5 | jul 2030 | Versão 1.0 com troféus e DualSense completo |
 
+### Ideias inspiradas no Wreckfest (Felipe, 14 out 2026)
+
+Só mecânicas gerais. Nada de nomes, veículos, pistas ou visual do jogo de
+referência: tudo fictício e feito por nós.
+
+| Ideia | O que muda no Detonauto | Quando | Custo e risco |
+|---|---|---|---|
+| Dano que afeta o carro | O dano deixa de ser só visual: roda torta puxa a direção, motor danificado perde força, capô amassado atrapalha a visão. Usa as zonas e peças de `docs/regras-dano.md` | Primeiro o visual (já no plano); a consequência na direção na Versão 1.0 | Médio. Regra pura testável; a sensação precisa de playtest |
+| Arena de destruição | Modo de arena fechada com vários carros até sobrar um, aproveitando dano e tráfego em trilha | Junto do Road Rage (Atualização 2) | Alto. Pede IA de rivais e muitos carros com física; medir antes |
+| Veículos improvisados | Carros velhos e estranhos, vans, ônibus, até um trator, todos fictícios. A tabela `TrafficVehicles.csv` já tem classes variadas | Alguns já no Acesso Antecipado como tráfego; jogáveis depois | Baixo a médio. Arte e ajuste de física por veículo |
+| Pistas sujas e ovais | Terra, lama e pista de bate-bate, com carros pesados | Versão 1.0, depois do segundo distrito | Alto. Exige tipos de superfície na física e pista própria |
+
+**Regra de escopo:** nada disso entra antes de o Crash estar jogável e do
+checkpoint G1 (teste de dano a 60 fps). O plano atual já é grande para uma
+pessoa; cada ideia nova só entra tirando outra ou empurrando uma data.
+
 Fora do plano: online em tempo real, tela dividida e carros licenciados.
 
 ## Carros
