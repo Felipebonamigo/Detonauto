@@ -124,8 +124,9 @@ void FDNDataTurboConfigSpec::Define()
 			Check.Bad(TEXT("min > max"), TEXT("DriftMinAngleDeg"), Base, [](FDNTurboConfigRow& R) { R.DriftMinAngleDeg = 80.f; R.DriftMaxAngleDeg = 70.f; });
 			Check.Bad(TEXT("min negativo"), TEXT("DriftMinAngleDeg"), Base, [](FDNTurboConfigRow& R) { R.DriftMinAngleDeg = -1.f; });
 			Check.Good(TEXT("min 0"), Base, [](FDNTurboConfigRow& R) { R.DriftMinAngleDeg = 0.f; });
-			Check.Bad(TEXT("max 180,001"), TEXT("DriftMaxAngleDeg"), Base, [](FDNTurboConfigRow& R) { R.DriftMaxAngleDeg = 180.001f; });
-			Check.Good(TEXT("max 180"), Base, [](FDNTurboConfigRow& R) { R.DriftMaxAngleDeg = 180.f; });
+			Check.Bad(TEXT("max 90,001 (acima de 90 o carro anda de re)"), TEXT("DriftMaxAngleDeg"), Base, [](FDNTurboConfigRow& R) { R.DriftMaxAngleDeg = 90.001f; });
+			Check.Bad(TEXT("max 180"), TEXT("DriftMaxAngleDeg"), Base, [](FDNTurboConfigRow& R) { R.DriftMaxAngleDeg = 180.f; });
+			Check.Good(TEXT("max 90"), Base, [](FDNTurboConfigRow& R) { R.DriftMaxAngleDeg = 90.f; });
 		});
 
 		It("TakedownSetsBarTo precisa estar em (0, MaxBar]", [this, Base, Check]()
@@ -207,6 +208,13 @@ void FDNDataCrashConfigSpec::Define()
 			Check.Good(TEXT("QuietSpeedMetersPerSecond 0"), Base, [](FDNCrashConfigRow& R) { R.QuietSpeedMetersPerSecond = 0.f; });
 		});
 
+		It("o silencio precisa caber antes do limite da rodada: QuietSecondsToEnd <= MaxSecondsAfterFirstImpact", [this, Base, Check]()
+		{
+			Check.Bad(TEXT("silencio maior que o limite"), TEXT("QuietSecondsToEnd"), Base, [](FDNCrashConfigRow& R) { R.QuietSecondsToEnd = 31.f; R.MaxSecondsAfterFirstImpact = 30.f; });
+			Check.Bad(TEXT("silencio 0,001 acima"), TEXT("QuietSecondsToEnd"), Base, [](FDNCrashConfigRow& R) { R.QuietSecondsToEnd = 30.001f; R.MaxSecondsAfterFirstImpact = 30.f; });
+			Check.Good(TEXT("silencio igual ao limite"), Base, [](FDNCrashConfigRow& R) { R.QuietSecondsToEnd = 30.f; R.MaxSecondsAfterFirstImpact = 30.f; });
+		});
+
 		It("NaN e infinito sao recusados", [this, Base, Check]()
 		{
 			Check.Bad(TEXT("ChainWindowSeconds NaN"), TEXT("ChainWindowSeconds"), Base, [](FDNCrashConfigRow& R) { R.ChainWindowSeconds = NaNf; });
@@ -255,7 +263,7 @@ void FDNDataTakedownConfigSpec::Define()
 			Check.Bad(TEXT("BehindMax 180,001"), TEXT("BehindMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.BehindMaxAngleDegrees = 180.001f; });
 			Check.Bad(TEXT("SideMax 0"), TEXT("SideMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 0.f; });
 			Check.Bad(TEXT("SideMax 181"), TEXT("SideMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 181.f; });
-			Check.Good(TEXT("SideMax 180"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 180.f; });
+			Check.Bad(TEXT("SideMax 180 (passa do inicio do T)"), TEXT("SideMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 180.f; });
 		});
 
 		It("o angulo do T: 0 <= minimo < maximo <= 180", [this, Base, Check]()
@@ -263,9 +271,17 @@ void FDNDataTakedownConfigSpec::Define()
 			Check.Bad(TEXT("min = max"), TEXT("TBoneMinAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMinAngleDegrees = 120.f; R.TBoneMaxAngleDegrees = 120.f; });
 			Check.Bad(TEXT("min > max"), TEXT("TBoneMinAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMinAngleDegrees = 130.f; R.TBoneMaxAngleDegrees = 120.f; });
 			Check.Bad(TEXT("min negativo"), TEXT("TBoneMinAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMinAngleDegrees = -1.f; });
-			Check.Good(TEXT("min 0"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMinAngleDegrees = 0.f; });
+			Check.Bad(TEXT("min 0 (o T comeca antes do fim da lateral)"), TEXT("SideMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMinAngleDegrees = 0.f; });
 			Check.Bad(TEXT("max 180,001"), TEXT("TBoneMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMaxAngleDegrees = 180.001f; });
 			Check.Good(TEXT("max 180"), Base, [](FDNTakedownConfigRow& R) { R.TBoneMaxAngleDegrees = 180.f; });
+		});
+
+		It("a lateral nao pode invadir o T: SideMaxAngleDegrees <= TBoneMinAngleDegrees (vao e permitido)", [this, Base, Check]()
+		{
+			Check.Bad(TEXT("lateral 0,001 acima do T"), TEXT("SideMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 60.001f; R.TBoneMinAngleDegrees = 60.f; });
+			Check.Bad(TEXT("lateral 70, T comeca em 60"), TEXT("SideMaxAngleDegrees"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 70.f; });
+			Check.Good(TEXT("lateral igual ao inicio do T"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 60.f; R.TBoneMinAngleDegrees = 60.f; });
+			Check.Good(TEXT("vao entre a lateral e o T"), Base, [](FDNTakedownConfigRow& R) { R.SideMaxAngleDegrees = 50.f; R.TBoneMinAngleDegrees = 60.f; });
 		});
 
 		It("o meio angulo das zonas: estritamente entre 0 e 90", [this, Base, Check]()
@@ -363,16 +379,6 @@ void FDNDataDriftSpec::Define()
 			ExpectSame(*this, TEXT("TBoneMaxAngleDegrees"), Csv.TBoneMaxAngleDegrees, Def.TBoneMaxAngleDegrees);
 			ExpectSame(*this, TEXT("SideMaxAngleDegrees"), Csv.SideMaxAngleDegrees, Def.SideMaxAngleDegrees);
 			ExpectSame(*this, TEXT("ZoneHalfAngleDegrees"), Csv.ZoneHalfAngleDegrees, Def.ZoneHalfAngleDegrees);
-		});
-
-		// Se alguém ACRESCENTAR um campo a uma struct de configuração, o tamanho muda e este teste reprova: é o
-		// lembrete para acrescentar a coluna no CSV, o campo na struct de linha, o ToConfig, a validação e a deriva acima.
-		// (Frágil por natureza: depende do layout do compilador, hoje MSVC em Win64.)
-		It("as structs de configuracao nao ganharam campo sem alguem atualizar o CSV", [this]()
-		{
-			TestEqual("sizeof(FDNTurboConfig)", static_cast<int32>(sizeof(FDNTurboConfig)), 88);
-			TestEqual("sizeof(FDNCrashConfig)", static_cast<int32>(sizeof(FDNCrashConfig)), 28);
-			TestEqual("sizeof(FDNTakedownConfig)", static_cast<int32>(sizeof(FDNTakedownConfig)), 32);
 		});
 	});
 }

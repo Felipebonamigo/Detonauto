@@ -197,6 +197,8 @@ struct FDNTrafficSettingsRow : public FTableRowBase
 // Linhas de ajuste de pontuação. Os campos têm os MESMOS nomes dos campos das structs puras (FDNTurboConfig,
 // FDNCrashConfig, FDNTakedownConfig) e começam zerados: os números de verdade moram em Data/*.csv, e o teste de
 // deriva (DNDataConfigs.spec.cpp) garante que o CSV e o padrão da struct pura continuam iguais.
+// AO ACRESCENTAR UM CAMPO a FDNTurboConfig / FDNCrashConfig / FDNTakedownConfig: acrescente a coluna no CSV, o campo
+// na struct de linha abaixo, a linha em ToConfig(), a regra em DNDataValidation e a comparação no teste de deriva.
 
 /** Data/Turbo.csv (uma linha). Significado de cada campo: comentários de FDNTurboConfig em Core/DNTurbo.h. */
 USTRUCT(BlueprintType)

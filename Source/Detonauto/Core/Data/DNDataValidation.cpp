@@ -388,9 +388,9 @@ TArray<FString> FDNDataValidation::ValidateTurbo(const TArray<FDNTurboConfigEntr
 			}
 		}
 
-		// Derrapada: 0 <= mínimo < máximo <= 180.
+		// Derrapada: 0 <= mínimo < máximo <= 90 (acima de 90 o carro anda de ré, não derrapa).
 		const bool bDriftMin = CheckNotNegative(TurboFile, Id, TEXT("DriftMinAngleDeg"), R.DriftMinAngleDeg, Errors);
-		const bool bDriftMax = CheckRange(TurboFile, Id, TEXT("DriftMaxAngleDeg"), R.DriftMaxAngleDeg, 0.0f, false, 180.0f, true, Errors);
+		const bool bDriftMax = CheckRange(TurboFile, Id, TEXT("DriftMaxAngleDeg"), R.DriftMaxAngleDeg, 0.0f, false, 90.0f, true, Errors);
 		if (bDriftMin && bDriftMax && R.DriftMinAngleDeg >= R.DriftMaxAngleDeg)
 		{
 			Errors.Add(FString::Printf(TEXT("%s, linha '%s': DriftMinAngleDeg (%f) precisa ser menor que DriftMaxAngleDeg (%f)."), TurboFile, *Id, R.DriftMinAngleDeg, R.DriftMaxAngleDeg));
@@ -435,8 +435,13 @@ TArray<FString> FDNDataValidation::ValidateCrash(const TArray<FDNCrashConfigEntr
 			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'ChainBonusMaxPercent' não pode ser negativo (veio %d)."), CrashFile, *E.Id, R.ChainBonusMaxPercent));
 		}
 		CheckNotNegative(CrashFile, E.Id, TEXT("QuietSpeedMetersPerSecond"), R.QuietSpeedMetersPerSecond, Errors);
-		CheckAboveZero(CrashFile, E.Id, TEXT("QuietSecondsToEnd"), R.QuietSecondsToEnd, Errors);
-		CheckAboveZero(CrashFile, E.Id, TEXT("MaxSecondsAfterFirstImpact"), R.MaxSecondsAfterFirstImpact, Errors);
+		const bool bQuiet = CheckAboveZero(CrashFile, E.Id, TEXT("QuietSecondsToEnd"), R.QuietSecondsToEnd, Errors);
+		const bool bMaxAfter = CheckAboveZero(CrashFile, E.Id, TEXT("MaxSecondsAfterFirstImpact"), R.MaxSecondsAfterFirstImpact, Errors);
+		// Senão a regra do silêncio nunca encerraria a rodada: o limite de tempo sempre chegaria antes.
+		if (bQuiet && bMaxAfter && R.QuietSecondsToEnd > R.MaxSecondsAfterFirstImpact)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': QuietSecondsToEnd (%f) não pode passar de MaxSecondsAfterFirstImpact (%f)."), CrashFile, *E.Id, R.QuietSecondsToEnd, R.MaxSecondsAfterFirstImpact));
+		}
 	}
 	return Errors;
 }
@@ -454,13 +459,19 @@ TArray<FString> FDNDataValidation::ValidateTakedown(const TArray<FDNTakedownConf
 		CheckAboveZero(TakedownFile, Id, TEXT("RivalCrashWindowSeconds"), R.RivalCrashWindowSeconds, Errors);
 		CheckAboveZero(TakedownFile, Id, TEXT("VerticalMinHeightCm"), R.VerticalMinHeightCm, Errors);
 		CheckRange(TakedownFile, Id, TEXT("BehindMaxAngleDegrees"), R.BehindMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
-		CheckRange(TakedownFile, Id, TEXT("SideMaxAngleDegrees"), R.SideMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
+		const bool bSide = CheckRange(TakedownFile, Id, TEXT("SideMaxAngleDegrees"), R.SideMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
 
 		const bool bTMin = CheckNotNegative(TakedownFile, Id, TEXT("TBoneMinAngleDegrees"), R.TBoneMinAngleDegrees, Errors);
 		const bool bTMax = CheckRange(TakedownFile, Id, TEXT("TBoneMaxAngleDegrees"), R.TBoneMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
 		if (bTMin && bTMax && R.TBoneMinAngleDegrees >= R.TBoneMaxAngleDegrees)
 		{
 			Errors.Add(FString::Printf(TEXT("%s, linha '%s': TBoneMinAngleDegrees (%f) precisa ser menor que TBoneMaxAngleDegrees (%f)."), TakedownFile, *Id, R.TBoneMinAngleDegrees, R.TBoneMaxAngleDegrees));
+		}
+
+		// A lateral termina onde (ou antes de) o T começa: sem sobreposição; um vão entre as duas é permitido.
+		if (bSide && bTMin && R.SideMaxAngleDegrees > R.TBoneMinAngleDegrees)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': SideMaxAngleDegrees (%f) não pode passar de TBoneMinAngleDegrees (%f)."), TakedownFile, *Id, R.SideMaxAngleDegrees, R.TBoneMinAngleDegrees));
 		}
 
 		// Quatro zonas de 2 x meio ângulo cabem em 360 graus sem se sobrepor só com meio ângulo < 90.
