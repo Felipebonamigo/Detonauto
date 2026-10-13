@@ -1,0 +1,7 @@
+Name,MassKg,MaxTorque,LateralGrip,SuspensionStiffness,SteeringGain,CenterOfMassDropCm,SuspensionDampingRatio,SuspensionTravelCm,RollbarScaling,RearGripFactor,HandbrakeRearGrip,HandbrakeRampInSeconds,HandbrakeRampOutSeconds,HandbrakeTorque,CameraDistanceCm,CameraHeightCm,CameraFov,NitroAccelMps2,NitroDrainPerSecond,NitroRegenPerSecond
+Padrao,1500,750,1.0,250,1.0,0,0.5,10,0.15,1.0,1.0,0.1,0.5,6000,650,150,90,10,25,10
+Arcade,1200,1100,2.5,200,1.4,0,0.5,10,0.15,1.0,1.0,0.1,0.5,6000,650,150,90,10,25,10
+Pesado,2400,900,0.8,350,0.8,0,0.5,10,0.15,1.0,1.0,0.1,0.5,6000,650,150,90,10,25,10
+arcade-1,1200,850,1.0,170,1.0,25,0.55,18,0.05,1.0,1.0,0.1,0.5,6000,810,185,95,12,25,10
+arcade-2,1200,850,1.0,170,1.0,25,0.55,18,0.05,0.85,0.35,0.12,0.7,3000,810,185,95,12,25,10
+arcade-3,1350,800,1.0,210,1.0,15,0.5,14,0.1,0.92,0.35,0.12,0.7,3000,810,185,95,12,25,10
