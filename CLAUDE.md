@@ -83,3 +83,17 @@ Revisar na Sprint 7. Prefixos de assets: `BP_` Blueprint, `SM_` malha estática,
 textura, `NS_` sistema Niagara, `SW_` som, `DT_` DataTable, `WBP_` interface,
 `L_` mapa. Classes C++ seguem o padrão do Unreal com o prefixo do jogo, por
 exemplo `ADNVehicle` e `UDNDamageComponent`.
+
+## Cidades e pontos turísticos
+
+Decisão do Felipe, 14 out 2026. Detalhes e a ressalva em `docs/menu-mapa.md`.
+
+- Use **apenas o que é público**, como monumentos, praças, vias e obras em
+  logradouro público, nos termos da lei brasileira.
+- **Nenhuma marca real**, em nenhum lugar: fachadas, placas, outdoors, veículos
+  de tráfego, interface.
+- Nenhum ponto turístico é destruído no jogo.
+- Texto sobre cidades e pontos turísticos só entra depois de conferido em fonte
+  confiável (`NeedsReview` em `Data/Landmarks.csv`). Texto gerado por IA entra na
+  declaração de conteúdo de IA da Steam.
+

@@ -132,3 +132,20 @@ atualização", e precisa ser refletido no cronograma geral se for aprovado.
   direção de uma cidade no globo é o vetor unitário
   `(cos lat · cos lon, cos lat · sin lon, sin lat)`.
 
+## Decisão do Felipe sobre o que usar (14 out 2026)
+
+- **Só o que é público**, nos termos da lei brasileira (Lei 9.610/98, art. 48):
+  monumentos, praças, vias e obras situadas em logradouro público.
+- **Nenhuma marca real**: nem logotipo, nem letreiro, nem fachada com marca. As
+  marcas fictícias do jogo ocupam esse lugar.
+- A **consulta a um advogado passou a ser opcional**. O Felipe aceita o risco
+  com essas duas regras. Se uma loja ou um país reclamar de algum elemento, ele
+  sai do jogo por atualização.
+
+**Ressalva registrada, sem mudar a decisão:** a liberdade do art. 48 vale no
+Brasil. Em outros países ela pode ser menor, principalmente para arquitetura
+moderna de autor. A mitigação é a de antes: preferir monumentos antigos e
+formas genéricas, não destruir nenhum ponto turístico e manter cada elemento
+reconhecível fácil de remover. Quem lê isto no futuro deve saber que o risco
+foi aceito, e não eliminado.
+
