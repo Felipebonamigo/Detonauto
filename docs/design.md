@@ -86,6 +86,31 @@ precisa de IA complexa: precisa parecer vivo e explodir bem.
 Os nomes Road Rage e os termos da batida são de trabalho, herdados do Burnout.
 Os nomes finais serão próprios.
 
+### Modo de arremesso (ideia do Felipe, 14 out 2026)
+
+Nome de trabalho: **Arremesso**. Não usar o nome de nenhum jogo existente,
+nem as provas, os personagens ou o visual deles. A mecânica em si (lançar o
+piloto do carro e pontuar pelo voo) é genérica.
+
+- O jogador acelera numa pista curta e, numa linha de largada, o carro para ou
+  desacelera e o **piloto é lançado** pelo para-brisa, com a força definida
+  pela velocidade e pelo ângulo no momento da largada.
+- O piloto é um boneco de física (ragdoll) que voa, quica e rola. Pontua pelo
+  resultado: distância, altura ou acerto num alvo.
+- Provas de exemplo, todas nossas e com nomes próprios: salto em distância,
+  salto em altura, alvos circulares, aros de fogo, pinos. Cada prova é um
+  "cruzamento" curto, com medalhas de bronze, prata e ouro como no Crash.
+- Reaproveita o que já existe: carro, tráfego, pontuação, medalhas, progresso
+  e dados em CSV. Novo: boneco de física, câmera de voo, alvos.
+
+Fica **depois** do Acesso Antecipado (entra como atualização, junto ou depois
+do Road Rage). Não entra no cronograma atual até o Crash estar jogável. Custo
+técnico: um boneco de física por rodada é barato perto do tráfego, mas precisa
+de personagem (o manequim gratuito da Epic serve para protótipo; conferir a
+licença antes de qualquer uso final), esqueleto e animação de lançamento.
+Regra pura prevista (Core): pontuação por distância, altura e alvo, com
+limites de medalha em CSV, no mesmo padrão dos outros contratos.
+
 ## Conteúdo por lançamento
 
 | Lançamento | Data prevista | Conteúdo |
