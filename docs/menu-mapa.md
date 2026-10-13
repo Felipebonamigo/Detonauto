@@ -119,3 +119,16 @@ atualização", e precisa ser refletido no cronograma geral se for aprovado.
 3. **Quando abrir o mundo.** Depois de duas ou três cidades brasileiras.
 4. **Texto das cidades:** escrito por você, por mim com revisão sua, ou só
    dados verificados (nome, ano, fatos simples).
+
+## Regras de progresso (decididas em 14 out 2026)
+
+- Um cruzamento está **feito** quando tem medalha de bronze ou melhor.
+- Os contadores mostram **cruzamentos feitos sobre o total**, por cidade, por
+  região e no geral.
+- Cada nível mostra também quantas medalhas de ouro tem.
+- Uma cidade com `Playable = false` conta no mapa, mas não entra no total
+  jogável e não pode ser selecionada. Aparece como "em breve".
+- O mapa usa convenção de eixos do Unreal (Z para cima, X para a frente). A
+  direção de uma cidade no globo é o vetor unitário
+  `(cos lat · cos lon, cos lat · sin lon, sin lat)`.
+

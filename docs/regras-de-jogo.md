@@ -177,3 +177,17 @@ comentário no código e um teste que fica fácil de trocar se a decisão mudar.
 | K2. Limites | "Entre 60 e 120", "pelo menos 100 cm" e "pelo menos 20 km/h" são inclusivos |
 | K3. Condição 2 e 3 | "Em até 1,5 s" é inclusivo e conta do instante do contato |
 
+**Escolhas da implementação, aceitas em 14 out 2026**
+
+| Ponto | Decisão |
+|---|---|
+| O5. Barra no quadro do aperto | Vale a barra depois dos ganhos e do takedown daquele quadro |
+| D1. Limites de medalha inválidos | `Evaluate` devolve nenhuma medalha, em vez de adivinhar |
+| D2. Pontos de uma destruição | `RegisterDestruction` devolve os pontos efetivamente somados. Se saturar, a diferença |
+| D3. Velocidade inválida (NaN) no fim da rodada | Conta como em movimento, para não encerrar a rodada por engano |
+| D4. Multiplicador fora de 1 a 8 | É limitado ao intervalo |
+| E1. Vetor inválido (zero ou NaN) no takedown | A zona é lateral e a classificação é geral. O tipo vertical não depende dos vetores e continua valendo |
+| E2. Vetores sem comprimento 1 | São normalizados. Os que já têm comprimento 1 passam intactos, para o limite ficar exato |
+| E3. Condição 3 do takedown | O jogador só é desqualificado se se destruir de 0 a 1,5 s depois do contato. Antes, depois ou NaN não desqualificam |
+| E4. Altura NaN | Nunca vira vertical |
+
