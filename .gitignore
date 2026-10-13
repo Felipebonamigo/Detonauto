@@ -21,6 +21,8 @@ Build/*/**
 # Visual Studio e outras IDEs (os arquivos de projeto o Unreal gera de novo)
 .vs/
 *.sln
+*.slnx
+.vsconfig
 *.suo
 *.user
 *.VC.db

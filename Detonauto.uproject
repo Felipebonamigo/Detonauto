@@ -1,0 +1,13 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "Jogo de corrida arcade com destruição, modo Crash.",
+	"Modules": [
+		{
+			"Name": "Detonauto",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
