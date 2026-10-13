@@ -18,11 +18,18 @@ int32 FDNCrash::ComputePoints(const FDNCrashConfig& Config, int32 Value, int32 M
 
 	const int64 Mult = FMath::Clamp<int64>(Multiplier, 1, FMath::Max(1, Config.MaxMultiplier));
 	const int64 Links = FMath::Max<int64>(0, ChainLinks);
-	const int64 BonusPercent = FMath::Min<int64>(Links * Config.ChainBonusPercentPerLink, Config.ChainBonusMaxPercent);
+	// O bônus nunca é negativo (percentual negativo na configuração vale como sem bônus). Cada fator cabe em 32 bits,
+	// então Links * percentual cabe em int64.
+	const int64 BonusPercent = FMath::Clamp<int64>(Links * Config.ChainBonusPercentPerLink, 0, FMath::Max(0, Config.ChainBonusMaxPercent));
 
 	// C2: valor x (100 + bônus) / 100, truncado, e só depois vezes o multiplicador. Tudo em int64.
+	// Valor < 2^31 e (100 + bônus) < 2^31 + 100: o produto cabe em int64.
 	const int64 WithChain = static_cast<int64>(Value) * (100 + BonusPercent) / 100;
-	const int64 Points = WithChain * Mult;
+	if (WithChain >= MAX_int32)
+	{
+		return MAX_int32; // o multiplicador é >= 1: já saturou, e multiplicar de novo poderia estourar o int64
+	}
+	const int64 Points = WithChain * Mult; // < 2^31 x 2^31: cabe em int64
 	return Points > MAX_int32 ? MAX_int32 : static_cast<int32>(Points);
 }
 

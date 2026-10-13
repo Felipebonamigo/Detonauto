@@ -62,6 +62,25 @@ void FDNCrashPointsSpec::Define()
 			TestEqual("justo no teto", FDNCrash::ComputePoints(Config, MAX_int32, 1, 0), MAX_int32);
 		});
 
+		// A configuração agora vem de CSV: valores extremos não podem estourar a conta em int64.
+		It("configuracao extrema (teto do bonus e multiplicador gigantes) satura em vez de estourar", [this]()
+		{
+			FDNCrashConfig Extreme;
+			Extreme.MaxMultiplier = MAX_int32;
+			Extreme.ChainBonusPercentPerLink = MAX_int32;
+			Extreme.ChainBonusMaxPercent = MAX_int32;
+			TestEqual("valor, multiplicador e elos no maximo", FDNCrash::ComputePoints(Extreme, MAX_int32, MAX_int32, MAX_int32), MAX_int32);
+			TestEqual("so o multiplicador gigante", FDNCrash::ComputePoints(Extreme, 1000, MAX_int32, 0), MAX_int32);
+			TestEqual("so o bonus gigante", FDNCrash::ComputePoints(Extreme, MAX_int32, 1, MAX_int32), MAX_int32);
+		});
+
+		It("bonus negativo na configuracao nao reduz os pontos abaixo do valor", [this]()
+		{
+			FDNCrashConfig Odd;
+			Odd.ChainBonusPercentPerLink = -10;
+			Odd.ChainBonusMaxPercent = -50;
+			TestEqual("elos com bonus negativo valem como sem bonus", FDNCrash::ComputePoints(Odd, 1000, 1, 5), 1000);
+		});
 		It("valor zero ou negativo vale 0 pontos", [this]()
 		{
 			TestEqual("zero", FDNCrash::ComputePoints(Config, 0, 4, 2), 0);
