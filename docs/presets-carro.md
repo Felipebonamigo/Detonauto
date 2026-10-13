@@ -119,6 +119,9 @@ os arquivos). A barra não tem ganho por contramão, derrapada ou salto.
 **Medido** (`arcade-1`): com 1,2 s de nitro o carro chegou a 121 km/h aos 2,4 s contra 88 km/h sem nitro; a barra foi de
 100 a 70 e passou a recarregar ao soltar.
 
+**Amassado (lote 10):** as teclas T, Y, U (frente), G, H, J (lado esquerdo) e V (limpar) dão batidas simuladas e o HUD mostra a
+contagem de amassados. Ver [`prototipo-amassado.md`](prototipo-amassado.md).
+
 ## Roteiro de 5 minutos (3 perguntas por preset)
 
 Mesmo trecho reto e as mesmas curvas para todos. Comece pelo `Padrao` (tecla 0) para ter a referência.
@@ -202,10 +205,10 @@ Conferidos nos cabeçalhos e fontes da engine instalada (`Plugins/Experimental/C
 ## Limites e pendências
 
 - **Nada disto foi sentido.** Os números de "esperado" são hipóteses; o roteiro acima é para o Felipe confirmar ou corrigir.
-- **Editor aberto trava o build.** Durante este lote o editor estava aberto no `VeiculoTeste` e a DLL não pôde ser
-  recompilada no lugar; o código foi compilado e testado em uma **cópia** do projeto (conteúdo ligado por junção), e os
-  arquivos do `Sandbox/VeiculoTeste` são os mesmos. O Felipe precisa **fechar o editor e compilar**
-  (`build.ps1`) antes de jogar: sem isso o editor aberto continua com o código antigo.
+- **Editor aberto trava o build.** Durante o lote 8 o editor estava aberto no `VeiculoTeste` e o código foi compilado e testado em
+  uma cópia do projeto. No lote 10 o editor estava fechado e o `Sandbox/VeiculoTeste` real foi **compilado no lugar** (inclui os
+  presets deste documento). Se o Felipe abrir o editor e ele pedir para recompilar, aceite; para compilar pela linha de comando
+  o editor precisa estar fechado.
 - **Trocar de preset andando** zera o câmbio por ~0,2 s e reaplica a suspensão; não é uma troca "limpa". Para comparar sem
   esse efeito, reinicie com Alt+P e use `-DNCarRow=arcade-2` ou o campo `TuningRow` do carro.
 - **Medidas do mapa de teste:** a parede fica a ~50 m do ponto de partida, então as manobras medidas são curtas. O
