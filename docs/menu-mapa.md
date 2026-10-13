@@ -43,6 +43,11 @@ Contadores em cada nível, no formato feito/total.
 | `Data/Landmarks.csv` | Id, cidade, nome, tipo, texto curto, fonte do texto, necessita revisão |
 | `Data/Crossings.csv` | A tabela de cruzamentos, com a coluna `Cidade` |
 
+**Ids.** Dois ids que só diferem em maiúsculas e minúsculas são o mesmo id (como o
+`FName` da engine), e o validador os recusa como duplicados. Um id só pode ter
+letras sem acento, números, hífen e sublinhado, para ser seguro como nome de
+ativo e como chave.
+
 Latitude e longitude servem para o globo girar até a cidade e para colocar o
 ponto. A lógica de progresso (feito sobre total, medalhas) é regra pura em
 `Core/`, com testes, como as demais.
