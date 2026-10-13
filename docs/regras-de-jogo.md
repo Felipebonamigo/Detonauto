@@ -37,12 +37,15 @@ O ganho nunca passa de 100. Com o turbo ligado, só o takedown dá ganho.
 
 ### Uso
 
-- O turbo liga quando o jogador segura o botão e a barra tem mais de 0.
+- **O turbo liga no aperto do botão**, isto é, no quadro em que o botão passa de
+  solto para apertado, e só se a barra tiver mais de 0 nesse quadro. Segurar o
+  botão com a barra vazia não liga nada, mesmo que a barra comece a encher.
 - Consome 25 unidades por segundo. A barra cheia dura 4 s.
 - Desliga ao soltar o botão ou quando a barra chega a 0.
-- **Depois de a barra zerar com o botão ainda apertado, o turbo só volta a
-  ligar com um novo aperto** (soltar e apertar de novo). Isso evita um turbo
-  que religa sozinho quando o takedown recarrega a barra.
+- Por consequência, depois de a barra zerar com o botão ainda apertado, o
+  turbo só volta a ligar com um novo aperto (soltar e apertar de novo). Isso
+  evita um turbo que religa sozinho quando o takedown recarrega a barra ou
+  quando os ganhos enchem a barra com o botão segurado.
 
 ### Turbo prolongado
 
@@ -143,8 +146,12 @@ comentário no código e um teste que fica fácil de trocar se a decisão mudar.
 | T3. Depois da 5ª passada da cadeia | O multiplicador fica em 2,0 |
 | T4. Intervalo de exatamente 2,0 s | Continua a cadeia. Só "mais de 2,0 s" reinicia |
 | T5. "Entre 15 e 70 graus" | Inclusivo nos dois extremos. "Acima de" é estritamente maior |
-| T6. Religar com o botão apertado | Exige novo aperto, como descrito na seção de uso |
+| T6. Religar com o botão apertado | Exige novo aperto. **Revisão:** a regra virou mais simples, e o turbo só liga no aperto (borda de subida do botão), como descrito na seção de uso |
 | T7. Turbo prolongado | A barra vai a 50 e o turbo continua no mesmo uso, com um prêmio por uso |
+| O1. Ganho e consumo no mesmo quadro | Resolvido pela regra do aperto: ganhar com a barra vazia e o botão segurado não liga o turbo, então o ganho não é gasto no mesmo quadro |
+| O2. Sinal do ângulo de deslizamento | Vale o valor absoluto: derrapar para os dois lados ganha |
+| O3. Passada que não cumpre as condições | Não conta como elo da cadeia nem marca o veículo como contado |
+| O4. Teto de 20 por salto | Conta o ganho possível do salto, mesmo que a barra já estivesse cheia ou o turbo ligado |
 
 **Crash**
 
