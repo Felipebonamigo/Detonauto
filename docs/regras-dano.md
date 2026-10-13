@@ -107,3 +107,23 @@ O contrato acima não cobria; ficaram assim em `Core/DNDamage.h` e nos testes (`
 **Regra 5 (destruído), decisão confirmada:** destruído quando o total das 5 zonas chega a 0,5 ou qualquer das zonas Front,
 Rear, Left, Right e Roof chega a 1,0. A Under sozinha não destrói. A versão anterior só destruía por Front ou Rear e deixava
 uma zona lateral saturada sobreviver (total 0,2); foi corrigida (D12 em `Core/DNDamage.h`).
+
+## Referência de calibração (lote 11)
+
+Medida no protótipo do amassado (`docs/prototipo-amassado.md`), carro batendo de frente numa parede, com a variação de velocidade
+medida no corpo (velocidade antes menos depois, em m/s). **Nenhum número de `Data/Damage.csv` foi alterado por causa disto**:
+`ZoneDestroyDeltaVMs` e os demais ficam como estão até o Felipe sentir o amassado e o peso do carro. Para mudar a partir de que
+velocidade o carro é destruído, basta trocar `ZoneDestroyDeltaVMs` (hoje 30).
+
+| Velocidade ao bater (km/h) | ΔV (m/s) | Amassado (cm) | Destruído |
+|---|---|---|---|
+| 42 | 15,1 | 19,6 | não |
+| 60 | 21,1 | 25,0 | não |
+| 80 | 28,0 | 25,0 | não (dano da zona +0,87) |
+| ~120 | 41,7 a 43,5 | 25,0 | sim |
+
+- O ΔV é de **1,25 a 1,3 vezes a velocidade de aproximação** (o carro volta da parede com ~28% da velocidade; o quique faz parte da
+  "variação de velocidade do veículo"). Dispersão de ~10% entre execuções no mesmo cenário.
+- Com os valores atuais (zona satura em 2 + 30 = 32 m/s), uma batida **frontal na parede** destrói a partir de ~90 km/h de
+  aproximação. Contra outro carro em movimento ou em ângulo o número será outro; não foi medido.
+- Os números são de um carro (`arcade-1`, 1200 kg, e `Padrao`, 1500 kg) e de uma parede; servem de referência, não de especificação.
