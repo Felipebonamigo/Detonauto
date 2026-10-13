@@ -372,8 +372,8 @@ void FDNTurboUseSpec::Define()
 			TestNearlyEqual("barra", S.Bar, 0.f, Tol);
 		});
 
-		// T6 (docs/regras-de-jogo.md, "Decisões de implementação"): depois de a barra zerar com o botão
-		// ainda apertado, o turbo só volta a ligar com um novo aperto (soltar e apertar de novo).
+		// T6/O1 (docs/regras-de-jogo.md): depois de a barra zerar com o botão ainda apertado, o turbo só
+		// volta a ligar com um novo aperto (soltar e apertar de novo): consequência da regra do aperto.
 		It("zerou com o botao apertado: um takedown nao religa sozinho", [this]()
 		{
 			FDNTurboState S;
@@ -398,24 +398,58 @@ void FDNTurboUseSpec::Define()
 			TestTrue("ligou", S.bActive);
 		});
 
-		// Efeito do contrato (documentado, não corrigido): com o botão apertado e a barra vazia, o primeiro
-		// ganho liga o turbo e ele gasta esse ganho no mesmo quadro (contramão dá 12/s e o consumo é 25/s).
-		// A barra zera, vale a T6 e só um novo aperto liga de novo. Enquanto isso os ganhos voltam a acumular.
-		It("botao apertado com a barra vazia: o primeiro ganho liga e queima no mesmo quadro, depois exige novo aperto", [this]()
+		// O1 (docs/regras-de-jogo.md): o turbo liga no APERTO (borda de subida do botão) e só se a barra
+		// tiver mais de 0 nesse quadro. Segurar o botão com a barra vazia não liga nada.
+		It("segurar o botao com a barra vazia nao liga, e a barra vai acumulando", [this]()
 		{
 			FDNTurboState S;
-			Step(Config, S, 0.1f, 0.f, false, 0.f, false, true); // barra 0, botao apertado: nao liga
-			TestFalse("ainda desligado", S.bActive);
-			Step(Config, S, 0.1f, 100.f, true, 0.f, false, true); // ganha 1,2, liga, gasta 2,5
-			TestFalse("queimou e desligou", S.bActive);
-			TestNearlyEqual("barra", S.Bar, 0.f, Tol);
-			TestTrue("exige novo aperto", S.bNeedsNewPress);
-			Step(Config, S, 0.1f, 100.f, true, 0.f, false, true); // os ganhos voltam a acumular
+			Step(Config, S, 0.1f, 0.f, false, 0.f, false, true); // aperta com a barra em 0
+			TestFalse("nao ligou", S.bActive);
+			Step(Config, S, 0.1f, 100.f, true, 0.f, false, true); // segura, contramao enche
+			TestFalse("segue desligado", S.bActive);
 			TestNearlyEqual("acumulou 1,2", S.Bar, 1.2f, Tol);
-			TestFalse("segue desligado ate soltar e apertar", S.bActive);
-			Step(Config, S, 0.f, 0.f, false, 0.f, false, false);
+			Step(Config, S, 0.1f, 100.f, true, 0.f, false, true);
+			TestNearlyEqual("acumulou 2,4", S.Bar, 2.4f, Tol);
+			TestFalse("continua desligado", S.bActive);
+		});
+
+		It("soltar e apertar de novo religa quando a barra tem carga", [this]()
+		{
+			FDNTurboState S;
+			Step(Config, S, 0.1f, 0.f, false, 0.f, false, true);
+			Step(Config, S, 1.f, 100.f, true, 0.f, false, true); // barra enche segurando
+			TestFalse("segurar nao liga", S.bActive);
+			Step(Config, S, 0.f, 0.f, false, 0.f, false, false); // solta
+			Step(Config, S, 0.f, 0.f, false, 0.f, false, true);  // aperta
+			TestTrue("o novo aperto liga", S.bActive);
+		});
+
+		It("takedown com o botao segurado e o turbo desligado nao liga sozinho", [this]()
+		{
+			FDNTurboState S;
+			Step(Config, S, 0.1f, 0.f, false, 0.f, false, true); // aperta com 0, nao liga
+			Step(Config, S, 0.f, 0.f, false, 0.f, false, true, true); // takedown, botao segurado
+			TestNearlyEqual("a barra encheu", S.Bar, 100.f, Tol);
+			TestFalse("nao ligou sozinho", S.bActive);
+		});
+
+		// Quadro do aperto: vale a barra já com os ganhos e o takedown desse quadro.
+		It("aperto no mesmo quadro de um takedown liga (a barra ja esta cheia)", [this]()
+		{
+			FDNTurboState S;
+			Step(Config, S, 0.f, 0.f, false, 0.f, false, true, true);
+			TestTrue("ligou", S.bActive);
+		});
+
+		It("so o aperto liga: manter apertado depois de soltar a barra a zero nao religa", [this]()
+		{
+			FDNTurboState S;
+			S.Bar = 25.f;
 			Step(Config, S, 0.f, 0.f, false, 0.f, false, true);
-			TestTrue("novo aperto liga", S.bActive);
+			Step(Config, S, 1.f, 0.f, false, 0.f, false, true); // zera
+			TestFalse("desligou", S.bActive);
+			Step(Config, S, 0.f, 100.f, true, 0.f, false, true, true); // enche e segue apertado
+			TestFalse("nao religou", S.bActive);
 		});
 		It("soltar o botao sem zerar nao exige nada alem de apertar de novo", [this]()
 		{

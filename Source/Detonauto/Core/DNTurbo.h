@@ -72,8 +72,8 @@ struct FDNTurboState
 	float Bar = 0.0f;
 	bool bActive = false;
 
-	/** T6: depois de zerar com o botão apertado, só um novo aperto liga de novo. */
-	bool bNeedsNewPress = false;
+	/** O botão estava apertado no quadro anterior. O turbo liga na borda de subida (O1). */
+	bool bButtonWasHeld = false;
 
 	// cadeia de passadas raspando
 	int32 NearMissChainLength = 0;
@@ -125,6 +125,6 @@ struct FDNTurbo
 	/** Takedown: a barra vai ao valor configurado. */
 	static void ApplyTakedown(const FDNTurboConfig& Config, FDNTurboState& State);
 
-	/** Um quadro: ganhos (só com o turbo desligado), takedown, ligar, consumo, desligar e turbo prolongado. */
+	/** Um quadro: ganhos (só com o turbo desligado), takedown, ligar no aperto, consumo, desligar e turbo prolongado. */
 	static void Tick(const FDNTurboConfig& Config, FDNTurboState& State, const FDNTurboFrameInput& Input);
 };

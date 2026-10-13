@@ -89,12 +89,6 @@ void FDNTurbo::Tick(const FDNTurboConfig& Config, FDNTurboState& State, const FD
 	// O tempo da cadeia anda sempre, com o turbo ligado ou não.
 	State.SecondsSinceNearMiss = FMath::Min(State.SecondsSinceNearMiss + Dt, 1.0e9f);
 
-	// T6: soltar o botão libera o novo aperto.
-	if (!Input.bButtonHeld)
-	{
-		State.bNeedsNewPress = false;
-	}
-
 	// Ganhos: só com o turbo desligado no começo do quadro; só o takedown ganha com ele ligado.
 	// O salto sempre acompanha o tempo no ar (para o limite por salto), mas o ganho só vale desligado.
 	const bool bWasActive = State.bActive;
@@ -117,8 +111,12 @@ void FDNTurbo::Tick(const FDNTurboConfig& Config, FDNTurboState& State, const FD
 		ApplyTakedown(Config, State);
 	}
 
-	// Ligar: segurar o botão com a barra acima de 0 (e sem a trava de novo aperto).
-	if (!State.bActive && Input.bButtonHeld && State.Bar > 0.0f && !State.bNeedsNewPress)
+	// Ligar (O1): só no aperto, isto é, na borda de subida do botão (solto no quadro anterior e apertado
+	// agora), e se a barra tiver mais de 0 neste quadro (já com os ganhos e o takedown dele). Segurar o
+	// botão com a barra vazia não liga nada. Por consequência, depois de zerar com o botão apertado,
+	// só um novo aperto liga de novo (T6).
+	const bool bPressed = Input.bButtonHeld && !State.bButtonWasHeld;
+	if (!State.bActive && bPressed && State.Bar > 0.0f)
 	{
 		State.bActive = true;
 		State.bStartedAtFull = State.Bar >= Config.MaxBar;
@@ -146,9 +144,10 @@ void FDNTurbo::Tick(const FDNTurboConfig& Config, FDNTurboState& State, const FD
 				else
 				{
 					State.bActive = false;
-					State.bNeedsNewPress = true;
 				}
 			}
 		}
 	}
+
+	State.bButtonWasHeld = Input.bButtonHeld;
 }
