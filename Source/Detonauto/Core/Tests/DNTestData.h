@@ -60,6 +60,22 @@ namespace DNTest
 		return R;
 	}
 
+	inline FDNDamageConfigRow DamageRow(const FDNDamageConfig& C = FDNDamageConfig())
+	{
+		FDNDamageConfigRow R;
+		R.DentMinDeltaVMs = C.DentMinDeltaVMs;
+		R.ZoneDestroyDeltaVMs = C.ZoneDestroyDeltaVMs;
+		R.DentMaxDepthCm = C.DentMaxDepthCm;
+		R.DentDepthPerMs = C.DentDepthPerMs;
+		R.DentBaseRadiusCm = C.DentBaseRadiusCm;
+		R.MaxDents = C.MaxDents;
+		R.PartDetachDeltaVMs = C.PartDetachDeltaVMs;
+		R.PartDetachZoneDamage = C.PartDetachZoneDamage;
+		R.DestroyedTotalDamage = C.DestroyedTotalDamage;
+		R.MaxActive = C.MaxActive;
+		return R;
+	}
+
 	template <typename EntryType, typename RowType>
 	EntryType Entry(const RowType& Row, const TCHAR* Id = TEXT("padrao"))
 	{
@@ -72,6 +88,7 @@ namespace DNTest
 	inline FDNTurboConfigEntry TurboEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTurboConfigEntry>(TurboRow(), Id); }
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }
+	inline FDNDamageConfigEntry DamageEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNDamageConfigEntry>(DamageRow(), Id); }
 
 	/**
 	 *  Subsistema de GameInstance sem mundo: a classe exige um UGameInstance como dono (ClassWithin), então cada um ganha

@@ -133,7 +133,7 @@ struct FDNDataLoader
 		return ParseEntries<RowType>(Csv, FPaths::GetCleanFilename(RelativePath), OutEntries);
 	}
 
-	/** Lê as nove tabelas de Data/. */
+	/** Lê as dez tabelas de Data/. */
 	static TArray<FString> LoadAll(FDNData& OutData)
 	{
 		TArray<FString> Errors;
@@ -146,6 +146,7 @@ struct FDNDataLoader
 		Errors.Append(LoadEntries<FDNTurboConfigRow>(TEXT("Data/Turbo.csv"), OutData.TurboConfig));
 		Errors.Append(LoadEntries<FDNCrashConfigRow>(TEXT("Data/Crash.csv"), OutData.CrashConfig));
 		Errors.Append(LoadEntries<FDNTakedownConfigRow>(TEXT("Data/Takedown.csv"), OutData.TakedownConfig));
+		Errors.Append(LoadEntries<FDNDamageConfigRow>(TEXT("Data/Damage.csv"), OutData.DamageConfig));
 		return Errors;
 	}
 };

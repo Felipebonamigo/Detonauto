@@ -315,6 +315,7 @@ namespace
 	constexpr const TCHAR* TurboFile = TEXT("Turbo.csv");
 	constexpr const TCHAR* CrashFile = TEXT("Crash.csv");
 	constexpr const TCHAR* TakedownFile = TEXT("Takedown.csv");
+	constexpr const TCHAR* DamageFile = TEXT("Damage.csv");
 
 	/** Decimal finito e dentro da faixa (extremos inclusivos ou não). Devolve verdadeiro se está ok; senão registra o erro. */
 	bool CheckRange(const TCHAR* File, const FString& RowId, const TCHAR* Field, float Value,
@@ -480,6 +481,35 @@ TArray<FString> FDNDataValidation::ValidateTakedown(const TArray<FDNTakedownConf
 	return Errors;
 }
 
+TArray<FString> FDNDataValidation::ValidateDamage(const TArray<FDNDamageConfigEntry>& Rows)
+{
+	TArray<FString> Errors;
+	CheckSingleRow(DamageFile, Rows, Errors);
+
+	for (const FDNDamageConfigEntry& E : Rows)
+	{
+		const FDNDamageConfigRow& R = E.Row;
+		const FString& Id = E.Id;
+		CheckAboveZero(DamageFile, Id, TEXT("DentMinDeltaVMs"), R.DentMinDeltaVMs, Errors);
+		CheckAboveZero(DamageFile, Id, TEXT("ZoneDestroyDeltaVMs"), R.ZoneDestroyDeltaVMs, Errors);
+		CheckAboveZero(DamageFile, Id, TEXT("DentMaxDepthCm"), R.DentMaxDepthCm, Errors);
+		CheckAboveZero(DamageFile, Id, TEXT("DentDepthPerMs"), R.DentDepthPerMs, Errors);
+		CheckAboveZero(DamageFile, Id, TEXT("DentBaseRadiusCm"), R.DentBaseRadiusCm, Errors);
+		if (R.MaxDents < 1)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'MaxDents' precisa ser pelo menos 1 (veio %d)."), DamageFile, *Id, R.MaxDents));
+		}
+		CheckAboveZero(DamageFile, Id, TEXT("PartDetachDeltaVMs"), R.PartDetachDeltaVMs, Errors);
+		CheckRange(DamageFile, Id, TEXT("PartDetachZoneDamage"), R.PartDetachZoneDamage, 0.0f, false, 1.0f, true, Errors);
+		CheckRange(DamageFile, Id, TEXT("DestroyedTotalDamage"), R.DestroyedTotalDamage, 0.0f, false, 1.0f, true, Errors);
+		if (R.MaxActive < 1)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'MaxActive' precisa ser pelo menos 1 (veio %d)."), DamageFile, *Id, R.MaxActive));
+		}
+	}
+	return Errors;
+}
+
 TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 {
 	TArray<FString> Errors;
@@ -492,5 +522,6 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateTurbo(Data.TurboConfig));
 	Errors.Append(ValidateCrash(Data.CrashConfig));
 	Errors.Append(ValidateTakedown(Data.TakedownConfig));
+	Errors.Append(ValidateDamage(Data.DamageConfig));
 	return Errors;
 }

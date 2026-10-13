@@ -36,6 +36,9 @@ struct FDNDataValidation
 	/** Exatamente uma linha; finitos; janela e altura > 0; ângulos em (0, 180]; SideMax <= TBoneMin; T: 0 <= min < max <= 180; ZoneHalfAngle em (0, 90). */
 	static TArray<FString> ValidateTakedown(const TArray<FDNTakedownConfigEntry>& Rows);
 
+	/** Exatamente uma linha; finitos; limites e fatores > 0; PartDetachZoneDamage e DestroyedTotalDamage em (0, 1]; MaxDents e MaxActive inteiros >= 1. */
+	static TArray<FString> ValidateDamage(const TArray<FDNDamageConfigEntry>& Rows);
+
 	/** Todas as tabelas, com as referências entre elas. */
 	static TArray<FString> ValidateAll(const FDNData& Data);
 

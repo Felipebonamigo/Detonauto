@@ -13,6 +13,7 @@
 //   Turbo.csv           Id + os campos de FDNTurboConfig, na mesma ordem (uma linha, id "padrao")
 //   Crash.csv           Id + os campos de FDNCrashConfig (uma linha)
 //   Takedown.csv        Id + os campos de FDNTakedownConfig (uma linha)
+//   Damage.csv          Id + os campos de FDNDamageConfig (uma linha)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -25,6 +26,7 @@
 #include "Core/DNTurbo.h"
 #include "Core/DNCrash.h"
 #include "Core/DNTakedown.h"
+#include "Core/DNDamage.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -309,6 +311,40 @@ struct FDNTakedownConfigRow : public FTableRowBase
 	}
 };
 
+/** Data/Damage.csv (uma linha). Significado de cada campo: FDNDamageConfig em Core/DNDamage.h. */
+USTRUCT(BlueprintType)
+struct FDNDamageConfigRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DentMinDeltaVMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ZoneDestroyDeltaVMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DentMaxDepthCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DentDepthPerMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DentBaseRadiusCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxDents = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PartDetachDeltaVMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PartDetachZoneDamage = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DestroyedTotalDamage = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxActive = 0;
+
+	FDNDamageConfig ToConfig() const
+	{
+		FDNDamageConfig C;
+		C.DentMinDeltaVMs = DentMinDeltaVMs;
+		C.ZoneDestroyDeltaVMs = ZoneDestroyDeltaVMs;
+		C.DentMaxDepthCm = DentMaxDepthCm;
+		C.DentDepthPerMs = DentDepthPerMs;
+		C.DentBaseRadiusCm = DentBaseRadiusCm;
+		C.MaxDents = MaxDents;
+		C.PartDetachDeltaVMs = PartDetachDeltaVMs;
+		C.PartDetachZoneDamage = PartDetachZoneDamage;
+		C.DestroyedTotalDamage = DestroyedTotalDamage;
+		C.MaxActive = MaxActive;
+		return C;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -326,6 +362,7 @@ using FDNTrafficSettingsEntry = TDNTableEntry<FDNTrafficSettingsRow>;
 using FDNTurboConfigEntry = TDNTableEntry<FDNTurboConfigRow>;
 using FDNCrashConfigEntry = TDNTableEntry<FDNCrashConfigRow>;
 using FDNTakedownConfigEntry = TDNTableEntry<FDNTakedownConfigRow>;
+using FDNDamageConfigEntry = TDNTableEntry<FDNDamageConfigRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -339,4 +376,5 @@ struct FDNData
 	TArray<FDNTurboConfigEntry> TurboConfig;
 	TArray<FDNCrashConfigEntry> CrashConfig;
 	TArray<FDNTakedownConfigEntry> TakedownConfig;
+	TArray<FDNDamageConfigEntry> DamageConfig;
 };
