@@ -43,6 +43,7 @@ void ADNMeasureGameMode::BeginPlay()
 	FParse::Value(Cmd, TEXT("DNMeasure="), MeasureSeconds);
 	FParse::Value(Cmd, TEXT("DNSeed="), Seed);
 	bExtraMove = FParse::Param(Cmd, TEXT("DNExtraMove"));
+	bPlayerStill = FParse::Param(Cmd, TEXT("DNStill"));
 
 	if (CarKind.Equals(TEXT("DN"), ESearchCase::IgnoreCase))
 	{
@@ -73,8 +74,8 @@ void ADNMeasureGameMode::BeginPlay()
 
 	SpawnExtras();
 
-	UE_LOG(LogVeiculoTeste, Display, TEXT("DNMeasure: carro=%s extras=%d (movendo=%d) aquecimento=%.0f s medição=%.0f s semente=%d"),
-		*CarClass->GetName(), Extras.Num(), bExtraMove ? 1 : 0, WarmupSeconds, MeasureSeconds, Seed);
+	UE_LOG(LogVeiculoTeste, Display, TEXT("DNMeasure: carro=%s extras=%d (movendo=%d) jogador parado=%d aquecimento=%.0f s medição=%.0f s semente=%d"),
+		*CarClass->GetName(), Extras.Num(), bExtraMove ? 1 : 0, bPlayerStill ? 1 : 0, WarmupSeconds, MeasureSeconds, Seed);
 }
 
 void ADNMeasureGameMode::SpawnExtras()
@@ -139,7 +140,14 @@ void ADNMeasureGameMode::Tick(float DeltaSeconds)
 	{
 		if (AWheeledVehiclePawn* Player = Cast<AWheeledVehiclePawn>(PC->GetPawn()))
 		{
-			DriveCar(Player, Elapsed, 0.0f);
+			if (bPlayerStill)
+			{
+				Player->GetVehicleMovementComponent()->SetHandbrakeInput(true);
+			}
+			else
+			{
+				DriveCar(Player, Elapsed, 0.0f);
+			}
 		}
 	}
 

@@ -11,6 +11,7 @@
 //   -DNExtraMove              extras se movem (acelerador + volante em vai-e-vem); sem isto ficam parados
 //   -DNWarmup=S -DNMeasure=S  segundos de aquecimento e de medição (padrão 30 e 60)
 //   -DNSeed=N                 semente do que for aleatório (padrão 12345)
+//   -DNStill                  o jogador fica parado (freio de mão): a câmera enxerga os extras, que ficam à frente
 
 #pragma once
 
@@ -43,6 +44,7 @@ private:
 	TSubclassOf<APawn> CarClass;
 	int32 ExtraRequested = 0;
 	bool bExtraMove = false;
+	bool bPlayerStill = false;
 	float WarmupSeconds = 30.0f;
 	float MeasureSeconds = 60.0f;
 	int32 Seed = 12345;

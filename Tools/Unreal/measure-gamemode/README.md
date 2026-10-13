@@ -21,6 +21,7 @@ Argumentos de linha de comando que ele entende (o `measure.ps1` os monta):
 | `-DNExtraMove` | Extras em movimento (sem isto ficam parados, acordados a cada 0,5 s) |
 | `-DNWarmup=S`, `-DNMeasure=S` | Segundos de aquecimento (padrão 30) e de medição (padrão 60) |
 | `-DNSeed=N` | Semente da posição e rotação dos extras (padrão 12345) |
+| `-DNStill` | O jogador fica parado (freio de mão): a câmera enxerga os extras, que ficam à frente (usado nos cenários `X*` do amassado, lote 10) |
 
 ## De que depende (conferido no código)
 

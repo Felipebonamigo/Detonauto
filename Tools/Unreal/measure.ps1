@@ -50,6 +50,17 @@ $All = [ordered]@{
     'D-21'    = @{ Car = 'DN';       Extra = 20; Move = $false; Sp = 0  }
     'D-41'    = @{ Car = 'DN';       Extra = 40; Move = $false; Sp = 0  }
     'D-41M'   = @{ Car = 'DN';       Extra = 40; Move = $true;  Sp = 0  }
+    # Protótipo de amassado (lote 10): carros DN com o jogador parado e os extras na vista. Dent: none = materiais originais;
+    # mat = material de amassado SEM amassados; dents = material com 8 amassados de profundidade máxima em cada carro.
+    'X-1'     = @{ Car = 'DN'; Extra = 0;  Move = $false; Sp = 0; Dent = 'none';  Still = $true }
+    'X-6'     = @{ Car = 'DN'; Extra = 5;  Move = $false; Sp = 0; Dent = 'none';  Still = $true }
+    'X-12'    = @{ Car = 'DN'; Extra = 11; Move = $false; Sp = 0; Dent = 'none';  Still = $true }
+    'XM-1'    = @{ Car = 'DN'; Extra = 0;  Move = $false; Sp = 0; Dent = 'mat';   Still = $true }
+    'XM-6'    = @{ Car = 'DN'; Extra = 5;  Move = $false; Sp = 0; Dent = 'mat';   Still = $true }
+    'XM-12'   = @{ Car = 'DN'; Extra = 11; Move = $false; Sp = 0; Dent = 'mat';   Still = $true }
+    'XD-1'    = @{ Car = 'DN'; Extra = 0;  Move = $false; Sp = 0; Dent = 'dents'; Still = $true }
+    'XD-6'    = @{ Car = 'DN'; Extra = 5;  Move = $false; Sp = 0; Dent = 'dents'; Still = $true }
+    'XD-12'   = @{ Car = 'DN'; Extra = 11; Move = $false; Sp = 0; Dent = 'dents'; Still = $true }
 }
 if (-not $Scenario) { $Scenario = @($All.Keys) }
 foreach ($s in $Scenario) { if (-not $All.Contains($s)) { Write-Error "Cenário desconhecido: $s. Válidos: $($All.Keys -join ', ')"; exit 1 } }
@@ -131,6 +142,15 @@ foreach ($name in $Scenario) {
         "-DNWarmup=$Warmup", "-DNMeasure=$Measure", "-DNSeed=$Seed", "-abslog=`"$log`""
     )
     if ($sc.Move) { $argList += '-DNExtraMove' }
+    if ($sc.Still) { $argList += '-DNStill' }
+    # O carro DN agora liga o amassado por padrão (para o Felipe jogar); as medições de referência o desligam.
+    if ($sc.Car -eq 'DN') {
+        switch ($sc.Dent) {
+            'mat'   { $argList += '-DNDentMaterial' }
+            'dents' { $argList += '-DNDents=8' }
+            default { $argList += '-DNNoDents' }
+        }
+    }
 
     Write-Host "[$name] carro=$($sc.Car) extras=$($sc.Extra) movendo=$($sc.Move) escala=$(if($sc.Sp){"$($sc.Sp)%"}else{'padrão'}) ..."
     $p = Start-Process $exe -ArgumentList $argList -PassThru
@@ -143,7 +163,7 @@ foreach ($name in $Scenario) {
 
     $d = Read-Csv $csv.FullName
     $r = [pscustomobject]@{
-        Name = $name; Car = $sc.Car; Extra = $sc.Extra; Move = $sc.Move; Sp = $sc.Sp
+        Name = $name; Car = $sc.Car; Extra = $sc.Extra; Move = $sc.Move; Sp = $sc.Sp; Dent = $sc.Dent
         Frame = Get-Stats $d.FrameTime; Game = Get-Stats $d.GameThreadTime
         Draw = Get-Stats $d.RenderThreadTime; Gpu = Get-Stats $d.GPUTime
     }
@@ -166,7 +186,7 @@ $table += '| Cenário | Extras | Frame média / p95 | Game média / p95 | Draw m
 $table += '|---|---|---|---|---|---|'
 foreach ($r in $results) {
     $cell = { param($s) ('{0:N2} / {1:N2} ms' -f $s.Mean, $s.P95) }
-    $label = "$($r.Name) ($($r.Car)$(if($r.Move){', em movimento'}elseif($r.Extra){', parados'})$(if($r.Sp){", escala $($r.Sp)%"}))"
+    $label = "$($r.Name) ($($r.Car)$(if($r.Move){', em movimento'}elseif($r.Extra){', parados'})$(if($r.Sp){", escala $($r.Sp)%"})$(if($r.Dent){", amassado: $($r.Dent)"}))"
     $table += "| $label | $($r.Extra) | $(& $cell $r.Frame) | $(& $cell $r.Game) | $(& $cell $r.Draw) | $(& $cell $r.Gpu) |"
 }
 $report += "== TABELA"

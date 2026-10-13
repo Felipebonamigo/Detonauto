@@ -10,6 +10,10 @@
                 de deslizamento máximo e a guinada máxima (é o que separa um preset derrapador de um que não derrapa)
       Turn      a mesma curva SEM freio de mão (referência)
       Switch    troca de preset andando (arcade-2 em 1,4 s, Padrao em 2,2 s) e mostra que a velocidade se mantém
+      Wall      reto a fundo contra a parede: mostra as batidas reais e os amassados, e salva dn-dent-parede.png
+    Com -ShotDent, em vez do cenário: carro parado, 8 amassados de demonstração aplicados em 2 s, e quatro capturas só da
+    cena (sem HUD) em <projeto>\Saved\Screenshots\WindowsEditor: dn-dent-A-antes/depois (frente e lado esquerdo) e
+    dn-dent-B-depois/antes (traseira e lado direito).
     Com -Shot, em vez do cenário: acelera, liga o nitro e salva uma captura de tela (com o HUD) em
     <projeto>\Saved\Screenshots\WindowsEditor\dn-hud.png.
     Documentação e interpretação dos números: docs\presets-carro.md.
@@ -25,8 +29,9 @@
 param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Row = 'Padrao',
-    [ValidateSet('Sin', 'Accel', 'Nitro', 'Handbrake', 'Turn', 'Switch')][string]$Scenario = 'Sin',
+    [ValidateSet('Sin', 'Accel', 'Nitro', 'Handbrake', 'Turn', 'Switch', 'Wall')][string]$Scenario = 'Sin',
     [switch]$Shot,
+    [switch]$ShotDent,
     [string]$Map = '/Game/VehicleTemplate/Maps/VehicleBasic',
     [int]$TimeoutSeconds = 240,
     [string]$EngineVersion
@@ -37,21 +42,22 @@ $ErrorActionPreference = 'Stop'
 try { $ctx = Resolve-UnrealContext $Uproject $EngineVersion } catch { Write-Error $_.Exception.Message; exit 1 }
 $exe = Join-Path $ctx.Root 'Engine\Binaries\Win64\UnrealEditor.exe'
 $projDir = Split-Path $ctx.Uproject
-$tag = if ($Shot) { "$Row-shot" } else { "$Row-$Scenario" }
+$tag = if ($ShotDent) { "$Row-shotdent" } elseif ($Shot) { "$Row-shot" } else { "$Row-$Scenario" }
 $log = Join-Path $projDir "Saved\Logs\car-probe-$tag.log"
 New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
 if (Test-Path $log) { Remove-Item $log }
 
 $a = @("`"$($ctx.Uproject)`"", "$Map`?game=/Script/$($ctx.Name).DNTestCarGameMode", '-game', '-windowed', '-novsync', '-nosplash', '-nosound',
     "-DNCarRow=$Row", "-abslog=`"$log`"")
-if ($Shot) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNCarShot') }
+if ($ShotDent) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNShotDent') }
+elseif ($Shot) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNCarShot') }
 else { $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario") }
 
 $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
 if (-not $p.WaitForExit($TimeoutSeconds * 1000)) { Stop-Process -Id $p.Id; Write-Error "Passou de $TimeoutSeconds s e o jogo foi fechado."; exit 1 }
 if (-not (Test-Path $log)) { Write-Error 'O jogo não deixou log.'; exit 1 }
 
-Select-String -Path $log -Pattern 'DNTestCar|DNCarProbe|DNCarShot|Error:|Fatal' |
+Select-String -Path $log -Pattern 'DNTestCar|DNCarProbe|DNCarShot|DNDent|Error:|Fatal' |
     ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[[^\]]*\]', '' -replace '^LogVeiculoTeste: Display: ', '' }
-if ($Shot) { Get-ChildItem (Join-Path $projDir 'Saved\Screenshots') -Recurse -Filter 'dn-hud.png' -ErrorAction SilentlyContinue | ForEach-Object { "Captura: $($_.FullName)" } }
+if ($Shot -or $ShotDent -or $Scenario -eq 'Wall') { Get-ChildItem (Join-Path $projDir 'Saved\Screenshots') -Recurse -Filter 'dn-*.png' -ErrorAction SilentlyContinue | ForEach-Object { "Captura: $($_.FullName)" } }
 exit 0
