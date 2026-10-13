@@ -473,6 +473,21 @@ void FDNDataLoaderSpec::Define()
 			}
 		});
 
+		// O Git no Windows entrega os CSVs com CRLF (text=auto): o carregador precisa ler igual.
+		It("le o mesmo conteudo com quebras de linha do Windows (CRLF)", [this]()
+		{
+			TArray<FDNCityEntry> Out;
+			const TArray<FString> Errors = FDNDataLoader::ParseEntries<FDNCityRow>(
+				TEXT("Id,Name,RegionId,Latitude,Longitude,District,Order,Unlocked,Playable\r\nrio,Rio,brasil,-22.9,-43.2,,1,true,false\r\nsp,São Paulo,brasil,-23.5,-46.6,,2,true,false\r\n"), TEXT("Cities.csv"), Out);
+			ExpectClean(*this, TEXT("CRLF"), Errors);
+			if (TestEqual("duas linhas", Out.Num(), 2))
+			{
+				TestEqual("id sem sobra de \\r", Out[1].Id, FString(TEXT("sp")));
+				TestEqual("ultima coluna sem sobra de \\r", Out[1].Row.Playable, false);
+				TestEqual("nome com acento", Out[1].Row.Name, FString(TEXT("São Paulo")));
+			}
+		});
+
 		It("cabecalho sem linhas da lista vazia e nenhum erro", [this]()
 		{
 			TArray<FDNLandmarkEntry> Out;
