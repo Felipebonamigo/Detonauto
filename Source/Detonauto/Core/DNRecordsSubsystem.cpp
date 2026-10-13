@@ -27,7 +27,7 @@ bool UDNRecordsSubsystem::LoadFromFile(const FString& Path)
 	IFileManager& Files = IFileManager::Get();
 	if (!Files.FileExists(*Path))
 	{
-		UE_LOG(LogDetonauto, Log, TEXT("[Registro] Sem arquivo de registro em '%s': começando vazio."), *Path);
+		UE_LOG(LogDetonauto, Log, TEXT("Registro do jogador: Sem arquivo de registro em '%s': começando vazio."), *Path);
 		return true;
 	}
 
@@ -53,7 +53,7 @@ bool UDNRecordsSubsystem::LoadFromFile(const FString& Path)
 			Backup = FString::Printf(TEXT("%s.corrompido-%s-%d"), *Path, *Stamp, Suffix);
 		}
 		const bool bMoved = Files.Move(*Backup, *Path, /*Replace*/ false);
-		UE_LOG(LogDetonauto, Error, TEXT("[Registro] Arquivo '%s' corrompido (%s). %s"), *Path,
+		UE_LOG(LogDetonauto, Error, TEXT("Registro do jogador: Arquivo '%s' corrompido (%s). %s"), *Path,
 			Result.Warnings.IsEmpty() ? TEXT("sem detalhe") : *Result.Warnings[0],
 			bMoved ? *FString::Printf(TEXT("Guardado em '%s'; começando vazio."), *Backup) : TEXT("NÃO consegui renomear; começando vazio."));
 		if (bMoved)
@@ -65,7 +65,7 @@ bool UDNRecordsSubsystem::LoadFromFile(const FString& Path)
 
 	for (const FString& Warning : Result.Warnings)
 	{
-		UE_LOG(LogDetonauto, Warning, TEXT("[Registro] %s"), *Warning);
+		UE_LOG(LogDetonauto, Warning, TEXT("Registro do jogador: %s"), *Warning);
 	}
 	Records = MoveTemp(Result.Records);
 	return true;
@@ -80,13 +80,13 @@ bool UDNRecordsSubsystem::SaveToFile(const FString& Path) const
 	const FString Tmp = Path + TEXT(".tmp");
 	if (!FFileHelper::SaveStringToFile(Records.Serialize(), *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 	{
-		UE_LOG(LogDetonauto, Error, TEXT("[Registro] Não consegui gravar '%s'; o arquivo anterior ficou como estava."), *Tmp);
+		UE_LOG(LogDetonauto, Error, TEXT("Registro do jogador: Não consegui gravar '%s'; o arquivo anterior ficou como estava."), *Tmp);
 		Files.Delete(*Tmp, false, true, true);
 		return false;
 	}
 	if (!Files.Move(*Path, *Tmp, /*Replace*/ true))
 	{
-		UE_LOG(LogDetonauto, Error, TEXT("[Registro] Não consegui trocar '%s' por '%s'; o arquivo anterior ficou como estava."), *Path, *Tmp);
+		UE_LOG(LogDetonauto, Error, TEXT("Registro do jogador: Não consegui trocar '%s' por '%s'; o arquivo anterior ficou como estava."), *Path, *Tmp);
 		Files.Delete(*Tmp, false, true, true);
 		return false;
 	}
@@ -107,7 +107,7 @@ FDNProgressResult UDNRecordsSubsystem::ProgressoParaMenu() const
 {
 	if (!DataSource)
 	{
-		UE_LOG(LogDetonauto, Error, TEXT("[Registro] ProgressoParaMenu sem fonte de dados (UDNGameDataSubsystem)."));
+		UE_LOG(LogDetonauto, Error, TEXT("Registro do jogador: ProgressoParaMenu sem fonte de dados (UDNGameDataSubsystem)."));
 		return FDNProgressResult();
 	}
 	return ProgressoParaMenu(DataSource->GetData());

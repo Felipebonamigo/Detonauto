@@ -10,22 +10,22 @@ Os subsistemas e os componentes já têm testes sem mundo (`Core/Tests/DNSubsyst
 
 1. Abra o projeto no editor e aperte **Play** (PIE) em qualquer mapa.
 2. Abra **Window > Output Log** e filtre por `LogDetonauto`.
-3. **Esperado:** uma linha `[Dados] Tabelas carregadas e válidas.` e nenhuma linha `[Dados]` com erro.
+3. **Esperado:** uma linha `Dados do jogo: Tabelas carregadas e válidas.` e nenhuma linha `Dados do jogo:` com erro.
 4. Para ver o erro funcionando: feche o jogo, troque um número de `Data/Turbo.csv` por `abc`, aperte Play de novo.
-   **Esperado:** linhas `[Dados]` em vermelho dizendo qual arquivo e qual campo, e **o jogo abre do mesmo jeito**
+   **Esperado:** linhas `Dados do jogo:` em vermelho dizendo qual arquivo e qual campo, e **o jogo abre do mesmo jeito**
    (erro de dado não derruba). Desfaça a troca depois (`git checkout Data/Turbo.csv`).
 
 ## 2. O registro é criado e gravado
 
 1. Com o jogo parado, apague `Saved/SaveGames/Detonauto.json` se existir.
-2. Aperte Play. **Esperado:** no log, `[Registro] Sem arquivo de registro ... começando vazio.` e **nenhum** arquivo criado ainda.
+2. Aperte Play. **Esperado:** no log, `Registro do jogador: Sem arquivo de registro ... começando vazio.` e **nenhum** arquivo criado ainda.
 3. Quando existir um jeito de terminar um cruzamento (ainda não existe), confira que `Saved/SaveGames/Detonauto.json`
    aparece com `{"version":1,"best":{...}}` e que **não sobra** `Detonauto.json.tmp` ao lado.
 
 ## 3. Arquivo corrompido não é perdido
 
 1. Feche o jogo. Crie `Saved/SaveGames/Detonauto.json` com o texto `isto nao e json`.
-2. Aperte Play. **Esperado:** erro `[Registro] Arquivo ... corrompido` no log; ao lado do original aparece
+2. Aperte Play. **Esperado:** erro `Registro do jogador: Arquivo ... corrompido` no log; ao lado do original aparece
    `Detonauto.json.corrompido-<data>` com o seu texto; o jogo começa com o registro vazio.
 
 ## 4. Os dados chegam aos componentes dentro de um mundo (precisa de um ator)

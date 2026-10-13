@@ -101,7 +101,7 @@ void FDNGameDataSubsystemSpec::Define()
 			Data.CrashConfig[0].Row.MaxMultiplier = 4;
 			Data.TakedownConfig = { DNTest::TakedownEntry() };
 			Data.TakedownConfig[0].Row.MinRelativeSpeedKmh = 33.f;
-			AddExpectedError(TEXT("[Dados]"), EAutomationExpectedErrorFlags::Contains, 0); // outras tabelas vazias dao erro
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0); // outras tabelas vazias dao erro
 			Sub->ApplyData(MoveTemp(Data), {});
 			TestEqual("MaxBar", Sub->GetTurboConfig().MaxBar, 200.f);
 			TestEqual("TakedownSetsBarTo", Sub->GetTurboConfig().TakedownSetsBarTo, 150.f);
@@ -117,7 +117,7 @@ void FDNGameDataSubsystemSpec::Define()
 			Data.TurboConfig[0].Row.MaxBar = -5.f; // invalida
 			Data.CrashConfig = { DNTest::CrashEntry() };
 			Data.CrashConfig[0].Row.MaxMultiplier = 4; // valida: continua valendo
-			AddExpectedError(TEXT("[Dados]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(MoveTemp(Data), { TEXT("Fake.csv: erro do carregador") });
 			TestFalse("dados invalidos", Sub->AreTablesValid());
 			TestTrue("o erro do carregador esta na lista", Sub->GetErrors().ContainsByPredicate([](const FString& E) { return E.Contains(TEXT("Fake.csv")); }));
@@ -129,7 +129,7 @@ void FDNGameDataSubsystemSpec::Define()
 		It("sem nenhuma linha de configuracao: padrao, e nao quebra", [this]()
 		{
 			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();
-			AddExpectedError(TEXT("[Dados]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(FDNData(), {});
 			TestFalse("invalido", Sub->AreTablesValid());
 			TestEqual("padrao", Sub->GetCrashConfig().MaxMultiplier, FDNCrashConfig().MaxMultiplier);
@@ -139,7 +139,7 @@ void FDNGameDataSubsystemSpec::Define()
 		It("recarregar substitui o estado anterior (nao acumula erros)", [this]()
 		{
 			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();
-			AddExpectedError(TEXT("[Dados]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(FDNData(), { TEXT("x.csv: erro") });
 			TestFalse("invalido", Sub->AreTablesValid());
 			Sub->Reload();
@@ -216,7 +216,7 @@ void FDNRecordsSubsystemSpec::Define()
 
 			// Uma PASTA no lugar do .tmp: gravar o temporario falha. Gravar direto no arquivo final funcionaria.
 			IFileManager::Get().MakeDirectory(*(Path + TEXT(".tmp")), true);
-			AddExpectedError(TEXT("[Registro]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Registro do jogador:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->RegisterResult(TEXT("a"), 999); // recorde na memoria; gravacao falha
 			TestEqual("o recorde fica na memoria", Sub->GetRecords().BestScore(TEXT("a")).Get(-1), 999);
 			TestFalse("Save falha", Sub->Save());
@@ -231,7 +231,7 @@ void FDNRecordsSubsystemSpec::Define()
 			Write(Path, Garbage);
 
 			UDNRecordsSubsystem* Sub = NewRecords();
-			AddExpectedError(TEXT("[Registro]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Registro do jogador:"), EAutomationExpectedErrorFlags::Contains, 0);
 			TestFalse("devolve falso: o arquivo estava corrompido", Sub->LoadFromFile(Path));
 			TestEqual("comeca vazio", Sub->GetRecords().Num(), 0);
 			TestFalse("o arquivo original saiu do caminho", IFileManager::Get().FileExists(*Path));
@@ -250,7 +250,7 @@ void FDNRecordsSubsystemSpec::Define()
 
 		It("S3: arquivo vazio e versao desconhecida tambem contam como corrompidos e sao preservados", [this]()
 		{
-			AddExpectedError(TEXT("[Registro]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Registro do jogador:"), EAutomationExpectedErrorFlags::Contains, 0);
 			for (const TCHAR* Content : { TEXT(""), TEXT("{\"version\":2,\"best\":{\"a\":1}}"), TEXT("[]"), TEXT("{\"version\":1}") })
 			{
 				FTempDir Temp;
@@ -271,7 +271,7 @@ void FDNRecordsSubsystemSpec::Define()
 		{
 			FTempDir Temp;
 			const FString Path = Temp.File(TEXT("Detonauto.json"));
-			AddExpectedError(TEXT("[Registro]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Registro do jogador:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Write(Path, TEXT("lixo 1"));
 			NewRecords()->LoadFromFile(Path);
 			Write(Path, TEXT("lixo 2"));
@@ -331,7 +331,7 @@ void FDNRecordsSubsystemSpec::Define()
 		It("ProgressoParaMenu sem a fonte de dados: resultado vazio e erro logado, sem quebrar", [this]()
 		{
 			UDNRecordsSubsystem* Sub = NewRecords();
-			AddExpectedError(TEXT("[Registro]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Registro do jogador:"), EAutomationExpectedErrorFlags::Contains, 0);
 			const FDNProgressResult P = Sub->ProgressoParaMenu();
 			TestEqual("total", P.Overall.Total, 0);
 		});

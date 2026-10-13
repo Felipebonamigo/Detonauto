@@ -29,15 +29,15 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 
 	for (const FString& Error : Errors)
 	{
-		UE_LOG(LogDetonauto, Error, TEXT("[Dados] %s"), *Error);
+		UE_LOG(LogDetonauto, Error, TEXT("Dados do jogo: %s"), *Error);
 	}
 	if (bDataValid)
 	{
-		UE_LOG(LogDetonauto, Log, TEXT("[Dados] Tabelas carregadas e válidas."));
+		UE_LOG(LogDetonauto, Log, TEXT("Dados do jogo: Tabelas carregadas e válidas."));
 	}
 	else
 	{
-		UE_LOG(LogDetonauto, Error, TEXT("[Dados] %d erro(s): o jogo segue, mas os dados estão marcados como inválidos."), Errors.Num());
+		UE_LOG(LogDetonauto, Error, TEXT("Dados do jogo: %d erro(s): o jogo segue, mas os dados estão marcados como inválidos."), Errors.Num());
 	}
 }
 

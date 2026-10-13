@@ -100,7 +100,7 @@ void FDNTurboComponentSpec::Define()
 			Data.TurboConfig = { DNTest::TurboEntry() };
 			Data.TurboConfig[0].Row.MaxBar = 80.f;
 			Data.TurboConfig[0].Row.TakedownSetsBarTo = 80.f;
-			AddExpectedError(TEXT("[Dados]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(MoveTemp(Data), {});
 
 			UDNTurboComponent* C = NewObject<UDNTurboComponent>(GetTransientPackage());
@@ -207,7 +207,7 @@ void FDNCrashRoundComponentSpec::Define()
 			FDNData Data;
 			Data.CrashConfig = { DNTest::CrashEntry() };
 			Data.CrashConfig[0].Row.MaxMultiplier = 3;
-			AddExpectedError(TEXT("[Dados]"), EAutomationExpectedErrorFlags::Contains, 0);
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(MoveTemp(Data), {});
 			UDNCrashRoundComponent* D = NewObject<UDNCrashRoundComponent>(GetTransientPackage());
 			D->ConfigureFromData(Sub);
