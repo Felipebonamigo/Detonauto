@@ -1,0 +1,2 @@
+Id,MinRelativeSpeedKmh,RivalCrashWindowSeconds,VerticalMinHeightCm,BehindMaxAngleDegrees,TBoneMinAngleDegrees,TBoneMaxAngleDegrees,SideMaxAngleDegrees,ZoneHalfAngleDegrees
+padrao,20,1.5,100,30,60,120,60,45

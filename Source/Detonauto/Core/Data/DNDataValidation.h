@@ -29,6 +29,13 @@ struct FDNDataValidation
 	/** Exatamente uma linha; todos os valores finitos e maiores que zero; WakeDistanceM < WakeAheadM < DespawnDistanceM. */
 	static TArray<FString> ValidateTrafficSettings(const TArray<FDNTrafficSettingsEntry>& Settings);
 
+	/** Exatamente uma linha; finitos; limites e janelas > 0, ganhos e velocidades >= 0; Drift min < max <= 180; TakedownSetsBarTo em (0, MaxBar]; multiplicadores da cadeia não vazios e > 0. */
+	static TArray<FString> ValidateTurbo(const TArray<FDNTurboConfigEntry>& Rows);
+	/** Exatamente uma linha; MaxMultiplier >= 1; percentuais >= 0; janelas e tempos > 0; velocidade de repouso >= 0; finitos. */
+	static TArray<FString> ValidateCrash(const TArray<FDNCrashConfigEntry>& Rows);
+	/** Exatamente uma linha; finitos; janela e altura > 0; ângulos em (0, 180]; T: 0 <= min < max <= 180; ZoneHalfAngle em (0, 90). */
+	static TArray<FString> ValidateTakedown(const TArray<FDNTakedownConfigEntry>& Rows);
+
 	/** Todas as tabelas, com as referências entre elas. */
 	static TArray<FString> ValidateAll(const FDNData& Data);
 

@@ -309,6 +309,166 @@ TArray<FString> FDNDataValidation::ValidateTrafficSettings(const TArray<FDNTraff
 	}
 	return Errors;
 }
+
+namespace
+{
+	constexpr const TCHAR* TurboFile = TEXT("Turbo.csv");
+	constexpr const TCHAR* CrashFile = TEXT("Crash.csv");
+	constexpr const TCHAR* TakedownFile = TEXT("Takedown.csv");
+
+	/** Decimal finito e dentro da faixa (extremos inclusivos ou não). Devolve verdadeiro se está ok; senão registra o erro. */
+	bool CheckRange(const TCHAR* File, const FString& RowId, const TCHAR* Field, float Value,
+		float Min, bool bMinInclusive, float Max, bool bMaxInclusive, TArray<FString>& Errors)
+	{
+		const bool bFinite = FMath::IsFinite(Value);
+		const bool bAboveMin = bMinInclusive ? Value >= Min : Value > Min;
+		const bool bBelowMax = bMaxInclusive ? Value <= Max : Value < Max;
+		if (bFinite && bAboveMin && bBelowMax)
+		{
+			return true;
+		}
+		Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo '%s' precisa ser um número finito em %c%g, %g%c (veio %f)."),
+			File, *RowId, Field, bMinInclusive ? TEXT('[') : TEXT('('), Min, Max, bMaxInclusive ? TEXT(']') : TEXT(')'), Value));
+		return false;
+	}
+
+	constexpr float Huge = 3.0e38f;
+
+	/** Maior que zero. */
+	bool CheckAboveZero(const TCHAR* File, const FString& Id, const TCHAR* Field, float Value, TArray<FString>& Errors)
+	{
+		return CheckRange(File, Id, Field, Value, 0.0f, false, Huge, true, Errors);
+	}
+
+	/** Maior ou igual a zero. */
+	bool CheckNotNegative(const TCHAR* File, const FString& Id, const TCHAR* Field, float Value, TArray<FString>& Errors)
+	{
+		return CheckRange(File, Id, Field, Value, 0.0f, true, Huge, true, Errors);
+	}
+
+	/** Mensagem comum de "uma linha só". */
+	template <typename RowType>
+	void CheckSingleRow(const TCHAR* File, const TArray<TDNTableEntry<RowType>>& Rows, TArray<FString>& Errors)
+	{
+		CheckIds(File, Rows, Errors);
+		if (Rows.Num() != 1)
+		{
+			Errors.Add(FString::Printf(TEXT("%s: precisa ter exatamente uma linha (veio %d)."), File, Rows.Num()));
+		}
+	}
+}
+
+TArray<FString> FDNDataValidation::ValidateTurbo(const TArray<FDNTurboConfigEntry>& Rows)
+{
+	TArray<FString> Errors;
+	CheckSingleRow(TurboFile, Rows, Errors);
+
+	for (const FDNTurboConfigEntry& E : Rows)
+	{
+		const FDNTurboConfigRow& R = E.Row;
+		const FString& Id = E.Id;
+		const bool bMaxBar = CheckAboveZero(TurboFile, Id, TEXT("MaxBar"), R.MaxBar, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("WrongWayMinSpeedKmh"), R.WrongWayMinSpeedKmh, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("WrongWayGainPerSecond"), R.WrongWayGainPerSecond, Errors);
+		CheckAboveZero(TurboFile, Id, TEXT("NearMissMaxLateralCm"), R.NearMissMaxLateralCm, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("NearMissMinSpeedKmh"), R.NearMissMinSpeedKmh, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("NearMissGain"), R.NearMissGain, Errors);
+		CheckAboveZero(TurboFile, Id, TEXT("NearMissChainWindowSeconds"), R.NearMissChainWindowSeconds, Errors);
+
+		if (R.NearMissChainMultipliers.IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': NearMissChainMultipliers não pode ser vazio."), TurboFile, *Id));
+		}
+		for (int32 i = 0; i < R.NearMissChainMultipliers.Num(); ++i)
+		{
+			const float M = R.NearMissChainMultipliers[i];
+			if (!FMath::IsFinite(M) || M <= 0.0f)
+			{
+				Errors.Add(FString::Printf(TEXT("%s, linha '%s': NearMissChainMultipliers[%d] precisa ser um número finito maior que zero (veio %f)."), TurboFile, *Id, i, M));
+			}
+		}
+
+		// Derrapada: 0 <= mínimo < máximo <= 180.
+		const bool bDriftMin = CheckNotNegative(TurboFile, Id, TEXT("DriftMinAngleDeg"), R.DriftMinAngleDeg, Errors);
+		const bool bDriftMax = CheckRange(TurboFile, Id, TEXT("DriftMaxAngleDeg"), R.DriftMaxAngleDeg, 0.0f, false, 180.0f, true, Errors);
+		if (bDriftMin && bDriftMax && R.DriftMinAngleDeg >= R.DriftMaxAngleDeg)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': DriftMinAngleDeg (%f) precisa ser menor que DriftMaxAngleDeg (%f)."), TurboFile, *Id, R.DriftMinAngleDeg, R.DriftMaxAngleDeg));
+		}
+		CheckNotNegative(TurboFile, Id, TEXT("DriftMinSpeedKmh"), R.DriftMinSpeedKmh, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("DriftGainPerSecond"), R.DriftGainPerSecond, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("AirTimeThresholdSeconds"), R.AirTimeThresholdSeconds, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("AirGainPerSecond"), R.AirGainPerSecond, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("AirMaxGainPerJump"), R.AirMaxGainPerJump, Errors);
+
+		// O Takedown enche a barra até este valor: dentro de (0, MaxBar].
+		const bool bSets = CheckAboveZero(TurboFile, Id, TEXT("TakedownSetsBarTo"), R.TakedownSetsBarTo, Errors);
+		if (bMaxBar && bSets && R.TakedownSetsBarTo > R.MaxBar)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': TakedownSetsBarTo (%f) não pode passar de MaxBar (%f)."), TurboFile, *Id, R.TakedownSetsBarTo, R.MaxBar));
+		}
+		CheckAboveZero(TurboFile, Id, TEXT("ConsumptionPerSecond"), R.ConsumptionPerSecond, Errors);
+		CheckNotNegative(TurboFile, Id, TEXT("ExtendedBonus"), R.ExtendedBonus, Errors);
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateCrash(const TArray<FDNCrashConfigEntry>& Rows)
+{
+	TArray<FString> Errors;
+	CheckSingleRow(CrashFile, Rows, Errors);
+
+	for (const FDNCrashConfigEntry& E : Rows)
+	{
+		const FDNCrashConfigRow& R = E.Row;
+		if (R.MaxMultiplier < 1)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'MaxMultiplier' precisa ser pelo menos 1 (veio %d)."), CrashFile, *E.Id, R.MaxMultiplier));
+		}
+		CheckAboveZero(CrashFile, E.Id, TEXT("ChainWindowSeconds"), R.ChainWindowSeconds, Errors);
+		if (R.ChainBonusPercentPerLink < 0)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'ChainBonusPercentPerLink' não pode ser negativo (veio %d)."), CrashFile, *E.Id, R.ChainBonusPercentPerLink));
+		}
+		if (R.ChainBonusMaxPercent < 0)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'ChainBonusMaxPercent' não pode ser negativo (veio %d)."), CrashFile, *E.Id, R.ChainBonusMaxPercent));
+		}
+		CheckNotNegative(CrashFile, E.Id, TEXT("QuietSpeedMetersPerSecond"), R.QuietSpeedMetersPerSecond, Errors);
+		CheckAboveZero(CrashFile, E.Id, TEXT("QuietSecondsToEnd"), R.QuietSecondsToEnd, Errors);
+		CheckAboveZero(CrashFile, E.Id, TEXT("MaxSecondsAfterFirstImpact"), R.MaxSecondsAfterFirstImpact, Errors);
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateTakedown(const TArray<FDNTakedownConfigEntry>& Rows)
+{
+	TArray<FString> Errors;
+	CheckSingleRow(TakedownFile, Rows, Errors);
+
+	for (const FDNTakedownConfigEntry& E : Rows)
+	{
+		const FDNTakedownConfigRow& R = E.Row;
+		const FString& Id = E.Id;
+		CheckNotNegative(TakedownFile, Id, TEXT("MinRelativeSpeedKmh"), R.MinRelativeSpeedKmh, Errors);
+		CheckAboveZero(TakedownFile, Id, TEXT("RivalCrashWindowSeconds"), R.RivalCrashWindowSeconds, Errors);
+		CheckAboveZero(TakedownFile, Id, TEXT("VerticalMinHeightCm"), R.VerticalMinHeightCm, Errors);
+		CheckRange(TakedownFile, Id, TEXT("BehindMaxAngleDegrees"), R.BehindMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
+		CheckRange(TakedownFile, Id, TEXT("SideMaxAngleDegrees"), R.SideMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
+
+		const bool bTMin = CheckNotNegative(TakedownFile, Id, TEXT("TBoneMinAngleDegrees"), R.TBoneMinAngleDegrees, Errors);
+		const bool bTMax = CheckRange(TakedownFile, Id, TEXT("TBoneMaxAngleDegrees"), R.TBoneMaxAngleDegrees, 0.0f, false, 180.0f, true, Errors);
+		if (bTMin && bTMax && R.TBoneMinAngleDegrees >= R.TBoneMaxAngleDegrees)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': TBoneMinAngleDegrees (%f) precisa ser menor que TBoneMaxAngleDegrees (%f)."), TakedownFile, *Id, R.TBoneMinAngleDegrees, R.TBoneMaxAngleDegrees));
+		}
+
+		// Quatro zonas de 2 x meio ângulo cabem em 360 graus sem se sobrepor só com meio ângulo < 90.
+		CheckRange(TakedownFile, Id, TEXT("ZoneHalfAngleDegrees"), R.ZoneHalfAngleDegrees, 0.0f, false, 90.0f, false, Errors);
+	}
+	return Errors;
+}
+
 TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 {
 	TArray<FString> Errors;
@@ -318,5 +478,8 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateCrossings(Data.Crossings, Data.Cities));
 	Errors.Append(ValidateTrafficVehicles(Data.Vehicles));
 	Errors.Append(ValidateTrafficSettings(Data.TrafficSettings));
+	Errors.Append(ValidateTurbo(Data.TurboConfig));
+	Errors.Append(ValidateCrash(Data.CrashConfig));
+	Errors.Append(ValidateTakedown(Data.TakedownConfig));
 	return Errors;
 }

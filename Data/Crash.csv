@@ -1,0 +1,2 @@
+Id,MaxMultiplier,ChainWindowSeconds,ChainBonusPercentPerLink,ChainBonusMaxPercent,QuietSpeedMetersPerSecond,QuietSecondsToEnd,MaxSecondsAfterFirstImpact
+padrao,8,1.5,10,100,2.0,3.0,30.0

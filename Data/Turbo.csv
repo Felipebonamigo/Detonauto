@@ -1,0 +1,2 @@
+Id,MaxBar,WrongWayMinSpeedKmh,WrongWayGainPerSecond,NearMissMaxLateralCm,NearMissMinSpeedKmh,NearMissGain,NearMissChainWindowSeconds,NearMissChainMultipliers,DriftMinAngleDeg,DriftMaxAngleDeg,DriftMinSpeedKmh,DriftGainPerSecond,AirTimeThresholdSeconds,AirGainPerSecond,AirMaxGainPerJump,TakedownSetsBarTo,ConsumptionPerSecond,ExtendedBonus
+padrao,100,80,12,150,60,6,2.0,"(1.0,1.25,1.5,1.75,2.0)",15,70,60,8,0.3,10,20,100,25,50

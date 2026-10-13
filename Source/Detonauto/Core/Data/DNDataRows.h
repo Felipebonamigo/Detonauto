@@ -10,6 +10,9 @@
 //   Crossings.csv       Id, CityId, Order, Bronze, Silver, Gold
 //   TrafficVehicles.csv Id, Name, ValueCash, MassKg, Class
 //   TrafficSettings.csv Id, WakeDistanceM, WakeAheadM, WakeAheadMinClosingKmh, DespawnDistanceM, StillSpeedMs, MaxSpawnPerFrame (uma linha)
+//   Turbo.csv           Id + os campos de FDNTurboConfig, na mesma ordem (uma linha, id "padrao")
+//   Crash.csv           Id + os campos de FDNCrashConfig (uma linha)
+//   Takedown.csv        Id + os campos de FDNTakedownConfig (uma linha)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -19,6 +22,9 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Core/DNTraffic.h"
+#include "Core/DNTurbo.h"
+#include "Core/DNCrash.h"
+#include "Core/DNTakedown.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -188,6 +194,119 @@ struct FDNTrafficSettingsRow : public FTableRowBase
 		return S;
 	}
 };
+// Linhas de ajuste de pontuação. Os campos têm os MESMOS nomes dos campos das structs puras (FDNTurboConfig,
+// FDNCrashConfig, FDNTakedownConfig) e começam zerados: os números de verdade moram em Data/*.csv, e o teste de
+// deriva (DNDataConfigs.spec.cpp) garante que o CSV e o padrão da struct pura continuam iguais.
+
+/** Data/Turbo.csv (uma linha). Significado de cada campo: comentários de FDNTurboConfig em Core/DNTurbo.h. */
+USTRUCT(BlueprintType)
+struct FDNTurboConfigRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MaxBar = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WrongWayMinSpeedKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WrongWayGainPerSecond = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float NearMissMaxLateralCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float NearMissMinSpeedKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float NearMissGain = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float NearMissChainWindowSeconds = 0.0f;
+	/** No CSV: texto de tupla da Unreal entre aspas, por exemplo "(1.0,1.25,1.5)". */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<float> NearMissChainMultipliers;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftMinAngleDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftMaxAngleDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftMinSpeedKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftGainPerSecond = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float AirTimeThresholdSeconds = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float AirGainPerSecond = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float AirMaxGainPerJump = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TakedownSetsBarTo = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ConsumptionPerSecond = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ExtendedBonus = 0.0f;
+
+	FDNTurboConfig ToConfig() const
+	{
+		FDNTurboConfig C;
+		C.MaxBar = MaxBar;
+		C.WrongWayMinSpeedKmh = WrongWayMinSpeedKmh;
+		C.WrongWayGainPerSecond = WrongWayGainPerSecond;
+		C.NearMissMaxLateralCm = NearMissMaxLateralCm;
+		C.NearMissMinSpeedKmh = NearMissMinSpeedKmh;
+		C.NearMissGain = NearMissGain;
+		C.NearMissChainWindowSeconds = NearMissChainWindowSeconds;
+		C.NearMissChainMultipliers = NearMissChainMultipliers;
+		C.DriftMinAngleDeg = DriftMinAngleDeg;
+		C.DriftMaxAngleDeg = DriftMaxAngleDeg;
+		C.DriftMinSpeedKmh = DriftMinSpeedKmh;
+		C.DriftGainPerSecond = DriftGainPerSecond;
+		C.AirTimeThresholdSeconds = AirTimeThresholdSeconds;
+		C.AirGainPerSecond = AirGainPerSecond;
+		C.AirMaxGainPerJump = AirMaxGainPerJump;
+		C.TakedownSetsBarTo = TakedownSetsBarTo;
+		C.ConsumptionPerSecond = ConsumptionPerSecond;
+		C.ExtendedBonus = ExtendedBonus;
+		return C;
+	}
+};
+
+/** Data/Crash.csv (uma linha). Significado de cada campo: FDNCrashConfig em Core/DNCrash.h. */
+USTRUCT(BlueprintType)
+struct FDNCrashConfigRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxMultiplier = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ChainWindowSeconds = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ChainBonusPercentPerLink = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ChainBonusMaxPercent = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float QuietSpeedMetersPerSecond = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float QuietSecondsToEnd = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MaxSecondsAfterFirstImpact = 0.0f;
+
+	FDNCrashConfig ToConfig() const
+	{
+		FDNCrashConfig C;
+		C.MaxMultiplier = MaxMultiplier;
+		C.ChainWindowSeconds = ChainWindowSeconds;
+		C.ChainBonusPercentPerLink = ChainBonusPercentPerLink;
+		C.ChainBonusMaxPercent = ChainBonusMaxPercent;
+		C.QuietSpeedMetersPerSecond = QuietSpeedMetersPerSecond;
+		C.QuietSecondsToEnd = QuietSecondsToEnd;
+		C.MaxSecondsAfterFirstImpact = MaxSecondsAfterFirstImpact;
+		return C;
+	}
+};
+
+/** Data/Takedown.csv (uma linha). Significado de cada campo: FDNTakedownConfig em Core/DNTakedown.h. */
+USTRUCT(BlueprintType)
+struct FDNTakedownConfigRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MinRelativeSpeedKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float RivalCrashWindowSeconds = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float VerticalMinHeightCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float BehindMaxAngleDegrees = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TBoneMinAngleDegrees = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TBoneMaxAngleDegrees = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SideMaxAngleDegrees = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ZoneHalfAngleDegrees = 0.0f;
+
+	FDNTakedownConfig ToConfig() const
+	{
+		FDNTakedownConfig C;
+		C.MinRelativeSpeedKmh = MinRelativeSpeedKmh;
+		C.RivalCrashWindowSeconds = RivalCrashWindowSeconds;
+		C.VerticalMinHeightCm = VerticalMinHeightCm;
+		C.BehindMaxAngleDegrees = BehindMaxAngleDegrees;
+		C.TBoneMinAngleDegrees = TBoneMinAngleDegrees;
+		C.TBoneMaxAngleDegrees = TBoneMaxAngleDegrees;
+		C.SideMaxAngleDegrees = SideMaxAngleDegrees;
+		C.ZoneHalfAngleDegrees = ZoneHalfAngleDegrees;
+		return C;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -202,6 +321,9 @@ using FDNLandmarkEntry = TDNTableEntry<FDNLandmarkRow>;
 using FDNCrossingEntry = TDNTableEntry<FDNCrossingRow>;
 using FDNTrafficVehicleEntry = TDNTableEntry<FDNTrafficVehicleRow>;
 using FDNTrafficSettingsEntry = TDNTableEntry<FDNTrafficSettingsRow>;
+using FDNTurboConfigEntry = TDNTableEntry<FDNTurboConfigRow>;
+using FDNCrashConfigEntry = TDNTableEntry<FDNCrashConfigRow>;
+using FDNTakedownConfigEntry = TDNTableEntry<FDNTakedownConfigRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -212,4 +334,7 @@ struct FDNData
 	TArray<FDNCrossingEntry> Crossings;
 	TArray<FDNTrafficVehicleEntry> Vehicles;
 	TArray<FDNTrafficSettingsEntry> TrafficSettings;
+	TArray<FDNTurboConfigEntry> TurboConfig;
+	TArray<FDNCrashConfigEntry> CrashConfig;
+	TArray<FDNTakedownConfigEntry> TakedownConfig;
 };

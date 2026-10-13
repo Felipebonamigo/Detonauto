@@ -5,6 +5,7 @@
 
 #include <limits>
 #include "Misc/AutomationTest.h"
+#include "Core/Tests/DNTestData.h"
 #include "Core/Data/DNDataValidation.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -614,6 +615,9 @@ void FDNDataAllSpec::Define()
 			Data.Crossings = { Crossing(TEXT("c1")) };
 			Data.Vehicles = { Vehicle(TEXT("v1")) };
 			Data.TrafficSettings = { Settings() };
+			Data.TurboConfig = { DNTest::TurboEntry() };
+			Data.CrashConfig = { DNTest::CrashEntry() };
+			Data.TakedownConfig = { DNTest::TakedownEntry() };
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -626,7 +630,16 @@ void FDNDataAllSpec::Define()
 			Data.Crossings = { Crossing(TEXT("c1"), TEXT("sumiu")) };
 			Data.Vehicles = { Vehicle(TEXT("v1"), TEXT("Nome"), 0) };
 			Data.TrafficSettings = { Settings(TEXT("padrao"), 30.f, 25.f) };
+			Data.TurboConfig = { DNTest::TurboEntry() };
+			Data.TurboConfig[0].Row.MaxBar = 0.f;
+			Data.CrashConfig = { DNTest::CrashEntry() };
+			Data.CrashConfig[0].Row.MaxMultiplier = 0;
+			Data.TakedownConfig = { DNTest::TakedownEntry() };
+			Data.TakedownConfig[0].Row.ZoneHalfAngleDegrees = 90.f;
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
+			ExpectError(*this, TEXT("config do turbo"), Errors, { TEXT("Turbo.csv"), TEXT("MaxBar") });
+			ExpectError(*this, TEXT("config do crash"), Errors, { TEXT("Crash.csv"), TEXT("MaxMultiplier") });
+			ExpectError(*this, TEXT("config do takedown"), Errors, { TEXT("Takedown.csv"), TEXT("ZoneHalfAngleDegrees") });
 			ExpectError(*this, TEXT("cidade"), Errors, { TEXT("rio"), TEXT("atlantida") });
 			ExpectError(*this, TEXT("ponto"), Errors, { TEXT("p1"), TEXT("sumiu") });
 			ExpectError(*this, TEXT("cruzamento"), Errors, { TEXT("c1"), TEXT("sumiu") });
@@ -639,6 +652,10 @@ void FDNDataAllSpec::Define()
 			FDNData Data;
 			Data.Regions = { Region(TEXT("brasil")) };
 			ExpectError(*this, TEXT("sem configuracao"), FDNDataValidation::ValidateAll(Data), { TEXT("TrafficSettings"), TEXT("uma linha") });
+			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
+			ExpectError(*this, TEXT("sem turbo"), Errors, { TEXT("Turbo.csv"), TEXT("uma linha") });
+			ExpectError(*this, TEXT("sem crash"), Errors, { TEXT("Crash.csv"), TEXT("uma linha") });
+			ExpectError(*this, TEXT("sem takedown"), Errors, { TEXT("Takedown.csv"), TEXT("uma linha") });
 		});
 	});
 }
