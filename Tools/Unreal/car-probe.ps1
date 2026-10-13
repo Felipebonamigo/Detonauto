@@ -10,7 +10,8 @@
                 de deslizamento máximo e a guinada máxima (é o que separa um preset derrapador de um que não derrapa)
       Turn      a mesma curva SEM freio de mão (referência)
       Switch    troca de preset andando (arcade-2 em 1,4 s, Padrao em 2,2 s) e mostra que a velocidade se mantém
-      Wall      reto a fundo contra a parede: mostra as batidas reais e os amassados, e salva dn-dent-parede.png
+      Wall      reto contra a parede (a fundo, ou segurando -WallKmh): mostra as batidas reais (velocidade antes e depois, variação
+                de velocidade, ponto) e os amassados, e salva dn-dent-parede.png
     Com -ShotDent, em vez do cenário: carro parado, 8 amassados de demonstração aplicados em 2 s, e quatro capturas só da
     cena (sem HUD) em <projeto>\Saved\Screenshots\WindowsEditor: dn-dent-A-antes/depois (frente e lado esquerdo) e
     dn-dent-B-depois/antes (traseira e lado direito).
@@ -32,6 +33,7 @@ param(
     [ValidateSet('Sin', 'Accel', 'Nitro', 'Handbrake', 'Turn', 'Switch', 'Wall')][string]$Scenario = 'Sin',
     [switch]$Shot,
     [switch]$ShotDent,
+    [int]$WallKmh = 0,                   # cenário Wall: segura esta velocidade na aproximação (0 = acelerador a fundo)
     [string]$Map = '/Game/VehicleTemplate/Maps/VehicleBasic',
     [int]$TimeoutSeconds = 240,
     [string]$EngineVersion
@@ -51,7 +53,10 @@ $a = @("`"$($ctx.Uproject)`"", "$Map`?game=/Script/$($ctx.Name).DNTestCarGameMod
     "-DNCarRow=$Row", "-abslog=`"$log`"")
 if ($ShotDent) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNShotDent') }
 elseif ($Shot) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNCarShot') }
-else { $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario") }
+else {
+    $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario")
+    if ($WallKmh -gt 0) { $a += "-DNWallKmh=$WallKmh" }
+}
 
 $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
 if (-not $p.WaitForExit($TimeoutSeconds * 1000)) { Stop-Process -Id $p.Id; Write-Error "Passou de $TimeoutSeconds s e o jogo foi fechado."; exit 1 }
