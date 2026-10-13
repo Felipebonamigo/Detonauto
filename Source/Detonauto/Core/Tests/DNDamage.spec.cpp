@@ -107,6 +107,21 @@ void FDNDamageSpec::Define()
 			}
 		});
 
+		It("negativo e ignorado MESMO com limiar zero na configuracao", [this]()
+		{
+			FDNDamageConfig C;
+			C.DentMinDeltaVMs = 0.f;
+			for (const float V : { -0.001f, -1.f })
+			{
+				FDNDamageState S;
+				const FDNDamageResult R = FDNDamage::ApplyImpact(C, S, Hit(V));
+				TestFalse(FString::Printf(TEXT("%f: sem amassado"), V), R.bDentAdded);
+				TestTrue(FString::Printf(TEXT("%f: estado intacto"), V), Untouched(S));
+			}
+			FDNDamageState Zero;
+			TestTrue("com limiar 0, DeltaV 0 conta (>= inclusivo)", FDNDamage::ApplyImpact(C, Zero, Hit(0.f)).bDentAdded);
+		});
+
 		It("D5: zona fora do enum e ignorada", [this]()
 		{
 			FDNDamageState S;
@@ -255,6 +270,15 @@ void FDNDamageSpec::Define()
 			if (!TestEqual("continuam dois", S.Dents.Num(), 2)) { return; }
 			TestEqual("A engordou (o mais proximo): 9 + 3", S.Dents[0].DepthCm, 12.f);
 			TestEqual("B intacto", S.Dents[1].DepthCm, 9.f);
+
+			// agora o novo fica mais perto do B (que e o segundo da lista): a fusao nao pode ir para o primeiro ao alcance
+			FDNDamageState T;
+			FDNDamage::ApplyImpact(C, T, Hit(8.f, EDNDamageZone::Front, FVector(0, 0, 0)));
+			FDNDamage::ApplyImpact(C, T, Hit(8.f, EDNDamageZone::Front, FVector(20, 0, 0)));
+			FDNDamage::ApplyImpact(C, T, Hit(4.f, EDNDamageZone::Front, FVector(12, 0, 0)));    // a 12 de A e a 8 de B
+			if (!TestEqual("T: continuam dois", T.Dents.Num(), 2)) { return; }
+			TestEqual("T: A intacto", T.Dents[0].DepthCm, 9.f);
+			TestEqual("T: B engordou (o mais proximo): 9 + 3", T.Dents[1].DepthCm, 12.f);
 		});
 
 		It("D3: com varios ao alcance e a mesma distancia, funde no mais antigo", [this]()
@@ -540,6 +564,7 @@ void FDNDamageSpec::Define()
 		It("entradas negativas valem 0", [this, Check]()
 		{
 			Check(TEXT("Active negativo"), 24, -5, 3, 3, 0);
+			Check(TEXT("Active negativo e Requested grande"), 24, -5, 30, 24, 0);
 			Check(TEXT("Requested negativo"), 24, 5, -3, 0, 0);
 			Check(TEXT("MaxActive negativo"), -1, 5, 5, 0, 5);
 			Check(TEXT("MaxActive 0"), 0, 3, 2, 0, 3);
