@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Core/Data/DNDataRows.h"
+#include "Engine/GameInstance.h"
+#include "UObject/StrongObjectPtr.h"
 
 namespace DNTest
 {
@@ -70,4 +72,17 @@ namespace DNTest
 	inline FDNTurboConfigEntry TurboEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTurboConfigEntry>(TurboRow(), Id); }
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }
+
+	/**
+	 *  Subsistema de GameInstance sem mundo: a classe exige um UGameInstance como dono (ClassWithin), então cada um ganha
+	 *  o seu. Os donos ficam segurados até o fim da sessão de testes para o coletor de lixo não levar o objeto no meio.
+	 */
+	template <typename SubsystemType>
+	SubsystemType* NewSubsystem()
+	{
+		static TArray<TStrongObjectPtr<UGameInstance>> Owners;
+		UGameInstance* Owner = NewObject<UGameInstance>(GetTransientPackage());
+		Owners.Add(TStrongObjectPtr<UGameInstance>(Owner));
+		return NewObject<SubsystemType>(Owner);
+	}
 }

@@ -1,0 +1,50 @@
+// Cola fina: carrega as tabelas de Data/ na inicialização do jogo, valida e entrega os dados só para leitura.
+// Nenhuma regra aqui: o carregador (DNDataLoader) e os validadores (DNDataValidation) fazem o trabalho.
+// Erro de carga ou de validação NÃO derruba o jogo: é logado em LogDetonauto e marca os dados como inválidos.
+// Testes: Core/Tests/DNSubsystems.spec.cpp.
+//
+// S1: as configurações de turbo, Crash e takedown voltam ao padrão da struct pura SE a tabela delas for inválida
+//     (cada uma isolada das outras tabelas): um erro em Cities.csv não desfaz o balanceamento do turbo.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "Core/Data/DNDataRows.h"
+#include "DNGameDataSubsystem.generated.h"
+
+UCLASS()
+class DETONAUTO_API UDNGameDataSubsystem : public UGameInstanceSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+	/** Lê as tabelas de Data/ de novo e valida. Substitui o estado anterior. */
+	void Reload();
+
+	/** Para quem já tem os dados lidos (testes): valida e guarda. LoadErrors são os erros do carregador. */
+	void ApplyData(FDNData NewData, const TArray<FString>& LoadErrors);
+
+	const FDNData& GetData() const { return Data; }
+
+	/** (Não se chama IsDataValid: o UObject já tem um com outra assinatura.) Verdadeiro se carregou e passou em todos os validadores. */
+	bool AreTablesValid() const { return bDataValid; }
+
+	/** Erros de carga e de validação, em português, na ordem em que apareceram. */
+	const TArray<FString>& GetErrors() const { return Errors; }
+
+	/** A configuração do CSV, ou o padrão da struct pura se a tabela dela é inválida ou não foi carregada (S1). */
+	FDNTurboConfig GetTurboConfig() const;
+	FDNCrashConfig GetCrashConfig() const;
+	FDNTakedownConfig GetTakedownConfig() const;
+
+private:
+	FDNData Data;
+	TArray<FString> Errors;
+	bool bDataValid = false;
+	bool bTurboValid = false;
+	bool bCrashValid = false;
+	bool bTakedownValid = false;
+};

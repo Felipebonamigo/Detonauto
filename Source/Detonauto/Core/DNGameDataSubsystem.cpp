@@ -1,0 +1,57 @@
+#include "Core/DNGameDataSubsystem.h"
+#include "Core/Data/DNDataLoader.h"
+#include "Core/Data/DNDataValidation.h"
+#include "Detonauto.h"
+
+void UDNGameDataSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	Reload();
+}
+
+void UDNGameDataSubsystem::Reload()
+{
+	FDNData Loaded;
+	const TArray<FString> LoadErrors = FDNDataLoader::LoadAll(Loaded);
+	ApplyData(MoveTemp(Loaded), LoadErrors);
+}
+
+void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& LoadErrors)
+{
+	Data = MoveTemp(NewData);
+	Errors = LoadErrors;
+	Errors.Append(FDNDataValidation::ValidateAll(Data));
+
+	bTurboValid = FDNDataValidation::ValidateTurbo(Data.TurboConfig).IsEmpty();
+	bCrashValid = FDNDataValidation::ValidateCrash(Data.CrashConfig).IsEmpty();
+	bTakedownValid = FDNDataValidation::ValidateTakedown(Data.TakedownConfig).IsEmpty();
+	bDataValid = Errors.IsEmpty();
+
+	for (const FString& Error : Errors)
+	{
+		UE_LOG(LogDetonauto, Error, TEXT("[Dados] %s"), *Error);
+	}
+	if (bDataValid)
+	{
+		UE_LOG(LogDetonauto, Log, TEXT("[Dados] Tabelas carregadas e válidas."));
+	}
+	else
+	{
+		UE_LOG(LogDetonauto, Error, TEXT("[Dados] %d erro(s): o jogo segue, mas os dados estão marcados como inválidos."), Errors.Num());
+	}
+}
+
+FDNTurboConfig UDNGameDataSubsystem::GetTurboConfig() const
+{
+	return (bTurboValid && Data.TurboConfig.Num() == 1) ? Data.TurboConfig[0].Row.ToConfig() : FDNTurboConfig();
+}
+
+FDNCrashConfig UDNGameDataSubsystem::GetCrashConfig() const
+{
+	return (bCrashValid && Data.CrashConfig.Num() == 1) ? Data.CrashConfig[0].Row.ToConfig() : FDNCrashConfig();
+}
+
+FDNTakedownConfig UDNGameDataSubsystem::GetTakedownConfig() const
+{
+	return (bTakedownValid && Data.TakedownConfig.Num() == 1) ? Data.TakedownConfig[0].Row.ToConfig() : FDNTakedownConfig();
+}
