@@ -112,6 +112,24 @@ muda o código de `Move`.
 - Pela linha de comando: `Tools/Unreal/build.ps1` (o editor visual precisa
   estar fechado: ele trava a DLL).
 
+## Armadilhas dos testes
+
+Três coisas que já custaram tempo no lote 7 e valem para todo teste novo.
+
+- **Não use colchetes em `AddExpectedError`.** O padrão se comporta como expressão regular: `"[Registro]"` vira
+  "qualquer uma das letras R, e, g, i, s, t, o", casa com quase qualquer mensagem e **engole as falhas do próprio
+  teste**. Resultado: teste verde que não testa nada (seis mutantes sobreviveram assim). Use um texto literal sem
+  caracteres especiais, por exemplo `"Registro do jogador:"`, e por isso os logs do jogo não levam etiqueta entre colchetes.
+- **Subsistema de `GameInstance` precisa de um `UGameInstance` como dono** (`ClassWithin`). `NewObject<T>(GetTransientPackage())`
+  dispara um `ensure`, que derruba o primeiro teste que passar por ali. Use `DNTest::NewSubsystem<T>()`
+  (`Core/Tests/DNTestData.h`), que cria o dono sem mundo e o mantém vivo.
+- **O módulo não usa unity build** (`bUseUnity = false` em `Detonauto.Build.cs`). Com unity, arquivos `.cpp` eram
+  juntados em um só e as funções de ajuda com nome curto de testes diferentes (`City`, `Join`, `NaN`) colidiam toda
+  vez que um arquivo novo mudava o agrupamento.
+
+**Como saber se um teste tem dentes:** estrague o código de propósito (mutação) e veja o teste ficar vermelho. Se
+continuar verde, o teste não vale.
+
 ## Para responder sem consultar
 
 1. Qual a diferença entre um `AActor` e um `APawn`?
