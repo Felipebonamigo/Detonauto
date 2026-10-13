@@ -11,9 +11,22 @@ Cópia de referência dos arquivos do carro de teste que vivem no projeto descar
 | `DNCarTuning.spec.cpp` | `Source/VeiculoTeste/` | Testes de Automation da parte pura e dos presets do CSV |
 | `DNTestCar.h`, `DNTestCar.cpp` | `Source/VeiculoTeste/` | O carro: Chaos Vehicles em C++, presets, nitro, HUD e os modos de medição |
 | `DNTestCarWheels.h` | `Source/VeiculoTeste/` | As duas classes de roda (dianteira e traseira) |
+| `DNDentParams.h`, `DNDentParams.spec.cpp` | `Source/VeiculoTeste/` | Protótipo de amassado (lote 10): parâmetros do material, lado da batida e variação de velocidade; lógica pura, com testes |
 
 Para copiar para o projeto: arquivos `.h/.cpp` em `Source/VeiculoTeste/`, `TestCars.csv` em `Data/`, depois
 `Tools/Unreal/build.ps1` (com o editor FECHADO: ele trava a DLL) e `Tools/Unreal/test.ps1`.
 
 Como usar, o que cada preset muda e o roteiro de teste: [`docs/presets-carro.md`](../../../docs/presets-carro.md).
 Medições sem janela e captura de tela: `Tools/Unreal/car-probe.ps1`.
+
+## Amassado visual (lote 10)
+
+Além dos arquivos acima, o protótipo usa, **no projeto de teste**:
+
+- `Source/VeiculoTeste/Core/DNDamage.h` e `.cpp`: cópia **idêntica** de `Source/Detonauto/Core/DNDamage.*` (não edite aqui; confira com
+  `cmp`). O `Build.cs` do projeto de teste ganhou `PublicIncludePaths.Add(ModuleDirectory)` para o include `"Core/DNDamage.h"` valer
+  como no projeto principal.
+- `Source/VeiculoTeste/DNMeasureGameMode.*`: cópia em `Tools/Unreal/measure-gamemode/` (agora com `-DNStill`).
+- O material `Content/Sandbox_Teste/M_DNDentParent`, gerado por `Tools/Unreal/create_dent_material.ps1` (binário, fora do Git).
+
+O que é e o que foi medido: [`docs/prototipo-amassado.md`](../../../docs/prototipo-amassado.md).

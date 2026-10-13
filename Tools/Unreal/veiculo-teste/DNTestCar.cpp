@@ -23,6 +23,9 @@
 #include "InputCoreTypes.h"
 #include "Engine/Engine.h"
 #include "UnrealClient.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/StaticMesh.h"
+#include "DNDentParams.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "VeiculoTeste.h"
 
@@ -73,7 +76,7 @@ ADNTestCar::ADNTestCar()
 	};
 	if (BodyMesh.Succeeded())
 	{
-		MakeVisual(TEXT("Body"), BodyMesh.Object, NAME_None);
+		BodyComp = MakeVisual(TEXT("Body"), BodyMesh.Object, NAME_None);
 	}
 	if (GlassMesh.Succeeded())
 	{
@@ -333,13 +336,33 @@ void ADNTestCar::BeginPlay()
 		ApplyRuntimeParameters(Tuning);
 	}
 
-	bShot = FParse::Param(FCommandLine::Get(), TEXT("DNCarShot"));
+	// Amassado visual (protótipo): ligado por padrão para o Felipe testar jogando; -DNNoDents desliga (medição de referência);
+	// -DNDentMaterial liga só o material, sem amassados; -DNDents=N liga o material e aplica N amassados de demonstração.
+	{
+		const TCHAR* Cmd = FCommandLine::Get();
+		int32 DemoDents = 0;
+		FParse::Value(Cmd, TEXT("DNDents="), DemoDents);
+		const bool bNoDents = FParse::Param(Cmd, TEXT("DNNoDents"));
+		const bool bForceMaterial = FParse::Param(Cmd, TEXT("DNDentMaterial")) || DemoDents > 0;
+		DamageConfig.MaxDents = FDNDentParams::EffectiveMaxDents(DamageConfig.MaxDents);
+		if (bForceMaterial || !bNoDents)
+		{
+			// Em medição (-DNDentMaterial ou -DNDents=N) a batida real fica desligada: o que se mede é só o custo do material.
+			if (EnableDentMaterial(!bForceMaterial) && DemoDents > 0)
+			{
+				ApplyDemoDents(DemoDents);
+			}
+		}
+	}
+
+	bShotDent = FParse::Param(FCommandLine::Get(), TEXT("DNShotDent"));
+	bShot = bShotDent || FParse::Param(FCommandLine::Get(), TEXT("DNCarShot"));
 	bProbe = FParse::Param(FCommandLine::Get(), TEXT("DNCarProbe"));
 	if (bProbe)
 	{
 		ProbeScenario = TEXT("Sin");
 		FParse::Value(FCommandLine::Get(), TEXT("DNCarScenario="), ProbeScenario);
-		ProbeSeconds = (ProbeScenario == TEXT("Handbrake") || ProbeScenario == TEXT("Turn") || ProbeScenario == TEXT("Switch")) ? 9.0f : (ProbeScenario == TEXT("Nitro") || ProbeScenario == TEXT("Accel")) ? 3.6f : 10.0f;
+		ProbeSeconds = (ProbeScenario == TEXT("Handbrake") || ProbeScenario == TEXT("Turn") || ProbeScenario == TEXT("Switch")) ? 9.0f : (ProbeScenario == TEXT("Nitro") || ProbeScenario == TEXT("Accel")) ? 3.6f : (ProbeScenario == TEXT("Wall") ? 7.0f : 10.0f);
 		Chaos()->SetRequiresControllerForInputs(false);
 		UE_LOG(LogVeiculoTeste, Display, TEXT("DNTestCar: medição '%s' de %.0f s iniciada"), *ProbeScenario, ProbeSeconds);
 	}
@@ -364,10 +387,16 @@ FString ADNTestCar::NitroText() const
 
 TArray<FString> ADNTestCar::HudLines() const
 {
-	return {
+	TArray<FString> Lines = {
 		FString::Printf(TEXT("Preset: %s     (1 = arcade-1   2 = arcade-2   3 = arcade-3   0 = Padrao)"), *TuningRow.ToString()),
 		FString::Printf(TEXT("Velocidade: %.0f km/h"), SpeedKmh()),
 		NitroText() };
+	if (DentMaterial)
+	{
+		Lines.Add(FString::Printf(TEXT("Amassados: %d de %d     maior batida: %.1f m/s (%d batidas)"), DamageState.Dents.Num(), DamageConfig.MaxDents, MaxRealDeltaVMs, RealImpactCount));
+		Lines.Add(TEXT("Batida simulada:  T Y U = frente (pequena, media, maxima)   G H J = lado esquerdo   V = limpar"));
+	}
+	return Lines;
 }
 
 void ADNTestCar::UpdateHud() const
@@ -380,6 +409,12 @@ void ADNTestCar::UpdateHud() const
 	// inversa da ordem na tela (nitro, velocidade, preset).
 	const FVector2D Scale(1.6f, 1.6f);
 	const TArray<FString> Lines = HudLines();
+	// as duas linhas de amassado entram primeiro: ficam EMBAIXO (a última adicionada fica em cima)
+	if (Lines.Num() >= 5)
+	{
+		GEngine->AddOnScreenDebugMessage(9105, 0.0f, FColor::Silver, Lines[4], false, Scale);
+		GEngine->AddOnScreenDebugMessage(9104, 0.0f, FColor::Orange, Lines[3], false, Scale);
+	}
 	GEngine->AddOnScreenDebugMessage(9101, 0.0f, Nitro.bActive ? FColor::Cyan : FColor::White, Lines[2], false, Scale);
 	GEngine->AddOnScreenDebugMessage(9102, 0.0f, FColor::White, Lines[1], false, Scale);
 	GEngine->AddOnScreenDebugMessage(9103, 0.0f, FColor::Yellow, Lines[0], false, Scale);
@@ -414,10 +449,30 @@ void ADNTestCar::Tick(float DeltaSeconds)
 
 void ADNTestCar::ShotTick(float DeltaSeconds)
 {
-	// 0-3,4 s: acelera reto; nitro de 2,0 s em diante; em 3,4 s pede a captura de tela; fecha em 5 s.
 	const float Before = ShotTime;
 	ShotTime += DeltaSeconds;
 	auto Crossed = [&](float T) { return Before < T && ShotTime >= T; };
+
+	if (bShotDent)
+	{
+		// Carro parado. Vista A (frente e lado esquerdo): antes, depois dos 8 amassados. Vista B (traseira e lado direito):
+		// depois, e depois de limpar (antes). As capturas são só da cena (sem HUD).
+		Chaos()->SetThrottleInput(0.0f);
+		Chaos()->SetHandbrakeInput(true);
+		auto Shot = [](const TCHAR* Name) { FScreenshotRequest::RequestScreenshot(Name, false, false); };
+		if (Crossed(0.3f)) { SetShotCamera(135.0f); }
+		if (Crossed(1.6f)) { Shot(TEXT("dn-dent-A-antes")); }
+		if (Crossed(2.0f)) { ApplyDemoDents(DamageConfig.MaxDents); }
+		if (Crossed(2.8f)) { Shot(TEXT("dn-dent-A-depois")); }
+		if (Crossed(3.2f)) { SetShotCamera(-45.0f); }
+		if (Crossed(3.9f)) { Shot(TEXT("dn-dent-B-depois")); }
+		if (Crossed(4.3f)) { ClearDents(); }
+		if (Crossed(5.0f)) { Shot(TEXT("dn-dent-B-antes")); }
+		if (Crossed(5.8f)) { FPlatformMisc::RequestExit(false); }
+		return;
+	}
+
+	// 0-3,4 s: acelera reto; nitro de 2,0 s em diante; em 3,4 s pede a captura de tela; fecha em 5 s.
 	Chaos()->SetThrottleInput(ShotTime < 3.6f ? 1.0f : 0.0f);
 	if (Crossed(2.0f)) { NitroStart(FInputActionValue()); }
 	if (Crossed(3.4f))
@@ -487,6 +542,14 @@ void ADNTestCar::ProbeTick(float DeltaSeconds)
 			ProbeMinSpeedKmh = FMath::Min(ProbeMinSpeedKmh, SpeedKmh());
 		}
 	}
+	else if (ProbeScenario == TEXT("Wall"))
+	{
+		// Reto a fundo contra a parede (~3,3 s); depois a câmera vai para a frente-esquerda e tira a foto do estrago.
+		Move->SetThrottleInput(ProbeTime < 4.5f ? 1.0f : 0.0f);
+		Move->SetSteeringInput(0.0f);
+		if (Crossed(5.0f)) { SetShotCamera(135.0f); }
+		if (Crossed(6.0f)) { FScreenshotRequest::RequestScreenshot(TEXT("dn-dent-parede"), false, false); }
+	}
 	else if (ProbeScenario == TEXT("Nitro") || ProbeScenario == TEXT("Accel"))
 	{
 		// reto, acelerador a fundo; no cenário Nitro, Shift apertado de 1,2 s a 2,4 s
@@ -547,6 +610,15 @@ void ADNTestCar::ProbeFinish()
 	UE_LOG(LogVeiculoTeste, Display,
 		TEXT("DNCarProbe: %d quadros em %.1f s | intervalo entre quadros no Game thread (ms): média=%.2f p95=%.2f máx=%.2f | velocidade final=%.0f km/h"),
 		ProbeFrameMs.Num(), ProbeTime, FAvg, FP95, FMax, SpeedKmh());
+	if (DentMaterial)
+	{
+		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: ao fim: %d amassado(s) de %d, %d batida(s) reais, maior variação de velocidade %.1f m/s"),
+			DamageState.Dents.Num(), DamageConfig.MaxDents, RealImpactCount, MaxRealDeltaVMs);
+		for (const FDNDent& D : DamageState.Dents)
+		{
+			UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent:   amassado em %s: profundidade %.1f cm, raio %.1f cm"), *D.LocalPositionCm.ToCompactString(), D.DepthCm, D.RadiusCm);
+		}
+	}
 	if (ProbeScenario == TEXT("Handbrake") || ProbeScenario == TEXT("Turn"))
 	{
 		UE_LOG(LogVeiculoTeste, Display,
@@ -578,6 +650,17 @@ void ADNTestCar::CreateInputAssets()
 	Left.Modifiers.Add(NewObject<UInputModifierNegate>(MappingContext));
 	MappingContext->MapKey(HandbrakeAction, EKeys::SpaceBar);
 	MappingContext->MapKey(NitroAction, EKeys::LeftShift);
+
+	// batidas simuladas de teste: T Y U = frente (pequena, média, máxima), G H J = lado esquerdo, V = limpar
+	const FKey DentKeys[] = { EKeys::T, EKeys::Y, EKeys::U, EKeys::G, EKeys::H, EKeys::J, EKeys::V };
+	DentActions.Reset();
+	for (int32 i = 0; i < UE_ARRAY_COUNT(DentKeys); ++i)
+	{
+		UInputAction* Action = NewObject<UInputAction>(this, *FString::Printf(TEXT("DN_DentAction%d"), i));
+		Action->ValueType = EInputActionValueType::Boolean;
+		MappingContext->MapKey(Action, DentKeys[i]);
+		DentActions.Add(Action);
+	}
 
 	// 1, 2, 3 e 0 trocam de preset (ver HotkeyRows)
 	const FKey PresetKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Zero };
@@ -621,6 +704,10 @@ void ADNTestCar::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 		for (int32 i = 0; i < PresetActions.Num(); ++i)
 		{
 			Input->BindAction(PresetActions[i], ETriggerEvent::Started, this, &ADNTestCar::PresetKey, i);
+		}
+		for (int32 i = 0; i < DentActions.Num(); ++i)
+		{
+			Input->BindAction(DentActions[i], ETriggerEvent::Started, this, &ADNTestCar::DentKey, i);
 		}
 	}
 	else
@@ -672,4 +759,191 @@ void ADNTestCar::PresetKey(const FInputActionValue& Value, int32 HotkeyIndex)
 	{
 		UE_LOG(LogVeiculoTeste, Error, TEXT("DNTestCar: não consegui trocar para o preset '%s'"), *HotkeyRows()[HotkeyIndex].ToString());
 	}
+}
+
+// =====================================================================================================================
+// Protótipo de amassado visual (lote 10)
+// =====================================================================================================================
+
+namespace
+{
+	const TCHAR* DentParentPath = TEXT("/Game/Sandbox_Teste/M_DNDentParent.M_DNDentParent");
+
+	/** Variações de velocidade das batidas simuladas: dão profundidade pequena (4,5 cm), média (12 cm) e máxima (25 cm). */
+	const float SimulatedDeltaV[3] = { 5.0f, 10.0f, 20.0f };
+}
+
+void ADNTestCar::GetBodyBox(FVector& OutCenter, FVector& OutExtent) const
+{
+	OutCenter = FVector::ZeroVector;
+	OutExtent = FVector(230.0f, 100.0f, 70.0f); // só se a malha faltar
+	if (BodyComp && BodyComp->GetStaticMesh())
+	{
+		const FBoxSphereBounds Bounds = BodyComp->GetStaticMesh()->GetBounds();
+		OutCenter = Bounds.Origin;
+		OutExtent = Bounds.BoxExtent;
+	}
+}
+
+void ADNTestCar::LogMeshDensity() const
+{
+	if (BodyComp && BodyComp->GetStaticMesh())
+	{
+		const UStaticMesh* BodyMesh = BodyComp->GetStaticMesh();
+		const FBoxSphereBounds B = BodyMesh->GetBounds();
+		UE_LOG(LogVeiculoTeste, Display,
+			TEXT("DNDent: malha da carroceria '%s': %d vértices e %d triângulos (LOD0), %d LOD(s), %d material(is), Nanite=%d; caixa local centro=%s extensão=%s"),
+			*BodyMesh->GetName(), BodyMesh->GetNumVertices(0), BodyMesh->GetNumTriangles(0), BodyMesh->GetNumLODs(), BodyComp->GetNumMaterials(),
+			BodyMesh->GetNaniteSettings().bEnabled ? 1 : 0, *B.Origin.ToCompactString(), *B.BoxExtent.ToCompactString());
+	}
+	if (const USkeletalMesh* Skeletal = GetMesh()->GetSkeletalMeshAsset())
+	{
+		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: malha esquelética '%s' (física e rodas): %d LOD(s)"), *Skeletal->GetName(), Skeletal->GetLODNum());
+	}
+}
+
+bool ADNTestCar::EnableDentMaterial(bool bBindRealHits)
+{
+	if (DentMaterial)
+	{
+		return true;
+	}
+	if (!BodyComp || !BodyComp->GetStaticMesh())
+	{
+		UE_LOG(LogVeiculoTeste, Error, TEXT("DNDent: o carro não tem a malha da carroceria; amassado desligado"));
+		return false;
+	}
+	UMaterialInterface* Parent = LoadObject<UMaterialInterface>(nullptr, DentParentPath);
+	if (!Parent)
+	{
+		UE_LOG(LogVeiculoTeste, Error, TEXT("DNDent: material-pai não existe (%s). Rode Tools/Unreal/create_dent_material.ps1"), DentParentPath);
+		return false;
+	}
+
+	OriginalBodyMaterials.Reset();
+	for (int32 i = 0; i < BodyComp->GetNumMaterials(); ++i)
+	{
+		OriginalBodyMaterials.Add(BodyComp->GetMaterial(i));
+	}
+	DentMaterial = UMaterialInstanceDynamic::Create(Parent, this);
+	for (int32 i = 0; i < BodyComp->GetNumMaterials(); ++i)
+	{
+		BodyComp->SetMaterial(i, DentMaterial);
+	}
+	PushDentsToMaterial(); // todos os slots desligados
+
+	// batida real: o corpo físico avisa cada contato (paredes, outros carros)
+	if (bBindRealHits)
+	{
+		GetMesh()->SetNotifyRigidBodyCollision(true);
+		GetMesh()->OnComponentHit.AddUniqueDynamic(this, &ADNTestCar::OnCarHit);
+	}
+
+	LogMeshDensity();
+	return true;
+}
+
+void ADNTestCar::PushDentsToMaterial()
+{
+	if (!DentMaterial)
+	{
+		return;
+	}
+	for (int32 i = 0; i < FDNDentParams::MaxSlots; ++i)
+	{
+		const FDNDentParams::FSlot Slot = FDNDentParams::Slot(DamageState.Dents, i);
+		DentMaterial->SetVectorParameterValue(FDNDentParams::PositionName(i), Slot.Position);
+		DentMaterial->SetScalarParameterValue(FDNDentParams::RadiusName(i), Slot.Radius);
+		DentMaterial->SetScalarParameterValue(FDNDentParams::DepthName(i), Slot.Depth);
+	}
+}
+
+void ADNTestCar::SimulateImpact(float DeltaVMs, EDNDamageZone Zone, const FVector& LocalPositionCm)
+{
+	FDNImpact Impact;
+	Impact.DeltaVMs = DeltaVMs;
+	Impact.Zone = Zone;
+	Impact.LocalPositionCm = LocalPositionCm;
+	const FDNDamageResult Result = FDNDamage::ApplyImpact(DamageConfig, DamageState, Impact);
+	PushDentsToMaterial();
+	UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: batida de %.1f m/s na zona %d em %s: dano da zona +%.2f, amassado %s (profundidade %.1f cm, raio %.1f cm), %d amassado(s) guardado(s)%s"),
+		DeltaVMs, static_cast<int32>(Zone), *LocalPositionCm.ToCompactString(), Result.AddedZoneDamage, Result.bDentAdded ? TEXT("novo") : TEXT("nenhum"),
+		Result.Dent.DepthCm, Result.Dent.RadiusCm, DamageState.Dents.Num(), Result.bJustDestroyed ? TEXT(" | DESTRUIDO") : TEXT(""));
+}
+
+void ADNTestCar::ApplyDemoDents(int32 Count)
+{
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	// frente, traseira, lado esquerdo, lado direito, teto, quina da frente a esquerda, quina da frente a direita, quina de trás a esquerda
+	const FVector Fractions[8] = {
+		FVector(1.0f, 0.0f, 0.1f), FVector(-1.0f, 0.0f, 0.1f), FVector(0.0f, -1.0f, 0.0f), FVector(0.0f, 1.0f, 0.0f),
+		FVector(0.0f, 0.0f, 1.0f), FVector(0.8f, -0.8f, 0.0f), FVector(0.8f, 0.8f, 0.0f), FVector(-0.8f, -0.8f, 0.0f) };
+	const int32 N = FMath::Clamp(Count, 0, 8);
+	for (int32 i = 0; i < N; ++i)
+	{
+		const FVector Point = Center + Extent * Fractions[i];
+		SimulateImpact(SimulatedDeltaV[2], FDNDentParams::ZoneOfLocalPoint(Point, Center, Extent), Point);
+	}
+}
+
+void ADNTestCar::ClearDents()
+{
+	DamageState.Reset();
+	MaxRealDeltaVMs = 0.0f;
+	RealImpactCount = 0;
+	PushDentsToMaterial();
+}
+
+void ADNTestCar::DentKey(const FInputActionValue& Value, int32 DentIndex)
+{
+	if (!DentMaterial && !EnableDentMaterial())
+	{
+		return;
+	}
+	if (DentIndex == 6)
+	{
+		ClearDents();
+		return;
+	}
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const bool bFront = DentIndex < 3;
+	const FVector Point = bFront ? Center + FVector(Extent.X, 0.0f, 0.0f) : Center + FVector(0.0f, -Extent.Y, 0.0f);
+	SimulateImpact(SimulatedDeltaV[DentIndex % 3], bFront ? EDNDamageZone::Front : EDNDamageZone::Left, Point);
+}
+
+void ADNTestCar::OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (!BodyComp)
+	{
+		return;
+	}
+	const float DeltaV = FDNDentParams::DeltaVMsFromImpulse(NormalImpulse.Size(), Chaos()->Mass);
+	if (DeltaV <= 0.0f)
+	{
+		return;
+	}
+	MaxRealDeltaVMs = FMath::Max(MaxRealDeltaVMs, DeltaV);
+	++RealImpactCount;
+
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FVector LocalPoint = BodyComp->GetComponentTransform().InverseTransformPosition(Hit.ImpactPoint);
+	if (LoggedImpacts < 12 && DeltaV >= DamageConfig.DentMinDeltaVMs)
+	{
+		++LoggedImpacts;
+		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: BATIDA REAL contra '%s': impulso=%.0f kg cm/s, massa=%.0f kg -> variação de velocidade %.1f m/s; ponto local %s"),
+			*GetNameSafe(OtherActor), NormalImpulse.Size(), Chaos()->Mass, DeltaV, *LocalPoint.ToCompactString());
+	}
+	SimulateImpact(DeltaV, FDNDentParams::ZoneOfLocalPoint(LocalPoint, Center, Extent), LocalPoint);
+}
+
+void ADNTestCar::SetShotCamera(float YawDegrees)
+{
+	CameraBoom->bEnableCameraRotationLag = false;
+	CameraBoom->bInheritYaw = true;
+	CameraBoom->SetRelativeRotation(FRotator(-12.0f, YawDegrees, 0.0f));
+	CameraBoom->TargetArmLength = 560.0f;
+	CameraBoom->SocketOffset.Z = 60.0f;
 }

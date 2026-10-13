@@ -23,9 +23,12 @@
 #include "CoreMinimal.h"
 #include "WheeledVehiclePawn.h"
 #include "DNCarTuning.h"
+#include "Core/DNDamage.h"
 #include "DNTestCar.generated.h"
 
 class UStaticMeshComponent;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
@@ -63,7 +66,20 @@ class ADNTestCar : public AWheeledVehiclePawn
 	TArray<TObjectPtr<UInputAction>> PresetActions;
 
 	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInputAction>> DentActions;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;
+
+	/** A malha estática da carroceria (a que recebe o material de amassado). */
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> BodyComp;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> DentMaterial;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> OriginalBodyMaterials;
 
 	/** Atalho com o tipo certo do componente de movimento. */
 	UChaosWheeledVehicleMovementComponent* Chaos() const;
@@ -86,6 +102,23 @@ public:
 	/** As linhas das teclas 1, 2, 3 e 0, nessa ordem. */
 	static const TArray<FName>& HotkeyRows();
 
+	// ---- protótipo de amassado visual (lote 10; ver docs/prototipo-amassado.md) ----
+
+	/** Liga o material de amassado na carroceria. Falso (com erro no log) se o material-pai não existe. */
+	bool EnableDentMaterial(bool bBindRealHits = true);
+
+	/** Uma batida simulada: variação de velocidade [m/s], zona e ponto local na carroceria [cm]. */
+	void SimulateImpact(float DeltaVMs, EDNDamageZone Zone, const FVector& LocalPositionCm);
+
+	/** Até 8 amassados de profundidade máxima espalhados pela carroceria (para medir custo e tirar foto). */
+	void ApplyDemoDents(int32 Count);
+
+	/** Tira todos os amassados. */
+	void ClearDents();
+
+	int32 DentCount() const { return DamageState.Dents.Num(); }
+	bool IsDentMaterialOn() const { return DentMaterial != nullptr; }
+
 protected:
 
 	virtual void PreRegisterAllComponents() override;
@@ -101,6 +134,16 @@ protected:
 	void NitroStart(const FInputActionValue& Value);
 	void NitroStop(const FInputActionValue& Value);
 	void PresetKey(const FInputActionValue& Value, int32 HotkeyIndex);
+	void DentKey(const FInputActionValue& Value, int32 DentIndex);
+
+	/** Batida real do corpo físico (colisão com a parede, com outros carros...). */
+	UFUNCTION()
+	void OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+	void PushDentsToMaterial();
+	void GetBodyBox(FVector& OutCenter, FVector& OutExtent) const;
+	void LogMeshDensity() const;
+	void SetShotCamera(float YawDegrees);
 
 	void CreateInputAssets();
 
@@ -127,6 +170,12 @@ protected:
 	FDNCarTuning Tuning;
 	bool bTuningLoaded = false;
 
+	FDNDamageConfig DamageConfig;
+	FDNDamageState DamageState;
+	float MaxRealDeltaVMs = 0.0f;
+	int32 RealImpactCount = 0;
+	int32 LoggedImpacts = 0;
+
 	bool bHandbrakeHeld = false;
 	bool bNitroHeld = false;
 	float HandbrakeRamp = 0.0f;
@@ -152,6 +201,7 @@ protected:
 
 	// captura de tela para conferir o HUD e a câmera (linha de comando: -DNCarShot): acelera, liga o nitro e tira a foto
 	bool bShot = false;
+	bool bShotDent = false;
 	float ShotTime = 0.0f;
 
 	void ShotTick(float DeltaSeconds);
