@@ -143,6 +143,140 @@ void FDNDentParamsSpec::Define()
 			TestEqual("impulso NaN", FDNDentParams::DeltaVMsFromImpulse(NaN, 1500.f), 0.f);
 		});
 	});
+
+	// ---------------- Lote 11: calibracao da batida real ----------------
+
+	Describe("Variacao de velocidade antes e depois do contato", [this]()
+	{
+		It("e o modulo da diferenca das velocidades lineares, em m/s (entrada em cm/s)", [this]()
+		{
+			// de frente a 100 km/h (2778 cm/s) para parado: 27,78 m/s
+			TestEqual("frente ate parar", FDNDentParams::DeltaVMsBetween(FVector(2778, 0, 0), FVector::ZeroVector), 27.78f, 1e-3f);
+			// com quique: de +2778 para -1000: 37,78 m/s
+			TestEqual("com quique", FDNDentParams::DeltaVMsBetween(FVector(2778, 0, 0), FVector(-1000, 0, 0)), 37.78f, 1e-3f);
+			// de lado: so a componente que mudou
+			TestEqual("lateral", FDNDentParams::DeltaVMsBetween(FVector(1000, 0, 0), FVector(1000, 300, 400)), 5.f, 1e-4f);
+			TestEqual("sem mudanca", FDNDentParams::DeltaVMsBetween(FVector(500, 5, 5), FVector(500, 5, 5)), 0.f);
+		});
+
+		It("a ordem nao importa e NaN ou infinito valem 0", [this]()
+		{
+			const float NaN = std::numeric_limits<float>::quiet_NaN();
+			TestEqual("simetrico", FDNDentParams::DeltaVMsBetween(FVector::ZeroVector, FVector(2778, 0, 0)), 27.78f, 1e-3f);
+			TestEqual("NaN antes", FDNDentParams::DeltaVMsBetween(FVector(NaN, 0, 0), FVector::ZeroVector), 0.f);
+			TestEqual("infinito depois", FDNDentParams::DeltaVMsBetween(FVector::ZeroVector, FVector(0, std::numeric_limits<float>::infinity(), 0)), 0.f);
+		});
+	});
+
+	Describe("Agrupar os contatos de uma batida", [this]()
+	{
+		It("o primeiro contato abre a janela; so o MAIOR valor da janela sai, com o ponto dele", [this]()
+		{
+			FDNImpactGrouper G;
+			TestFalse("fechado no comeco", G.IsOpen());
+			G.Add(10.0, 8.f, FVector(1, 0, 0));
+			TestTrue("aberto", G.IsOpen());
+			G.Add(10.05, 15.f, FVector(2, 0, 0));   // o maior
+			G.Add(10.10, 12.f, FVector(3, 0, 0));   // o quique: menor, nao conta de novo
+			FDNImpactGrouper::FGroup Out;
+			TestFalse("antes de 0,15 s nao sai", G.TryFlush(10.14, Out));
+			if (!TestTrue("em 0,15 s sai (inclusivo)", G.TryFlush(10.15, Out))) { return; }
+			TestEqual("o maior", Out.DeltaVMs, 15.f);
+			TestEqual("o ponto do maior", Out.LocalPoint, FVector(2, 0, 0));
+			TestFalse("fechou", G.IsOpen());
+		});
+
+		It("empate no maior fica com o primeiro; valores iguais nao somam", [this]()
+		{
+			FDNImpactGrouper G;
+			G.Add(0.0, 10.f, FVector(1, 0, 0));
+			G.Add(0.02, 10.f, FVector(2, 0, 0));
+			FDNImpactGrouper::FGroup Out;
+			G.TryFlush(1.0, Out);
+			TestEqual("nao somou", Out.DeltaVMs, 10.f);
+			TestEqual("ficou o primeiro", Out.LocalPoint, FVector(1, 0, 0));
+		});
+
+		It("depois de sair, o proximo contato abre outra janela, independente", [this]()
+		{
+			FDNImpactGrouper G;
+			FDNImpactGrouper::FGroup Out;
+			G.Add(0.0, 10.f, FVector::ZeroVector);
+			TestTrue("1a sai", G.TryFlush(0.2, Out));
+			TestFalse("sem janela aberta nao sai nada", G.TryFlush(0.5, Out));
+			G.Add(0.6, 4.f, FVector(7, 0, 0));
+			TestTrue("2a sai", G.TryFlush(0.75, Out));
+			TestEqual("a 2a nao herda o maior da 1a", Out.DeltaVMs, 4.f);
+			TestTrue("a janela da 2a conta do primeiro contato dela", FMath::IsNearlyEqual(Out.StartTime, 0.6));
+		});
+
+		It("valor invalido (0, negativo, NaN, infinito) nao abre nem muda a janela", [this]()
+		{
+			const float NaN = std::numeric_limits<float>::quiet_NaN();
+			FDNImpactGrouper G;
+			for (const float V : { 0.f, -3.f, NaN, std::numeric_limits<float>::infinity() }) { G.Add(0.0, V, FVector::ZeroVector); }
+			TestFalse("nao abriu", G.IsOpen());
+			G.Add(1.0, 6.f, FVector(1, 0, 0));
+			G.Add(1.01, NaN, FVector(9, 0, 0));
+			FDNImpactGrouper::FGroup Out;
+			G.TryFlush(2.0, Out);
+			TestEqual("so o valido", Out.DeltaVMs, 6.f);
+		});
+
+		It("fronteira exata: com o primeiro contato em 0,0 s, em 0,15 s sai; um pouco antes nao", [this]()
+		{
+			FDNImpactGrouper Early;
+			Early.Add(0.0, 5.f, FVector::ZeroVector);
+			FDNImpactGrouper::FGroup Out;
+			TestFalse("0,149 nao sai", Early.TryFlush(0.149, Out));
+			FDNImpactGrouper Exact;
+			Exact.Add(0.0, 5.f, FVector::ZeroVector);
+			TestTrue("0,15 sai (inclusivo)", Exact.TryFlush(FDNImpactGrouper::WindowSeconds, Out));
+			FDNImpactGrouper Late;
+			Late.Add(0.0, 5.f, FVector::ZeroVector);
+			TestTrue("0,151 sai", Late.TryFlush(0.151, Out));
+		});
+
+		It("a janela e de 0,15 s", [this]()
+		{
+			TestEqual("janela", static_cast<float>(FDNImpactGrouper::WindowSeconds), 0.15f);
+		});
+	});
+
+	Describe("Ponto do amassado: sobe do chao e entra na caixa do corpo", [this]()
+	{
+		const FVector Center(0, 0, 60);
+		const FVector Extent(230, 100, 60); // o corpo vai de Z = 0 a Z = 120
+
+		It("ponto abaixo de 20 cm acima da base sobe ate 20 cm", [this, Center, Extent]()
+		{
+			TestEqual("no chao", FDNDentParams::ProjectToBody(FVector(230, 0, 1.8f), Center, Extent, 20.f), FVector(230, 0, 20));
+			TestEqual("abaixo da base", FDNDentParams::ProjectToBody(FVector(230, 0, -30), Center, Extent, 20.f), FVector(230, 0, 20));
+			TestEqual("a 19,9", static_cast<float>(FDNDentParams::ProjectToBody(FVector(0, 100, 19.9f), Center, Extent, 20.f).Z), 20.f);
+		});
+
+		It("ponto de 20 cm para cima fica onde esta", [this, Center, Extent]()
+		{
+			TestEqual("exatamente 20", FDNDentParams::ProjectToBody(FVector(100, -50, 20), Center, Extent, 20.f), FVector(100, -50, 20));
+			TestEqual("alto", FDNDentParams::ProjectToBody(FVector(-100, 30, 90), Center, Extent, 20.f), FVector(-100, 30, 90));
+		});
+
+		It("ponto fora da caixa vem para a superficie dela", [this, Center, Extent]()
+		{
+			TestEqual("na frente da caixa", FDNDentParams::ProjectToBody(FVector(400, 10, 60), Center, Extent, 20.f), FVector(230, 10, 60));
+			TestEqual("ao lado", FDNDentParams::ProjectToBody(FVector(0, -300, 60), Center, Extent, 20.f), FVector(0, -100, 60));
+			TestEqual("acima", FDNDentParams::ProjectToBody(FVector(0, 0, 500), Center, Extent, 20.f), FVector(0, 0, 120));
+		});
+
+		It("entrada invalida ou altura minima maior que o corpo nao quebra", [this, Center, Extent]()
+		{
+			const float NaN = std::numeric_limits<float>::quiet_NaN();
+			TestEqual("NaN cai no centro", FDNDentParams::ProjectToBody(FVector(NaN, 0, 0), Center, Extent, 20.f), Center);
+			// altura minima absurda: nunca sai da caixa
+			TestEqual("minima de 500 cm", static_cast<float>(FDNDentParams::ProjectToBody(FVector(0, 0, 10), Center, Extent, 500.f).Z), 120.f);
+			TestEqual("minima negativa vale 0", static_cast<float>(FDNDentParams::ProjectToBody(FVector(0, 0, 10), Center, Extent, -5.f).Z), 10.f);
+		});
+	});
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS

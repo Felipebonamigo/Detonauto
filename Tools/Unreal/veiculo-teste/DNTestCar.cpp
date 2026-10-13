@@ -362,6 +362,7 @@ void ADNTestCar::BeginPlay()
 	{
 		ProbeScenario = TEXT("Sin");
 		FParse::Value(FCommandLine::Get(), TEXT("DNCarScenario="), ProbeScenario);
+		FParse::Value(FCommandLine::Get(), TEXT("DNWallKmh="), WallTargetKmh);
 		ProbeSeconds = (ProbeScenario == TEXT("Handbrake") || ProbeScenario == TEXT("Turn") || ProbeScenario == TEXT("Switch")) ? 9.0f : (ProbeScenario == TEXT("Nitro") || ProbeScenario == TEXT("Accel")) ? 3.6f : (ProbeScenario == TEXT("Wall") ? 7.0f : 10.0f);
 		Chaos()->SetRequiresControllerForInputs(false);
 		UE_LOG(LogVeiculoTeste, Display, TEXT("DNTestCar: medição '%s' de %.0f s iniciada"), *ProbeScenario, ProbeSeconds);
@@ -423,6 +424,11 @@ void ADNTestCar::UpdateHud() const
 void ADNTestCar::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Batida real: fecha a janela vencida e guarda a velocidade do corpo ANTES do passo de física deste quadro. O contato
+	// chega depois do passo, com a velocidade já alterada; a diferença entre as duas é a variação de velocidade da batida.
+	FlushImpacts(GetWorld()->GetTimeSeconds());
+	VelocityBeforeStepCmS = GetMesh()->GetPhysicsLinearVelocity();
 
 	// freio de mão: a perda de aderência da traseira sobe e desce com rampa
 	HandbrakeRamp = FDNHandbrakeRamp::Step(HandbrakeRamp, bHandbrakeHeld, DeltaSeconds, Tuning.HandbrakeRampInSeconds, Tuning.HandbrakeRampOutSeconds);
@@ -544,8 +550,11 @@ void ADNTestCar::ProbeTick(float DeltaSeconds)
 	}
 	else if (ProbeScenario == TEXT("Wall"))
 	{
-		// Reto a fundo contra a parede (~3,3 s); depois a câmera vai para a frente-esquerda e tira a foto do estrago.
-		Move->SetThrottleInput(ProbeTime < 4.5f ? 1.0f : 0.0f);
+		// Reto contra a parede (~3,3 s a fundo); com -DNWallKmh=N segura a velocidade em N km/h (controle proporcional).
+		// Depois a câmera vai para a frente-esquerda e tira a foto do estrago.
+		// controle proporcional: acelerador cheio abaixo de ~8 km/h do alvo e 0,4 no alvo (o freio-motor do carro é forte)
+		const float Throttle = WallTargetKmh > 0.0f ? FMath::Clamp(0.4f + (WallTargetKmh - SpeedKmh()) * 0.08f, 0.0f, 1.0f) : 1.0f;
+		Move->SetThrottleInput(ProbeTime < 4.5f ? Throttle : 0.0f);
 		Move->SetSteeringInput(0.0f);
 		if (Crossed(5.0f)) { SetShotCamera(135.0f); }
 		if (Crossed(6.0f)) { FScreenshotRequest::RequestScreenshot(TEXT("dn-dent-parede"), false, false); }
@@ -612,8 +621,9 @@ void ADNTestCar::ProbeFinish()
 		ProbeFrameMs.Num(), ProbeTime, FAvg, FP95, FMax, SpeedKmh());
 	if (DentMaterial)
 	{
-		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: ao fim: %d amassado(s) de %d, %d batida(s) reais, maior variação de velocidade %.1f m/s"),
-			DamageState.Dents.Num(), DamageConfig.MaxDents, RealImpactCount, MaxRealDeltaVMs);
+		FlushImpacts(GetWorld()->GetTimeSeconds() + 1.0); // uma janela ainda aberta no fim também conta
+		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: ao fim: %d amassado(s) de %d, %d batida(s) reais, maior variação de velocidade %.1f m/s, destruído=%d"),
+			DamageState.Dents.Num(), DamageConfig.MaxDents, RealImpactCount, MaxRealDeltaVMs, DamageState.bDestroyed ? 1 : 0);
 		for (const FDNDent& D : DamageState.Dents)
 		{
 			UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent:   amassado em %s: profundidade %.1f cm, raio %.1f cm"), *D.LocalPositionCm.ToCompactString(), D.DepthCm, D.RadiusCm);
@@ -919,24 +929,58 @@ void ADNTestCar::OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	{
 		return;
 	}
-	const float DeltaV = FDNDentParams::DeltaVMsFromImpulse(NormalImpulse.Size(), Chaos()->Mass);
+	const double Now = GetWorld()->GetTimeSeconds();
+	FlushImpacts(Now); // uma janela vencida sai antes de este contato abrir outra
+
+	// Variação de velocidade medida no corpo: velocidade no início do quadro (antes do passo de física) menos a de agora.
+	const float DeltaV = FDNDentParams::DeltaVMsBetween(VelocityBeforeStepCmS, GetMesh()->GetPhysicsLinearVelocity());
 	if (DeltaV <= 0.0f)
 	{
 		return;
 	}
-	MaxRealDeltaVMs = FMath::Max(MaxRealDeltaVMs, DeltaV);
+
+	// Ponto do amassado: o contato sobe do chão (20 cm acima da base do corpo) e entra na caixa do corpo.
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FVector LocalContact = BodyComp->GetComponentTransform().InverseTransformPosition(Hit.ImpactPoint);
+	const FVector LocalPoint = FDNDentParams::ProjectToBody(LocalContact, Center, Extent, 20.0f);
+
+	const bool bWasOpen = ImpactGrouper.IsOpen();
+	ImpactGrouper.Add(Now, DeltaV, LocalPoint);
+	if (!bWasOpen && ImpactGrouper.IsOpen())
+	{
+		GroupVelocityBeforeCmS = VelocityBeforeStepCmS;
+		GroupContacts = 0;
+	}
+	++GroupContacts;
+	if (LoggedImpacts < 24 && DeltaV >= DamageConfig.DentMinDeltaVMs)
+	{
+		++LoggedImpacts;
+		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: contato com '%s': velocidade antes %.1f km/h, depois %.1f km/h -> %.1f m/s; contato local %s, ponto do amassado %s"),
+			*GetNameSafe(OtherActor), VelocityBeforeStepCmS.Size() * 0.036f, GetMesh()->GetPhysicsLinearVelocity().Size() * 0.036f, DeltaV,
+			*LocalContact.ToCompactString(), *LocalPoint.ToCompactString());
+	}
+}
+
+void ADNTestCar::FlushImpacts(double Now)
+{
+	FDNImpactGrouper::FGroup Group;
+	if (!ImpactGrouper.TryFlush(Now, Group))
+	{
+		return;
+	}
 	++RealImpactCount;
+	MaxRealDeltaVMs = FMath::Max(MaxRealDeltaVMs, Group.DeltaVMs);
 
 	FVector Center, Extent;
 	GetBodyBox(Center, Extent);
-	const FVector LocalPoint = BodyComp->GetComponentTransform().InverseTransformPosition(Hit.ImpactPoint);
-	if (LoggedImpacts < 12 && DeltaV >= DamageConfig.DentMinDeltaVMs)
-	{
-		++LoggedImpacts;
-		UE_LOG(LogVeiculoTeste, Display, TEXT("DNDent: BATIDA REAL contra '%s': impulso=%.0f kg cm/s, massa=%.0f kg -> variação de velocidade %.1f m/s; ponto local %s"),
-			*GetNameSafe(OtherActor), NormalImpulse.Size(), Chaos()->Mass, DeltaV, *LocalPoint.ToCompactString());
-	}
-	SimulateImpact(DeltaV, FDNDentParams::ZoneOfLocalPoint(LocalPoint, Center, Extent), LocalPoint);
+	const float WholeWindow = FDNDentParams::DeltaVMsBetween(GroupVelocityBeforeCmS, GetMesh()->GetPhysicsLinearVelocity());
+	UE_LOG(LogVeiculoTeste, Display,
+		TEXT("DNDent: IMPACTO REAL (janela de %.2f s fechada, %d contato(s)): velocidade antes do 1o contato %.1f km/h, agora %.1f km/h | variação de velocidade: maior por quadro %.1f m/s (vale), janela inteira %.1f m/s (só informativo)"),
+		FDNImpactGrouper::WindowSeconds, GroupContacts, GroupVelocityBeforeCmS.Size() * 0.036f, GetMesh()->GetPhysicsLinearVelocity().Size() * 0.036f,
+		Group.DeltaVMs, WholeWindow);
+	SimulateImpact(Group.DeltaVMs, FDNDentParams::ZoneOfLocalPoint(Group.LocalPoint, Center, Extent), Group.LocalPoint);
+	GroupContacts = 0;
 }
 
 void ADNTestCar::SetShotCamera(float YawDegrees)

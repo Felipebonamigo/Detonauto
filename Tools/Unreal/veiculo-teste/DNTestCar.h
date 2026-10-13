@@ -23,6 +23,7 @@
 #include "CoreMinimal.h"
 #include "WheeledVehiclePawn.h"
 #include "DNCarTuning.h"
+#include "DNDentParams.h"
 #include "Core/DNDamage.h"
 #include "DNTestCar.generated.h"
 
@@ -141,6 +142,9 @@ protected:
 	void OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 
 	void PushDentsToMaterial();
+
+	/** Fecha a janela de contatos vencida e aplica a batida (o maior valor da janela). */
+	void FlushImpacts(double Now);
 	void GetBodyBox(FVector& OutCenter, FVector& OutExtent) const;
 	void LogMeshDensity() const;
 	void SetShotCamera(float YawDegrees);
@@ -175,6 +179,14 @@ protected:
 	float MaxRealDeltaVMs = 0.0f;
 	int32 RealImpactCount = 0;
 	int32 LoggedImpacts = 0;
+
+	// calibração da batida real (lote 11): velocidade do corpo no início do quadro (antes do passo de física) e a janela de contatos
+	FVector VelocityBeforeStepCmS = FVector::ZeroVector;
+	FVector GroupVelocityBeforeCmS = FVector::ZeroVector;
+	FDNImpactGrouper ImpactGrouper;
+	int32 GroupContacts = 0;
+	/** Cenário Wall: velocidade-alvo [km/h] da aproximação da parede (0 = acelerador a fundo). */
+	float WallTargetKmh = 0.0f;
 
 	bool bHandbrakeHeld = false;
 	bool bNitroHeld = false;
