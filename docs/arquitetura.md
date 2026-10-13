@@ -126,6 +126,7 @@ folga, não medidos.
    Felipe jogar o carro de teste antes de decidir.
 4. Como guardar o replay do takedown sem custo alto de memória.
 5. Se o tráfego usa física completa ou um modelo simplificado até a batida.
+   A primeira medição aponta para o modelo simplificado (ver a seção abaixo).
 
 ## Diagnóstico do Chaos Vehicles para o estilo arcade (Sprint 4)
 
@@ -169,4 +170,36 @@ o custo real nem prova de 60 fps.
 **Direção provisória:** começar com o Chaos Vehicles configurado por tabela e
 adicionar uma camada própria de forças só onde o parâmetro não chegar. Não
 construir um modelo de física do zero antes de o Felipe sentir o carro.
+
+## Primeira evidência de desempenho (13 out 2026)
+
+Medição em modo Standalone, 1920x1080, num PC bem mais forte que o alvo "nível
+PS5" (RTX 4070 Ti e Ryzen 7 5800X3D). Detalhes e ressalvas em
+`docs/desempenho.md`. Os carros extras são cópias do mesmo carro, usadas como
+substitutos de custo, e não o tráfego nem o dano reais.
+
+| Cenário | Frame médio | Game thread médio |
+|---|---|---|
+| 1 carro | 6,7 ms | 1,6 ms |
+| 1 mais 20 parados | 7,2 ms | 4,7 ms |
+| 1 mais 40 parados | 7,7 ms | 7,0 ms |
+| 1 mais 40 em movimento | 9,1 ms | 9,1 ms |
+
+**O que sai daí:**
+
+- A GPU quase não muda (4,7 a 6,4 ms). O que cresce com o número de carros é o
+  Game thread, com cerca de 0,13 a 0,19 ms por carro com física completa.
+- Com 40 carros em movimento, o Game thread já passa os 8 ms que o orçamento
+  deste documento reservou, só com a física, e ainda sem IA, dano ou destroços.
+  Num hardware mais fraco, a conta fica pior.
+- **Consequência para o desenho:** não é viável dar física completa do Chaos a
+  todo carro de tráfego o tempo todo. O tráfego deve seguir trilhas de forma
+  simplificada (sem simulação de pneu e suspensão) e só virar corpo físico
+  completo quando for atingido. Isso responde a pergunta em aberto nº 5 como
+  hipótese de trabalho, a validar no protótipo com tráfego real.
+- Diferenças menores que cerca de 1 ms entre cenários não são confiáveis: houve
+  ruído entre rodadas iguais.
+
+**Ainda não medido:** tráfego real, dano, destroços, explosão, áudio, 4K, memória
+de vídeo, jogo empacotado e um hardware próximo do alvo.
 
