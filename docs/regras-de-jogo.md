@@ -40,12 +40,16 @@ O ganho nunca passa de 100. Com o turbo ligado, só o takedown dá ganho.
 - O turbo liga quando o jogador segura o botão e a barra tem mais de 0.
 - Consome 25 unidades por segundo. A barra cheia dura 4 s.
 - Desliga ao soltar o botão ou quando a barra chega a 0.
+- **Depois de a barra zerar com o botão ainda apertado, o turbo só volta a
+  ligar com um novo aperto** (soltar e apertar de novo). Isso evita um turbo
+  que religa sozinho quando o takedown recarrega a barra.
 
 ### Turbo prolongado
 
 Se o jogador liga o turbo com a barra em 100 e segura **sem soltar** até a
-barra chegar a 0, ele ganha 50 unidades, uma vez por uso. Soltar o botão em
-qualquer momento cancela o prêmio.
+barra chegar a 0, ele ganha 50 unidades, uma vez por uso, e o turbo continua
+ligado no mesmo uso. Soltar o botão em qualquer momento cancela o prêmio. Um
+"uso" vai do aperto que liga o turbo até ele desligar.
 
 ## 2. Pontuação do modo Crash
 
@@ -65,8 +69,9 @@ qualquer momento cancela o prêmio.
 
 Cada cruzamento define três limites crescentes: bronze, prata e ouro. A medalha
 é a mais alta cujo limite a pontuação alcançou. Abaixo do bronze, nenhuma.
-Limites devem ser estritamente crescentes. Uma configuração que não respeite
-isso é inválida e o teste de dados a recusa.
+Limites devem ser **maiores que zero e estritamente crescentes**. Uma
+configuração que não respeite isso é inválida e o teste de dados a recusa.
+Alcançar um limite significa pontuação maior ou igual a ele.
 
 ## 4. Takedown
 
@@ -83,15 +88,27 @@ Um takedown acontece quando **todas** as condições valem:
 Entradas: direção da frente do jogador `A`, direção da frente do rival `V`,
 normal do contato, altura relativa e se o jogador está caindo.
 
+**Convenção de contato.** A normal do contato é um vetor unitário no espaço
+do mundo que **aponta do jogador para o rival**. Com `V` a frente do rival:
+
+| Zona de contato no rival | Condição |
+|---|---|
+| Traseira | `dot(normal, V)` maior ou igual a cos 45° (0,7071) |
+| Frontal | `dot(normal, V)` menor ou igual a -cos 45° |
+| Lateral | qualquer outro valor |
+
+O ângulo entre `A` e `V` é `acos(dot(A, V))`, de 0 a 180 graus, com os dois
+vetores normalizados.
+
 Ordem de avaliação, a primeira que valer define o tipo:
 
 1. **Vertical:** o jogador está pelo menos 100 cm acima do rival e caindo.
-2. **Por trás:** o ângulo entre `A` e `V` é menor que 30 graus e o jogador está
-   atrás do rival.
-3. **Em T:** o ângulo entre `A` e `V` está entre 60 e 120 graus e o contato
-   está no lado do rival.
-4. **Lateral:** o contato está no lado do rival e o ângulo entre `A` e `V` é
-   menor que 60 graus.
+2. **Por trás:** o ângulo entre `A` e `V` é menor que 30 graus e a zona do
+   contato é traseira.
+3. **Em T:** o ângulo entre `A` e `V` está entre 60 e 120 graus (inclusive) e a
+   zona do contato é lateral.
+4. **Lateral:** a zona do contato é lateral e o ângulo entre `A` e `V` é menor
+   que 60 graus.
 5. **Geral:** qualquer outro caso.
 
 Cada tipo pode ter uma recompensa diferente no futuro. Por enquanto todos
@@ -111,3 +128,45 @@ Cada regra vira funções puras em C++, sem Actors nem física, com o tempo e as
 entradas passados como parâmetro. Um teste de Automation por regra, rodando
 sem janela pelo `Tools/Unreal/test.ps1`. A sensação final é decisão do Felipe
 jogando.
+
+## Decisões de implementação (13 out 2026)
+
+Ambiguidades levantadas na implementação e como foram fechadas. Cada uma vira um
+comentário no código e um teste que fica fácil de trocar se a decisão mudar.
+
+**Turbo**
+
+| Ponto | Decisão |
+|---|---|
+| T1. Fontes de ganho no mesmo quadro | Somam |
+| T2. "Uma vez por veículo" | Por veículo, enquanto o estado não for reiniciado. O estado guarda os ids já contados e tem um reinício explícito |
+| T3. Depois da 5ª passada da cadeia | O multiplicador fica em 2,0 |
+| T4. Intervalo de exatamente 2,0 s | Continua a cadeia. Só "mais de 2,0 s" reinicia |
+| T5. "Entre 15 e 70 graus" | Inclusivo nos dois extremos. "Acima de" é estritamente maior |
+| T6. Religar com o botão apertado | Exige novo aperto, como descrito na seção de uso |
+| T7. Turbo prolongado | A barra vai a 50 e o turbo continua no mesmo uso, com um prêmio por uso |
+
+**Crash**
+
+| Ponto | Decisão |
+|---|---|
+| C1. Ordem da conta | Valor com o bônus da cadeia, depois vezes o multiplicador. O 1º veículo da cadeia não tem bônus e o 11º já está em +100% |
+| C2. Arredondamento | Aritmética inteira de 64 bits, sem ponto flutuante. O bônus da cadeia é `valor × (100 + 10 × elos) / 100`, truncado para baixo, e só depois multiplicado |
+| C3. Fim da rodada | Só conta depois do primeiro impacto. "Parado" é velocidade menor ou igual a 2,0 m/s. 3,0 s e 30,0 s exatos encerram |
+| C4. Depois do fim | Pontos e multiplicadores são ignorados |
+| C5. Valor menor ou igual a zero | Ignorado: não vira elo da cadeia nem conta como primeiro impacto |
+
+**Medalhas**
+
+| Ponto | Decisão |
+|---|---|
+| M1. Limites | Estritamente crescentes **e maiores que zero**. Alcançar significa maior ou igual |
+
+**Takedown**
+
+| Ponto | Decisão |
+|---|---|
+| K1. Zona de contato | Convenção e limites na seção do takedown acima |
+| K2. Limites | "Entre 60 e 120", "pelo menos 100 cm" e "pelo menos 20 km/h" são inclusivos |
+| K3. Condição 2 e 3 | "Em até 1,5 s" é inclusivo e conta do instante do contato |
+
