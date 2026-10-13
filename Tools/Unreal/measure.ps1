@@ -11,8 +11,8 @@
     CSV Profiler; em ms). "Draw" é o tempo da thread de render, o mesmo do "Draw" do stat unit.
 
     REQUISITO: o projeto precisa ter o GameMode de medição (classe ADNMeasureGameMode, arquivos
-    DNMeasureGameMode.h/.cpp). Hoje ele só existe no projeto de teste, em
-    Sandbox\VeiculoTeste\Source\VeiculoTeste (fora do Git).
+    DNMeasureGameMode.h/.cpp). Há uma cópia de referência em Tools\Unreal\measure-gamemode\, com um
+    README que explica de que ela depende e como copiá-la para o projeto.
 
     ATENÇÃO: os carros extras são SUBSTITUTOS para estimar custo (corpos físicos iguais ao do
     jogador). Não são o tráfego real nem o dano real do jogo.

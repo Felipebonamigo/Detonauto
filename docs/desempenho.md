@@ -221,8 +221,7 @@ para o editor; o jogo empacotado não usa esse modo.
   é, provavelmente, característica do editor, suposição).
 - O jogador dirige com um piloto automático que bate em paredes; a cena vista muda entre rodadas.
 
-**Para repetir:** `Tools/Unreal/measure.ps1` (feche o editor antes). O script depende do GameMode de medição
-`DNMeasureGameMode`, que hoje está no projeto de teste em `Sandbox/` (fora do Git).
+**Para repetir:** `Tools/Unreal/measure.ps1` (feche o editor antes). O script depende do GameMode de medição `DNMeasureGameMode`. Uma cópia de referência está em `Tools/Unreal/measure-gamemode/`, com um README que diz de que ela depende e como copiá-la para o projeto. A versão que roda hoje vive no projeto de teste, em `Sandbox/` (fora do Git).
 
 ## Para o Felipe testar na Sprint 6
 
