@@ -79,3 +79,29 @@ valem 0.
 
 Como o amassado é desenhado, malhas, material, peças como atores, partículas,
 fogo, explosão. Isso depende de protótipo medido (Sprints 12 e 13).
+
+## Decisões de implementação (lote 9)
+
+O contrato acima não cobria; ficaram assim em `Core/DNDamage.h` e nos testes (`Core/Tests/DNDamage.spec.cpp`):
+
+- **D1.** No limiar exato (`DeltaVMs == DentMinDeltaVMs`) o impacto causa dano de valor 0 e um amassado de profundidade 0
+  (o contrato diz "gera um registro" e "2,0 causa"). Esse amassado ocupa uma vaga e pode ser substituído por ser o mais raso.
+- **D2.** `AddedZoneDamage` é o aumento real da zona, depois da saturação em 1,0 (não o valor bruto).
+- **D3.** A fusão compara a distância com a metade do raio do amassado **existente** (inclusivo, como pedem as bordas; o texto
+  da regra 3 diz "menos de metade", e as bordas dizem que exatamente a metade funde: valeu a das bordas). Havendo vários ao
+  alcance, funde no **mais próximo**, empate no mais antigo. Depois de fundir não se procura outra fusão.
+- **D4.** `LocalPositionCm` com NaN ou infinito: o amassado é ignorado e o dano segue.
+- **D5.** Zona fora do enum: o impacto é ignorado.
+- **D6.** As peças são avaliadas em todas as zonas: a regra do dano acumulado vale para as peças de qualquer zona.
+- **D7.** Configuração inválida não quebra: divisores `<= 0` viram um mínimo minúsculo, profundidades e raios ficam em `>= 0`
+  e as contagens em pelo menos 1. Quem recusa é o validador do CSV.
+- **D8.** `FDNDamageResult::Dent` é o amassado novo como calculado, antes de uma eventual fusão.
+- **D9.** Com o limite cheio e sem fusão, o novo substitui o mais raso mesmo que seja mais raso que ele (o contrato é literal).
+- **D10.** O contrato diz que `Damage.csv` tem "14 números", mas as regras trazem 10 (`DentMinDeltaVMs`, `ZoneDestroyDeltaVMs`,
+  `DentMaxDepthCm`, `DentDepthPerMs`, `DentBaseRadiusCm`, `MaxDents`, `PartDetachDeltaVMs`, `PartDetachZoneDamage`,
+  `DestroyedTotalDamage`, `MaxActive`). Só esses 10 existem; os outros quatro não foram inventados.
+- **D11.** Validação do CSV além do contrato: nenhuma relação entre campos (por exemplo `PartDetachDeltaVMs >= DentMinDeltaVMs`).
+
+**Dúvida da regra 5 (destruído):** implementada como escrita. Mas uma zona Left, Right, Roof ou Under saturada sozinha dá total
+0,2 e **não** destrói o carro (só Front ou Rear saturadas destroem, ou o total das cinco zonas chegar a 0,5). Se bater de lado
+até a carcaça não deve sobreviver, falta uma regra para as zonas laterais e o teto.
