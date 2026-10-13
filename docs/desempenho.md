@@ -92,7 +92,37 @@ cenário e os quatro tempos do `stat unit`. Ainda está vazia:
 
 | Data | Máquina | Cenário | Frame | Game | Draw | GPU | Observação |
 |---|---|---|---|---|---|---|---|
-| | | | | | | | |
+| 13 out 2026 | PC do Felipe (modelo a informar), VRAM 10,96 GB | Editor, Play in Editor, `VehicleBasic`, 1 carro, 47 atores | 10,04 ms | 8,68 ms | 0,00 ms | 8,86 ms | Primeira medição. Ver leitura abaixo |
+
+### Leitura da primeira medição (13 out 2026)
+
+**O que os números dizem:**
+
+- O quadro leva cerca de 10 ms, o que equivale a uns 100 quadros por segundo. Está
+  abaixo dos 16,6 ms da meta de 60 fps.
+- O Game thread (8,68 ms) e a GPU (8,86 ms) estão quase empatados, e os dois
+  respondem pelo tempo do quadro. Nenhum deles é um gargalo isolado.
+
+**O que os números não dizem, e por quê:**
+
+- **É medição no editor.** O Play in Editor tem custo extra, então o jogo
+  empacotado deve ir melhor. Falta medir em modo Standalone para saber.
+- **A cena é simples.** É um carro, sem tráfego, sem dano e sem explosão. O
+  Detonauto vai ter 40 carros de tráfego e peças soltas, e o custo vai subir.
+- **O Game thread já gasta 8,68 ms com um único carro.** O orçamento inicial
+  em `docs/arquitetura.md` previa 8 ms para o Game thread no jogo completo. Se parte
+  disso for custo do editor, a folga é maior que parece, mas não dá para
+  afirmar sem medir fora do editor.
+- **Draw em 0,00 ms** é um valor estranho. Pode ser um efeito da forma como o
+  editor reporta o tempo da thread de desenho, e não um custo real nulo.
+- **RenderRes 54,3% (1661x996).** A resolução de render aparece abaixo da nativa. Pode
+  ser um recurso de escala dinâmica ou de upscale ligado, e então a GPU estaria
+  trabalhando com menos pixels do que o monitor mostra. **Suposição:** não
+  confirmei a causa.
+- **A linha Input (433,86 ms) é implausível** como latência do jogo e foi descartada.
+
+**Próximas medições, em ordem de valor:** o mesmo carro em modo Standalone, depois
+com 20 e 40 carros de tráfego, e depois com uma batida em cadeia.
 
 ## Para o Felipe testar na Sprint 6
 

@@ -26,9 +26,14 @@ redirecionamentos do nome antigo do módulo e as pastas de conteúdo no lugar ce
 
 Comando: `stat unit`, com o jogo rodando e o carro em velocidade.
 
-| Máquina (placa de vídeo, processador) | Resolução | Frame | Game | Draw | GPU |
-|---|---|---|---|---|---|
-| | | | | | |
+| Máquina | Cenário | Frame | Game | Draw | GPU | Memória de vídeo |
+|---|---|---|---|---|---|---|
+| PC do Felipe (modelo da placa de vídeo e do processador a informar) | Editor, jogo em andamento (Play in Editor), mapa `VehicleBasic`, 1 carro, 47 atores | 10,04 ms | 8,68 ms | 0,00 ms | 8,86 ms | 5,62 GB de 10,96 GB |
+
+Lido de uma captura de tela do `stat unit` em 13 out 2026. Outras linhas da
+mesma tela, sem análise: RHIT 0,32 ms, Draws 456, Prims 122 mil, RenderRes 54,3%
+(1661x996), Mem 4,26 GB. A linha "Input" mostrava 433,86 ms e não é confiável
+para esta análise. Veja a leitura em `docs/desempenho.md`.
 
 ## Outros testes visuais pendentes
 
