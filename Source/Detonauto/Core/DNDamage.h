@@ -17,6 +17,8 @@
 //  D7 configuração inválida não quebra: valores <= 0 que viram divisor são trocados por um mínimo minúsculo, profundidades
 //     e raios ficam em >= 0 e as contagens em pelo menos 1 (quem recusa é o validador do CSV);
 //  D8 FDNDamageResult::Dent é o amassado NOVO como calculado, antes de uma eventual fusão;
+//  D12 destruído: total >= DestroyedTotalDamage OU qualquer zona entre Front, Rear, Left, Right e Roof em 1,0 (a Under não
+//      conta). A fração 0,5 da fusão, o 1,0 da zona e as 5 zonas ficam fixos no código (DNDamage.cpp), comentados;
 //  D9 com o limite cheio e sem fusão, o novo substitui o mais raso mesmo que seja mais raso que ele (o contrato é literal).
 
 #pragma once

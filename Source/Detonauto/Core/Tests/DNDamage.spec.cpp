@@ -470,15 +470,30 @@ void FDNDamageSpec::Define()
 			TestFalse("estado", S.bDestroyed);
 		});
 
-		It("so Left, Right, Roof ou Under em 1,0 NAO destroi (total 0,2)", [this]()
+		It("Left, Right ou Roof em 1,0 sozinhos tambem destroem (bater de lado ate a carcaca)", [this]()
 		{
-			for (const EDNDamageZone Z : { EDNDamageZone::Left, EDNDamageZone::Right, EDNDamageZone::Roof, EDNDamageZone::Under })
+			for (const EDNDamageZone Z : { EDNDamageZone::Left, EDNDamageZone::Right, EDNDamageZone::Roof })
 			{
 				FDNDamageState S;
 				const FDNDamageResult R = FDNDamage::ApplyImpact(FDNDamageConfig(), S, Hit(32.f, Z));
-				TestFalse(FString::Printf(TEXT("zona %d"), static_cast<int32>(Z)), R.bJustDestroyed);
-				TestFalse("estado", S.bDestroyed);
+				TestTrue(FString::Printf(TEXT("zona %d: acabou de ser destruido"), static_cast<int32>(Z)), R.bJustDestroyed);
+				TestTrue("estado", S.bDestroyed);
 			}
+		});
+
+		It("Under em 1,0 sozinha NAO destroi (fora das zonas e fora do total)", [this]()
+		{
+			FDNDamageState S;
+			const FDNDamageResult R = FDNDamage::ApplyImpact(FDNDamageConfig(), S, Hit(32.f, EDNDamageZone::Under));
+			TestFalse("nao destrui", R.bJustDestroyed);
+			TestFalse("estado", S.bDestroyed);
+			TestEqual("a zona Under chegou a 1,0", S.ZoneDamage[static_cast<int32>(EDNDamageZone::Under)], 1.f);
+		});
+
+		It("uma zona de lado em 0,999 ainda nao destroi", [this]()
+		{
+			FDNDamageState S;
+			TestFalse("nao destruido", FDNDamage::ApplyImpact(FDNDamageConfig(), S, Hit(31.97f, EDNDamageZone::Left)).bJustDestroyed);
 		});
 
 		It("total >= 0,5 destroi (inclusivo): cinco zonas a 0,5", [this]()

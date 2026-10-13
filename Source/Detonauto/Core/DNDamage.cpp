@@ -2,6 +2,12 @@
 
 namespace
 {
+	/** Fusão de amassados: a distância precisa ser no máximo esta fração do raio do amassado existente (regra 3). Fixo no código. */
+	constexpr double DentMergeRadiusFraction = 0.5;
+
+	/** Uma zona (Front, Rear, Left, Right ou Roof) com este dano destrói o veículo (regra 5). A Under não conta. Fixo no código. */
+	constexpr float ZoneDestroysVehicleAt = 1.0f;
+
 	/** Decimal finito e pelo menos Min; senão, o próprio Min (D7). */
 	double AtLeast(float Value, double Min)
 	{
@@ -40,7 +46,7 @@ namespace
 			const double Dy = static_cast<double>(NewDent.LocalPositionCm.Y) - Existing.LocalPositionCm.Y;
 			const double Dz = static_cast<double>(NewDent.LocalPositionCm.Z) - Existing.LocalPositionCm.Z;
 			const double DistSq = Dx * Dx + Dy * Dy + Dz * Dz;
-			const double Half = 0.5 * static_cast<double>(Existing.RadiusCm);
+			const double Half = DentMergeRadiusFraction * static_cast<double>(Existing.RadiusCm);
 			if (DistSq <= Half * Half && (Target == INDEX_NONE || DistSq < TargetDistSq))
 			{
 				Target = i;
@@ -157,9 +163,13 @@ FDNDamageResult FDNDamage::ApplyImpact(const FDNDamageConfig& Config, FDNDamageS
 	if (!State.bDestroyed)
 	{
 		const bool bTotal = TotalDamage(State) >= Config.DestroyedTotalDamage;
-		const bool bFrontOrRear = State.ZoneDamage[static_cast<int32>(EDNDamageZone::Front)] >= 1.0f
-			|| State.ZoneDamage[static_cast<int32>(EDNDamageZone::Rear)] >= 1.0f;
-		if (bTotal || bFrontOrRear)
+		// Qualquer das 5 zonas do total em 1,0 destrói: bater de lado ou no teto até a carcaça também acaba o carro.
+		bool bAnyZoneFull = false;
+		for (int32 i = 0; i < FDNDamageState::TotalZoneCount; ++i)
+		{
+			bAnyZoneFull = bAnyZoneFull || State.ZoneDamage[i] >= ZoneDestroysVehicleAt;
+		}
+		if (bTotal || bAnyZoneFull)
 		{
 			State.bDestroyed = true;
 			Result.bJustDestroyed = true;

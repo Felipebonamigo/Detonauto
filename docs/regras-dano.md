@@ -42,9 +42,10 @@ infinito ou negativo em `DeltaVMs`: ignorado, sem dano.
    **por este impacto**, em ordem fixa do enum.
 5. **Veículo destruído:** `TotalDamage = média de ZoneDamage das 5 zonas
    (Front, Rear, Left, Right, Roof)` (Under não conta); destruído quando
-   `TotalDamage >= DestroyedTotalDamage` (0,5) **ou** qualquer zona == 1,0 em
-   Front ou Rear (motor/traseira) — decisão a confirmar, anote se achar
-   estranho. Destruído é permanente e o primeiro impacto que o causa devolve
+   `TotalDamage >= DestroyedTotalDamage` (0,5) **ou** qualquer das 5 zonas
+   (Front, Rear, Left, Right, Roof) chegar a 1,0; bater de lado ou no teto até
+   a carcaça também destrói (decisão confirmada; a Under continua fora).
+   Destruído é permanente e o primeiro impacto que o causa devolve
    `bJustDestroyed = true` (uma vez).
 6. Depois de destruído continua acumulando dano e amassados (para a carcaça),
    mas nunca devolve `bJustDestroyed` de novo.
@@ -65,7 +66,7 @@ valem 0.
 
 ## Dados e testes
 
-- `Data/Damage.csv` com os 14 números acima (nomes em inglês), validador:
+- `Data/Damage.csv` com os 10 números acima (nomes em inglês), validador:
   tudo finito; limites `> 0`; `PartDetachZoneDamage` e `DestroyedTotalDamage`
   em (0,1]; `MaxDents` e `MaxActive` inteiros `>= 1`.
 - Bordas: 1,99 / 2,0 / 2,01 m/s; saturação em 1,0; fusão a exatamente metade
@@ -97,11 +98,12 @@ O contrato acima não cobria; ficaram assim em `Core/DNDamage.h` e nos testes (`
   e as contagens em pelo menos 1. Quem recusa é o validador do CSV.
 - **D8.** `FDNDamageResult::Dent` é o amassado novo como calculado, antes de uma eventual fusão.
 - **D9.** Com o limite cheio e sem fusão, o novo substitui o mais raso mesmo que seja mais raso que ele (o contrato é literal).
-- **D10.** O contrato diz que `Damage.csv` tem "14 números", mas as regras trazem 10 (`DentMinDeltaVMs`, `ZoneDestroyDeltaVMs`,
-  `DentMaxDepthCm`, `DentDepthPerMs`, `DentBaseRadiusCm`, `MaxDents`, `PartDetachDeltaVMs`, `PartDetachZoneDamage`,
-  `DestroyedTotalDamage`, `MaxActive`). Só esses 10 existem; os outros quatro não foram inventados.
+- **D10.** `Damage.csv` tem 10 números (`DentMinDeltaVMs`, `ZoneDestroyDeltaVMs`, `DentMaxDepthCm`, `DentDepthPerMs`,
+  `DentBaseRadiusCm`, `MaxDents`, `PartDetachDeltaVMs`, `PartDetachZoneDamage`, `DestroyedTotalDamage`, `MaxActive`). O
+  texto antigo dizia 14; foi erro de contagem do contrato, corrigido. A fração 0,5 da fusão, o 1,0 da zona e as 5 zonas
+  do total ficam fixos no código (`DNDamage.cpp`), comentados.
 - **D11.** Validação do CSV além do contrato: nenhuma relação entre campos (por exemplo `PartDetachDeltaVMs >= DentMinDeltaVMs`).
 
-**Dúvida da regra 5 (destruído):** implementada como escrita. Mas uma zona Left, Right, Roof ou Under saturada sozinha dá total
-0,2 e **não** destrói o carro (só Front ou Rear saturadas destroem, ou o total das cinco zonas chegar a 0,5). Se bater de lado
-até a carcaça não deve sobreviver, falta uma regra para as zonas laterais e o teto.
+**Regra 5 (destruído), decisão confirmada:** destruído quando o total das 5 zonas chega a 0,5 ou qualquer das zonas Front,
+Rear, Left, Right e Roof chega a 1,0. A Under sozinha não destrói. A versão anterior só destruía por Front ou Rear e deixava
+uma zona lateral saturada sobreviver (total 0,2); foi corrigida (D12 em `Core/DNDamage.h`).
