@@ -191,3 +191,25 @@ comentário no código e um teste que fica fácil de trocar se a decisão mudar.
 | E3. Condição 3 do takedown | O jogador só é desqualificado se se destruir de 0 a 1,5 s depois do contato. Antes, depois ou NaN não desqualificam |
 | E4. Altura NaN | Nunca vira vertical |
 
+
+## Ajuste em dados: Turbo.csv, Crash.csv e Takedown.csv (lote 5)
+
+Os números destas regras moram em `Data/Turbo.csv`, `Data/Crash.csv` e `Data/Takedown.csv` (uma linha cada, id
+`padrao`, colunas com os nomes dos campos de `FDNTurboConfig`, `FDNCrashConfig` e `FDNTakedownConfig`). O teste de
+deriva garante que o CSV e o padrão da struct pura são iguais. Ainda não são lidos pelo jogo. Regras de validação
+(`FDNDataValidation`), todas com valores finitos e exatamente uma linha:
+
+| Regra | Validação |
+|---|---|
+| V1. Turbo, limites e janelas | `MaxBar`, `NearMissMaxLateralCm`, `NearMissChainWindowSeconds` e `ConsumptionPerSecond` maiores que zero |
+| V2. Turbo, velocidades e ganhos | Velocidades mínimas, ganhos, `AirTimeThresholdSeconds`, `AirMaxGainPerJump` e `ExtendedBonus` maiores ou iguais a zero |
+| V3. Turbo, derrapada | `0 <= DriftMinAngleDeg < DriftMaxAngleDeg <= 90` (acima de 90 o carro anda de ré, não derrapa) |
+| V4. Turbo, takedown | `TakedownSetsBarTo` em `(0, MaxBar]` |
+| V5. Turbo, cadeia de quase batidas | `NearMissChainMultipliers` não vazio, cada valor finito e maior que zero. Não exige ordem crescente nem primeiro valor 1,0 |
+| V6. Crash, multiplicador e bônus | `MaxMultiplier >= 1`; `ChainBonusPercentPerLink` e `ChainBonusMaxPercent` maiores ou iguais a zero |
+| V7. Crash, tempos | `ChainWindowSeconds`, `QuietSecondsToEnd` e `MaxSecondsAfterFirstImpact` maiores que zero; `QuietSpeedMetersPerSecond >= 0` |
+| V8. Crash, fim da rodada | `QuietSecondsToEnd <= MaxSecondsAfterFirstImpact` (senão o silêncio nunca encerra a rodada) |
+| V9. Takedown, velocidade, janela e altura | `MinRelativeSpeedKmh >= 0`; `RivalCrashWindowSeconds` e `VerticalMinHeightCm` maiores que zero |
+| V10. Takedown, ângulos | `BehindMaxAngleDegrees` e `SideMaxAngleDegrees` em `(0, 180]`; `0 <= TBoneMinAngleDegrees < TBoneMaxAngleDegrees <= 180` |
+| V11. Takedown, lateral e T | `SideMaxAngleDegrees <= TBoneMinAngleDegrees`: sem sobreposição; um vão entre as duas é permitido |
+| V12. Takedown, zonas | `ZoneHalfAngleDegrees` em `(0, 90)`, estrito |
