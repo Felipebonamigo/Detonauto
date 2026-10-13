@@ -55,3 +55,17 @@ progresso (regra ainda não definida: NÃO inventar), gravação em disco.
 Usa o módulo `Json` do Unreal (`FJsonObject`) — acrescentar `"Json"` em
 `Detonauto.Build.cs`. Se preferir escrever/ler o texto à mão para manter o
 `Core/` livre do módulo, justifique e me pergunte antes.
+
+## Decisões de implementação (lote 6)
+
+O contrato acima não cobria; ficaram assim em `Core/DNRecords.h` e nos testes:
+
+- **R1.** Número JSON "inteiro" é o que não tem parte fracionária: `4200` e `4200.0` valem, `4200.5` não, `-0` vale 0.
+- **R2.** Numa versão 1, `best` ausente ou que não é objeto é erro (gravar por cima de um save assim apagaria tudo).
+- **R3.** Texto sobrando depois do objeto raiz é JSON inválido (erro).
+- **R4.** Com erro, a razão vem como primeiro aviso.
+- **R5.** Id não é aparado: só o id vazio é ignorado.
+- **R6.** `ToProgressInput` devolve um item por cruzamento da lista de entrada, na mesma ordem.
+- **R7.** A leitura é em fluxo (`TJsonReader`), não `FJsonObject`: o objeto da engine junta chaves que só diferem na
+  caixa (e as repetidas) antes de o código ver, e o contrato manda valer o maior com aviso. Os campos `version` e `best`
+  valem só em minúsculas e repetidos são erro.
