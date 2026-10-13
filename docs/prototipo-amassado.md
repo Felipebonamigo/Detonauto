@@ -32,8 +32,8 @@ código final. **Não foi avaliado se ficou bonito**: a seção "O que as captur
 3. **No carro** (`ADNTestCar`): cria um material dinâmico por carro a partir do pai e o aplica nos dois slots da malha da carroceria
    (`SM_SportsCar`). A cada impacto, `FDNDamage::ApplyImpact` (cópia **idêntica** de `Core/DNDamage.*`, em
    `Sandbox/VeiculoTeste/Source/VeiculoTeste/Core/`) atualiza a lista de amassados e `FDNDentParams` (parte pura, com testes)
-   a converte nos 24 parâmetros. Impacto real: `OnComponentHit` do corpo físico, com
-   `variação de velocidade = impulso / massa / 100` (impulso em kg cm/s, resultado em m/s).
+   a converte nos 24 parâmetros. Impacto real: `OnComponentHit` do corpo físico; a variação de velocidade é medida no próprio
+   corpo (ver "Calibração da batida real", lote 11).
 4. **Nanite:** a malha da carroceria é Nanite (`Nanite=1` no log). Sem a flag `used_with_nanite` a engine troca o material pelo padrão
    ("missing usage flag Nanite"); o script liga a flag e tenta definir o deslocamento máximo do WPO (40 cm).
 
@@ -115,6 +115,48 @@ cache não foram refeitas e o custo de redesenhar sombra com WPO em carros em mo
 pedido, mas a cena de Crash terá tráfego com muito mais veículos, que não terão 8 amassados cada ao mesmo tempo; (d) não investiguei
 as opções do Nanite para WPO (a medição é no estado padrão); (e) são médias de uma execução por cenário.
 
+## Calibração da batida real (lote 11)
+
+Três mudanças, só no protótipo (`Sandbox/VeiculoTeste`, sem tocar no `Core`):
+
+1. **Variação de velocidade medida no corpo.** O carro guarda a velocidade linear do corpo no início de cada quadro (antes do passo de
+   física). O contato chega depois do passo, com a velocidade já alterada; `ΔV = |velocidade antes - velocidade agora|` em m/s
+   (`FDNDentParams::DeltaVMsBetween`). Substitui `impulso / massa / 100`. Inclui o quique, como a definição do contrato
+   ("variação de velocidade do veículo causada pelo impacto").
+2. **Uma batida = uma janela de 0,15 s.** O primeiro contato abre a janela; durante ela só vale o **maior** ΔV (sem somar) e o ponto
+   dele; ao fechar, o amassado é aplicado uma vez (`FDNImpactGrouper`). O log também mostra, só como informação, o ΔV da janela inteira
+   (velocidade antes do 1º contato contra a de quando a janela fecha).
+3. **Ponto do amassado no corpo.** O ponto de contato local sobe até 20 cm acima da base da caixa do corpo e entra na caixa
+   (`FDNDentParams::ProjectToBody`): o contato com a parede caía a 1,9 cm do chão (Z local) e o amassado ia para o chão do
+   para-choque; agora vai para Z local 17,6 (a base da caixa fica em -2,4), na frente (X 247,5, o máximo da caixa). A caixa é só uma
+   aproximação da superfície do corpo.
+
+**Medição na parede** (`car-probe.ps1 -Scenario Wall -WallKmh N`, carro segurando a velocidade, parede de ~50 m à frente; velocidade
+real de aproximação lida do corpo; 1 execução por linha, salvo onde indicado):
+
+| Preset | Velocidade ao bater (km/h) | ΔV da batida (m/s) | ΔV da janela inteira (m/s) | Amassado (profundidade) | Destruído |
+|---|---|---|---|---|---|
+| `arcade-1` | 42,4 e 42,3 (2 execuções) | 15,1 e 15,0 | 14,7 e 14,6 | 19,6 e 19,5 cm | não |
+| `Padrao` | 41,6 | 13,2 | 13,1 | 16,9 cm | não |
+| `arcade-1` | 59,5 | 21,1 | 21,0 | 25,0 cm (teto) | não |
+| `Padrao` | 57,1 | 18,2 | 18,0 | 24,3 cm | não |
+| `arcade-1` | 79,9 | 28,0 | 27,9 | 25,0 cm | não (dano da zona +0,87) |
+| `arcade-1` | 119,3 a 120,0 (2 execuções) | 41,7 e 43,5 | 41,6 e 43,0 | 25,0 cm | **sim** |
+| `Padrao` | 113,4 e 113,6 (2 execuções) | 37,1 e 41,1 | 36,9 e 41,0 | 25,0 cm | **sim** |
+
+Leitura:
+
+- **A 120 km/h o ΔV é ~42 m/s, mais que os ~30 m/s do contrato**, não menos. O carro destrói no primeiro toque.
+- O ΔV vale **1,25 a 1,3 vezes a velocidade de aproximação** (120 km/h = 33,3 m/s dá 43,5; 80 km/h = 22,2 m/s dá 28,0; 60 km/h dá
+  21,1; 42 km/h dá 15,1). Ou seja, o carro volta da parede com ~28% da velocidade (quique). Pelas regras do dano (zona satura em 32 m/s,
+  ou seja, 2 + 30), **a partir de ~90 km/h de aproximação uma batida frontal destrói o carro** (32 / 1,28 = 25 m/s).
+- **Cada batida frontal foi um contato só, num quadro só**, por isso o ΔV do quadro e o da janela inteira quase não diferem (a
+  janela inteira é 0,2 a 3% menor). O risco de o agrupamento por maior valor subestimar uma batida que se espalhe por vários
+  quadros não apareceu na parede; apareceria numa batida em ângulo ou arrastando.
+- Os contatos seguintes (carro raspando e voltando) saem com 0,1 a 0,6 m/s e abaixo do limiar de 2 m/s: não amassam.
+- A "variação de velocidade" depende do quique da física do carro (`Padrao` 113 km/h deu 37,1 e 41,1 em duas execuções: a
+  dispersão é de ~10% entre execuções). Não ajustei nenhuma regra: os números ficam como medidos.
+
 ## Riscos
 
 1. **Normais e iluminação.** O WPO move o vértice e não a normal. O amassado ganha forma mas é iluminado como se fosse liso; só a
@@ -129,11 +171,9 @@ as opções do Nanite para WPO (a medição é no estado padrão); (e) são méd
 4. **Face de dentro.** Quando o vértice entra mais que a espessura da carroceria, aparece a face de trás (escura) e o interior vazio.
    Com profundidade máxima de 25 cm isso acontece em painéis finos, como na traseira nas capturas.
 5. **Malha esparsa.** Ver "A malha": o resultado depende da densidade de vértices; painéis planos amassam em facetas.
-6. **Calibração do impacto.** A batida real contra a parede deu `variação de velocidade = 45,1 m/s` com o carro chegando a
-   ~120 km/h: o impulso inclui o quique e passa dos 32 m/s que saturam uma zona, então o carro é "destruído" no primeiro
-   contato forte. A fórmula `impulso / massa / 100` e o impulso por contato (o motor avisa cada contato, e há vários por
-   batida) precisam de calibração antes de valer como "variação de velocidade" do contrato. Além disso o ponto de contato real
-   caiu no chão do para-choque, não no meio da frente.
+6. **Calibração do impacto.** Resolvida no lote 11 (seção abaixo): a variação de velocidade passou a ser medida no corpo, antes e
+   depois do contato, em vez de `impulso / massa / 100` (que deu 45,1 m/s a ~120 km/h). Fica o que a medição mostra: o quique entra
+   na conta e a variação passa de 1,25 vezes a velocidade de aproximação.
 7. **Estado só na memória.** Os amassados não são salvos nem restaurados ao reaparecer o carro; a lista vive no `FDNDamageState`.
 8. **Custo por carro.** Um material dinâmico por carro e 24 parâmetros reenviados a cada impacto. Se o tráfego tiver centenas de
    carros, o ideal é amassar só os carros perto da câmera e usar o material original nos outros.
