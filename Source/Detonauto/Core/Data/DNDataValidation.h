@@ -26,6 +26,8 @@ struct FDNDataValidation
 	static TArray<FString> ValidateLandmarks(const TArray<FDNLandmarkEntry>& Landmarks, const TArray<FDNCityEntry>& Cities);
 	static TArray<FString> ValidateCrossings(const TArray<FDNCrossingEntry>& Crossings, const TArray<FDNCityEntry>& Cities);
 	static TArray<FString> ValidateTrafficVehicles(const TArray<FDNTrafficVehicleEntry>& Vehicles);
+	/** Exatamente uma linha; todos os valores finitos e maiores que zero; WakeDistanceM < WakeAheadM < DespawnDistanceM. */
+	static TArray<FString> ValidateTrafficSettings(const TArray<FDNTrafficSettingsEntry>& Settings);
 
 	/** Todas as tabelas, com as referências entre elas. */
 	static TArray<FString> ValidateAll(const FDNData& Data);

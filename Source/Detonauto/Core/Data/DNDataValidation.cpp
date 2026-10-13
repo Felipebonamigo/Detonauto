@@ -9,6 +9,23 @@ namespace
 	constexpr const TCHAR* LandmarksFile = TEXT("Landmarks.csv");
 	constexpr const TCHAR* CrossingsFile = TEXT("Crossings.csv");
 	constexpr const TCHAR* VehiclesFile = TEXT("TrafficVehicles.csv");
+	constexpr const TCHAR* SettingsFile = TEXT("TrafficSettings.csv");
+
+	/** Decimal finito e maior que zero. Devolve verdadeiro se está ok; senão registra o erro. */
+	bool CheckPositiveFinite(const TCHAR* File, const FString& RowId, const TCHAR* Field, float Value, TArray<FString>& Errors)
+	{
+		if (!FMath::IsFinite(Value))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo '%s' precisa ser um número finito (veio %f)."), File, *RowId, Field, Value));
+			return false;
+		}
+		if (Value <= 0.0f)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo '%s' precisa ser maior que zero (veio %f)."), File, *RowId, Field, Value));
+			return false;
+		}
+		return true;
+	}
 
 	bool IsSafeIdChar(TCHAR C)
 	{
@@ -258,6 +275,40 @@ TArray<FString> FDNDataValidation::ValidateTrafficVehicles(const TArray<FDNTraff
 	return Errors;
 }
 
+TArray<FString> FDNDataValidation::ValidateTrafficSettings(const TArray<FDNTrafficSettingsEntry>& Settings)
+{
+	TArray<FString> Errors;
+	CheckIds(SettingsFile, Settings, Errors);
+
+	if (Settings.Num() != 1)
+	{
+		Errors.Add(FString::Printf(TEXT("%s: precisa ter exatamente uma linha (veio %d)."), SettingsFile, Settings.Num()));
+	}
+
+	for (const FDNTrafficSettingsEntry& S : Settings)
+	{
+		const FDNTrafficSettingsRow& R = S.Row;
+		const bool bWake = CheckPositiveFinite(SettingsFile, S.Id, TEXT("WakeDistanceM"), R.WakeDistanceM, Errors);
+		const bool bAhead = CheckPositiveFinite(SettingsFile, S.Id, TEXT("WakeAheadM"), R.WakeAheadM, Errors);
+		CheckPositiveFinite(SettingsFile, S.Id, TEXT("WakeAheadMinClosingKmh"), R.WakeAheadMinClosingKmh, Errors);
+		const bool bDespawn = CheckPositiveFinite(SettingsFile, S.Id, TEXT("DespawnDistanceM"), R.DespawnDistanceM, Errors);
+		CheckPositiveFinite(SettingsFile, S.Id, TEXT("StillSpeedMs"), R.StillSpeedMs, Errors);
+		if (R.MaxSpawnPerFrame <= 0)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'MaxSpawnPerFrame' precisa ser maior que zero (veio %d)."), SettingsFile, *S.Id, R.MaxSpawnPerFrame));
+		}
+
+		if (bWake && bAhead && R.WakeDistanceM >= R.WakeAheadM)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': WakeDistanceM (%f) precisa ser menor que WakeAheadM (%f)."), SettingsFile, *S.Id, R.WakeDistanceM, R.WakeAheadM));
+		}
+		if (bAhead && bDespawn && R.WakeAheadM >= R.DespawnDistanceM)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': WakeAheadM (%f) precisa ser menor que DespawnDistanceM (%f)."), SettingsFile, *S.Id, R.WakeAheadM, R.DespawnDistanceM));
+		}
+	}
+	return Errors;
+}
 TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 {
 	TArray<FString> Errors;
@@ -266,5 +317,6 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateLandmarks(Data.Landmarks, Data.Cities));
 	Errors.Append(ValidateCrossings(Data.Crossings, Data.Cities));
 	Errors.Append(ValidateTrafficVehicles(Data.Vehicles));
+	Errors.Append(ValidateTrafficSettings(Data.TrafficSettings));
 	return Errors;
 }

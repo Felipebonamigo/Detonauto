@@ -63,6 +63,19 @@ namespace
 		return E;
 	}
 
+	FDNTrafficSettingsEntry Settings(const TCHAR* Id = TEXT("padrao"), float Wake = 6.f, float Ahead = 25.f, float Closing = 20.f, float Despawn = 200.f, float Still = 2.f, int32 MaxSpawn = 2)
+	{
+		FDNTrafficSettingsEntry E;
+		E.Id = Id;
+		E.Row.WakeDistanceM = Wake;
+		E.Row.WakeAheadM = Ahead;
+		E.Row.WakeAheadMinClosingKmh = Closing;
+		E.Row.DespawnDistanceM = Despawn;
+		E.Row.StillSpeedMs = Still;
+		E.Row.MaxSpawnPerFrame = MaxSpawn;
+		return E;
+	}
+
 	FDNTrafficVehicleEntry Vehicle(const TCHAR* Id, const TCHAR* Name = TEXT("Compacto Modelo 1"), int32 Value = 800, float Mass = 950.f, const TCHAR* Class = TEXT("compact"))
 	{
 		FDNTrafficVehicleEntry E;
@@ -439,6 +452,64 @@ void FDNDataTrafficSpec::Define()
 	});
 }
 
+BEGIN_DEFINE_SPEC(FDNDataTrafficSettingsSpec, "Detonauto.Dados.ConfigTrafego",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+END_DEFINE_SPEC(FDNDataTrafficSettingsSpec)
+
+void FDNDataTrafficSettingsSpec::Define()
+{
+	const float NaNf = std::numeric_limits<float>::quiet_NaN();
+	const float Inff = std::numeric_limits<float>::infinity();
+
+	Describe("TrafficSettings.csv", [this, NaNf, Inff]()
+	{
+		It("a configuracao inicial (6, 25, 20, 200, 2, 2) e valida", [this]()
+		{
+			ExpectClean(*this, TEXT("inicial"), FDNDataValidation::ValidateTrafficSettings({ Settings() }));
+		});
+
+		It("exige EXATAMENTE uma linha", [this]()
+		{
+			ExpectError(*this, TEXT("zero linhas"), FDNDataValidation::ValidateTrafficSettings({}), { TEXT("TrafficSettings"), TEXT("uma linha") });
+			ExpectError(*this, TEXT("duas linhas"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("a")), Settings(TEXT("b")) }), { TEXT("TrafficSettings"), TEXT("uma linha") });
+		});
+
+		It("id vazio, repetido ou com caractere invalido e recusado", [this]()
+		{
+			ExpectError(*this, TEXT("id vazio"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("")) }), { TEXT("TrafficSettings"), TEXT("id") });
+			ExpectError(*this, TEXT("espaco"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao 1")) }), { TEXT("padrao 1"), TEXT("caractere") });
+		});
+
+		It("cada valor precisa ser maior que zero", [this]()
+		{
+			ExpectError(*this, TEXT("WakeDistanceM 0"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 0.f) }), { TEXT("WakeDistanceM"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("WakeAheadM -1"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, -1.f) }), { TEXT("WakeAheadM"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("WakeAheadMinClosingKmh 0"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 0.f) }), { TEXT("WakeAheadMinClosingKmh"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("DespawnDistanceM 0"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 20.f, 0.f) }), { TEXT("DespawnDistanceM"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("StillSpeedMs 0"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 20.f, 200.f, 0.f) }), { TEXT("StillSpeedMs"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("MaxSpawnPerFrame 0"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 20.f, 200.f, 2.f, 0) }), { TEXT("MaxSpawnPerFrame"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("MaxSpawnPerFrame -2"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 20.f, 200.f, 2.f, -2) }), { TEXT("MaxSpawnPerFrame"), TEXT("maior que zero") });
+		});
+
+		It("NaN e infinito sao recusados em cada campo decimal", [this, NaNf, Inff]()
+		{
+			ExpectError(*this, TEXT("WakeDistanceM NaN"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), NaNf) }), { TEXT("WakeDistanceM"), TEXT("finito") });
+			ExpectError(*this, TEXT("WakeAheadM inf"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, Inff) }), { TEXT("WakeAheadM"), TEXT("finito") });
+			ExpectError(*this, TEXT("closing NaN"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, NaNf) }), { TEXT("WakeAheadMinClosingKmh"), TEXT("finito") });
+			ExpectError(*this, TEXT("DespawnDistanceM inf"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 20.f, Inff) }), { TEXT("DespawnDistanceM"), TEXT("finito") });
+			ExpectError(*this, TEXT("StillSpeedMs NaN"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 25.f, 20.f, 200.f, NaNf) }), { TEXT("StillSpeedMs"), TEXT("finito") });
+		});
+
+		It("exige WakeDistanceM < WakeAheadM < DespawnDistanceM (estrito)", [this]()
+		{
+			ExpectClean(*this, TEXT("1 < 2 < 3"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 1.f, 2.f, 20.f, 3.f) }));
+			ExpectError(*this, TEXT("Wake = WakeAhead"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 25.f, 25.f) }), { TEXT("WakeDistanceM"), TEXT("WakeAheadM"), TEXT("menor") });
+			ExpectError(*this, TEXT("Wake > WakeAhead"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 30.f, 25.f) }), { TEXT("WakeDistanceM"), TEXT("WakeAheadM"), TEXT("menor") });
+			ExpectError(*this, TEXT("WakeAhead = Despawn"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 200.f, 20.f, 200.f) }), { TEXT("WakeAheadM"), TEXT("DespawnDistanceM"), TEXT("menor") });
+			ExpectError(*this, TEXT("WakeAhead > Despawn"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 300.f, 20.f, 200.f) }), { TEXT("WakeAheadM"), TEXT("DespawnDistanceM"), TEXT("menor") });
+		});
+	});
+}
 BEGIN_DEFINE_SPEC(FDNDataLoaderSpec, "Detonauto.Dados.Carregador",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 END_DEFINE_SPEC(FDNDataLoaderSpec)
@@ -542,6 +613,7 @@ void FDNDataAllSpec::Define()
 			Data.Landmarks = { Landmark(TEXT("p1")) };
 			Data.Crossings = { Crossing(TEXT("c1")) };
 			Data.Vehicles = { Vehicle(TEXT("v1")) };
+			Data.TrafficSettings = { Settings() };
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -553,11 +625,20 @@ void FDNDataAllSpec::Define()
 			Data.Landmarks = { Landmark(TEXT("p1"), TEXT("sumiu")) };
 			Data.Crossings = { Crossing(TEXT("c1"), TEXT("sumiu")) };
 			Data.Vehicles = { Vehicle(TEXT("v1"), TEXT("Nome"), 0) };
+			Data.TrafficSettings = { Settings(TEXT("padrao"), 30.f, 25.f) };
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
 			ExpectError(*this, TEXT("cidade"), Errors, { TEXT("rio"), TEXT("atlantida") });
 			ExpectError(*this, TEXT("ponto"), Errors, { TEXT("p1"), TEXT("sumiu") });
 			ExpectError(*this, TEXT("cruzamento"), Errors, { TEXT("c1"), TEXT("sumiu") });
 			ExpectError(*this, TEXT("veiculo"), Errors, { TEXT("v1"), TEXT("valor") });
+			ExpectError(*this, TEXT("configuracao do trafego"), Errors, { TEXT("WakeDistanceM"), TEXT("menor") });
+		});
+
+		It("a falta da configuracao do trafego e um erro", [this]()
+		{
+			FDNData Data;
+			Data.Regions = { Region(TEXT("brasil")) };
+			ExpectError(*this, TEXT("sem configuracao"), FDNDataValidation::ValidateAll(Data), { TEXT("TrafficSettings"), TEXT("uma linha") });
 		});
 	});
 }

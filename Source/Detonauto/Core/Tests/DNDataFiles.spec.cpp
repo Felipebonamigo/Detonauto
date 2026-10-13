@@ -83,6 +83,23 @@ void FDNDataFilesSpec::Define()
 			}
 		});
 
+		It("a configuracao do trafego tem uma linha com os valores iniciais do contrato", [this]()
+		{
+			FDNData Data;
+			FDNDataLoader::LoadAll(Data);
+			if (TestEqual("uma linha", Data.TrafficSettings.Num(), 1))
+			{
+				const FDNTrafficSettingsRow& S = Data.TrafficSettings[0].Row;
+				TestEqual("id", Data.TrafficSettings[0].Id, FString(TEXT("padrao")));
+				TestEqual("WakeDistanceM", S.WakeDistanceM, 6.0f);
+				TestEqual("WakeAheadM", S.WakeAheadM, 25.0f);
+				TestEqual("WakeAheadMinClosingKmh", S.WakeAheadMinClosingKmh, 20.0f);
+				TestEqual("DespawnDistanceM", S.DespawnDistanceM, 200.0f);
+				TestEqual("StillSpeedMs", S.StillSpeedMs, 2.0f);
+				TestEqual("MaxSpawnPerFrame", S.MaxSpawnPerFrame, 2);
+			}
+		});
+
 		It("o transito tem de 3 a 5 veiculos de exemplo", [this]()
 		{
 			FDNData Data;

@@ -1,0 +1,2 @@
+Id,WakeDistanceM,WakeAheadM,WakeAheadMinClosingKmh,DespawnDistanceM,StillSpeedMs,MaxSpawnPerFrame
+padrao,6.0,25.0,20.0,200.0,2.0,2

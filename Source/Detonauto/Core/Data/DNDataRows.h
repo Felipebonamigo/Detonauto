@@ -9,6 +9,7 @@
 //   Landmarks.csv       Id, CityId, Name, Kind, ShortText, SourceNote, NeedsReview
 //   Crossings.csv       Id, CityId, Order, Bronze, Silver, Gold
 //   TrafficVehicles.csv Id, Name, ValueCash, MassKg, Class
+//   TrafficSettings.csv Id, WakeDistanceM, WakeAheadM, WakeAheadMinClosingKmh, DespawnDistanceM, StillSpeedMs, MaxSpawnPerFrame (uma linha)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -17,6 +18,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "Core/DNTraffic.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -143,6 +145,49 @@ struct FDNTrafficVehicleRow : public FTableRowBase
 	FString Class;
 };
 
+/** Parâmetros do tráfego simplificado (docs/regras-trafego.md). O arquivo tem UMA linha. */
+USTRUCT(BlueprintType)
+struct FDNTrafficSettingsRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	/** Veículo Physics a esta distância (inclusive) acorda o Rail [m]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float WakeDistanceM = 6.0f;
+
+	/** Jogador a menos desta distância (estrito), na frente, acorda o Rail [m]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float WakeAheadM = 25.0f;
+
+	/** Velocidade de aproximação mínima (inclusiva) para acordar pela regra da frente [km/h]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float WakeAheadMinClosingKmh = 20.0f;
+
+	/** Mais longe que isto (estrito) e atrás do jogador, o veículo some [m]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float DespawnDistanceM = 200.0f;
+
+	/** Physics acima desta velocidade (estrito) não some durante a rodada de Crash [m/s]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float StillSpeedMs = 2.0f;
+
+	/** Máximo de veículos criados por quadro. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 MaxSpawnPerFrame = 2;
+
+	/** Os mesmos números no tipo puro usado pelas regras de Core/. */
+	FDNTrafficSettings ToSettings() const
+	{
+		FDNTrafficSettings S;
+		S.WakeDistanceM = WakeDistanceM;
+		S.WakeAheadM = WakeAheadM;
+		S.WakeAheadMinClosingKmh = WakeAheadMinClosingKmh;
+		S.DespawnDistanceM = DespawnDistanceM;
+		S.StillSpeedMs = StillSpeedMs;
+		S.MaxSpawnPerFrame = MaxSpawnPerFrame;
+		return S;
+	}
+};
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -156,6 +201,7 @@ using FDNCityEntry = TDNTableEntry<FDNCityRow>;
 using FDNLandmarkEntry = TDNTableEntry<FDNLandmarkRow>;
 using FDNCrossingEntry = TDNTableEntry<FDNCrossingRow>;
 using FDNTrafficVehicleEntry = TDNTableEntry<FDNTrafficVehicleRow>;
+using FDNTrafficSettingsEntry = TDNTableEntry<FDNTrafficSettingsRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -165,4 +211,5 @@ struct FDNData
 	TArray<FDNLandmarkEntry> Landmarks;
 	TArray<FDNCrossingEntry> Crossings;
 	TArray<FDNTrafficVehicleEntry> Vehicles;
+	TArray<FDNTrafficSettingsEntry> TrafficSettings;
 };
