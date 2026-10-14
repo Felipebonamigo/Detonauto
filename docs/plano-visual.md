@@ -94,8 +94,8 @@ e se há interior (necessário para a câmera do motorista).
 
 ## Ordem proposta
 
-1. Base de renderização em texto e medição (sem arte nova).
-2. Cena de aparência por script.
+1. Base de renderização em texto e medição (sem arte nova). **Feito no lote 15** (`desempenho.md`).
+2. Cena de aparência por script. **Feito no lote 15** (`lookdev.md`, com capturas antes e depois).
 3. Escolha do carro do City Sample para a fatia vertical e inspeção da malha.
 4. Pintura automotiva e pneus no carro escolhido.
 5. Dano: camada 1 (morph por zona) com um carro, depois camadas 2 a 4.
