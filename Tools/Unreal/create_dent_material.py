@@ -20,7 +20,13 @@ O QUE O MATERIAL FAZ (protótipo, lote 10; não é código final)
     Também escurece um pouco a cor dentro do amassado (marca de batida). A normal NÃO é recalculada: a iluminação do
     amassado usa a normal original da malha (risco anotado em docs/prototipo-amassado.md).
 
-    Parâmetros extras: BaseColor (cor da tinta), Metallic, Roughness.
+    PINTURA (lote 16): o mesmo material é a pintura automotiva da carroceria. Modelo de sombreamento Clear Coat: verniz liso por cima
+    (ClearCoat, ClearCoatRoughness) e base metálica com flocos por baixo (normal de flocos T_DNFlocos_N, gerada por este script, em
+    FlakeTiling x UV, força FlakeStrength). Cor = Base Texture x Paint Tint. Os parâmetros Base Texture, MRA (oclusão no B), Normal,
+    Paint Tint e MetalPaintMetallic têm os nomes do material do carro do template: o ADNVehicle copia os valores originais de cada
+    slot (chassi e janelas continuam com as texturas deles) e só a pintura fica com o tom deste material (vermelho escuro metálico).
+    Roughness é a aspereza da base. Tudo sai pelos atributos de material, o único caminho do Python 5.8 até o verniz.
+    Rodar de novo refaz o material no mesmo pacote (sem apagar).
 
 LIMITE DE SEGURANÇA: só grava pacotes em /Game/ do projeto que o abriu (qualquer outro destino é recusado antes de
 qualquer escrita) e o relatório só pode ficar dentro da pasta do projeto.
@@ -32,8 +38,12 @@ import sys
 sys.dont_write_bytecode = True
 
 import argparse
+import math
 import os
+import random
 import re
+import struct
+import zlib
 
 import unreal
 
@@ -114,18 +124,78 @@ def vector_param(mel, material, name, value, x, y):
     return n
 
 
+def write_flake_png(path, size=256, cell=2, tilt=0.35, seed=7):
+    """Normal map de flocos metálicos (conteúdo próprio, gerado aqui): células de cell x cell px, cada uma com uma normal inclinada
+    ao acaso até 'tilt' (~20 graus). PNG RGB 8 bits escrito só com a biblioteca padrão."""
+    rng = random.Random(seed)
+    cells = size // cell
+    grid = []
+    for _ in range(cells):
+        row = []
+        for _ in range(cells):
+            nx, ny = rng.uniform(-tilt, tilt), rng.uniform(-tilt, tilt)
+            nz = math.sqrt(max(0.0, 1.0 - nx * nx - ny * ny))
+            row.append(bytes(int(round((c * 0.5 + 0.5) * 255.0)) for c in (nx, ny, nz)))
+        grid.append(row)
+    rows = [b"".join(grid[y // cell][x // cell] for x in range(size)) for y in range(size)]
+    raw = b"".join(b"\x00" + r for r in rows)
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(png)
+
+
+def import_flakes(dest, report):
+    """Gera e importa T_DNFlocos_N em <dest> (normal map, sem sRGB)."""
+    png = os.path.join(project_dir(), "Saved", "DentMaterial", "T_DNFlocos_N.png")
+    write_flake_png(png)
+    task = unreal.AssetImportTask()
+    task.filename = png
+    task.destination_path = dest
+    task.destination_name = "T_DNFlocos_N"
+    task.automated = True
+    task.replace_existing = True
+    task.save = False
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    tex = unreal.load_asset(dest + "/T_DNFlocos_N")
+    if not isinstance(tex, unreal.Texture2D):
+        raise DentError("Não consegui importar a textura de flocos em " + dest)
+    tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+    tex.set_editor_property("srgb", False)
+    unreal.EditorAssetLibrary.save_asset(dest + "/T_DNFlocos_N")
+    report.append("textura de flocos gerada: " + dest + "/T_DNFlocos_N")
+    return tex
+
+
+def find_texture(name, fallback):
+    """A textura do carro do template pelo nome (o caminho muda entre o projeto e o Sandbox); senão, a da engine."""
+    for a in unreal.AssetRegistryHelpers.get_asset_registry().get_assets_by_path("/Game", recursive=True):
+        if str(a.asset_name) == name:
+            tex = unreal.load_asset(str(a.package_name))
+            if isinstance(tex, unreal.Texture):
+                return tex
+    return unreal.load_asset(fallback)
+
+
 def build(dest, report):
     if not DEST_PATTERN.match(dest):
         raise DentError("Destino recusado: '%s'. Só /Game/<pasta> do projeto é aceito." % dest)
 
     eal = unreal.EditorAssetLibrary
     path = dest + "/" + ASSET_NAME
-    if eal.does_asset_exist(path):
-        eal.delete_asset(path)  # sempre recria: o resultado tem que sair do script, não de uma edição à mão
-        report.append("material anterior apagado: " + path)
-
     mel = unreal.MaterialEditingLibrary
-    material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(ASSET_NAME, dest, unreal.Material, unreal.MaterialFactoryNew())
+    flakes = import_flakes(dest, report)
+    if eal.does_asset_exist(path):
+        # refaz no mesmo pacote: apagar no commandlet deixa o arquivo no disco e a criação seguinte falha
+        material = unreal.load_asset(path)
+        mel.delete_all_material_expressions(material)
+        report.append("material existente refeito: " + path)
+    else:
+        material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(ASSET_NAME, dest, unreal.Material, unreal.MaterialFactoryNew())
     if material is None:
         raise DentError("Não consegui criar o material em " + dest)
 
@@ -139,10 +209,69 @@ def build(dest, report):
     except Exception as exc:  # o nome da propriedade pode variar entre versões da engine: registra e segue
         unreal.log_warning("[create_dent_material] não consegui definir o deslocamento máximo do WPO: %r" % (exc,))
 
-    # --- cor, metal e aspereza ---
-    color = vector_param(mel, material, "BaseColor", (0.85, 0.18, 0.02, 1.0), -1400, -400)
-    metallic = scalar_param(mel, material, "Metallic", 0.6, -1400, -250)
-    roughness = scalar_param(mel, material, "Roughness", 0.35, -1400, -150)
+    # Pintura automotiva (lote 16): verniz (clear coat) liso por cima e base metálica com flocos por baixo. O verniz só entra pelos
+    # atributos de material (o Python da 5.8 não expõe o pino de verniz direto no material).
+    material.set_editor_property("use_material_attributes", True)
+    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_CLEAR_COAT)
+
+    # --- parâmetros com os MESMOS nomes do material do carro do template (o C++ copia o visual de cada slot) ---
+    def tex_param(name, texture, sampler, x, y):
+        n = node(mel, material, unreal.MaterialExpressionTextureSampleParameter2D, x, y)
+        n.set_editor_property("parameter_name", name)
+        n.set_editor_property("texture", texture)
+        # o tipo de amostragem tem que casar com a compressão da textura, senão o material não compila
+        compression = texture.get_editor_property("compression_settings")
+        if compression == unreal.TextureCompressionSettings.TC_NORMALMAP:
+            sampler = unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL
+        elif compression == unreal.TextureCompressionSettings.TC_MASKS:
+            sampler = unreal.MaterialSamplerType.SAMPLERTYPE_MASKS
+        elif sampler != unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL:
+            sampler = unreal.MaterialSamplerType.SAMPLERTYPE_COLOR if texture.get_editor_property("srgb") else unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR
+        n.set_editor_property("sampler_type", sampler)
+        return n
+
+    base_tex = tex_param("Base Texture", find_texture("T_SportsCar_Body_D", "/Engine/EngineResources/WhiteSquareTexture"),
+                         unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, -1700, -700)
+    mra_tex = tex_param("MRA", find_texture("T_SportsCar_Body_MRA", "/Engine/EngineResources/WhiteSquareTexture"),
+                        unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, -1700, -450)
+    body_n = tex_param("Normal", find_texture("T_SportsCar_Body_BotN", "/Engine/EngineMaterials/DefaultNormal"),
+                       unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, -1700, -200)
+    tint = vector_param(mel, material, "Paint Tint", (0.16, 0.012, 0.012, 1.0), -1700, -850)  # vermelho escuro metálico
+    metallic = scalar_param(mel, material, "MetalPaintMetallic", 0.7, -1400, -560)
+    roughness = scalar_param(mel, material, "Roughness", 0.4, -1400, -500)
+    coat = scalar_param(mel, material, "ClearCoat", 1.0, -1400, -440)
+    coat_rough = scalar_param(mel, material, "ClearCoatRoughness", 0.03, -1400, -380)
+
+    color = node(mel, material, unreal.MaterialExpressionMultiply, -1400, -750)
+    mel.connect_material_expressions(base_tex, "RGB", color, "A")
+    mel.connect_material_expressions(tint, "", color, "B")
+
+    # flocos: normal procedural repetida pelo UV, misturada à normal da carroceria na camada de baixo do verniz
+    uv = node(mel, material, unreal.MaterialExpressionTextureCoordinate, -1900, 50)
+    tiling = scalar_param(mel, material, "FlakeTiling", 30.0, -1900, 150)
+    flake_uv = node(mel, material, unreal.MaterialExpressionMultiply, -1700, 80)
+    mel.connect_material_expressions(uv, "", flake_uv, "A")
+    mel.connect_material_expressions(tiling, "", flake_uv, "B")
+    flake_n = node(mel, material, unreal.MaterialExpressionTextureSample, -1500, 80)
+    flake_n.set_editor_property("texture", flakes)
+    flake_n.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    mel.connect_material_expressions(flake_uv, "", flake_n, "UVs")
+    strength = scalar_param(mel, material, "FlakeStrength", 0.6, -1500, 250)
+    blend = node(mel, material, unreal.MaterialExpressionCustom, -1200, 0)
+    blend.set_editor_property("code", "return normalize(float3(A.xy + B.xy * S, A.z));")
+    blend.set_editor_property("description", "Flocos na normal")
+    blend.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    blend_inputs = []
+    for name in ("A", "B", "S"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        blend_inputs.append(ci)
+    blend.set_editor_property("inputs", blend_inputs)
+    mel.connect_material_expressions(body_n, "RGB", blend, "A")
+    mel.connect_material_expressions(flake_n, "RGB", blend, "B")
+    mel.connect_material_expressions(strength, "", blend, "S")
+    bottom = node(mel, material, unreal.MaterialExpressionClearCoatNormalCustomOutput, -900, 0)
+    mel.connect_material_expressions(blend, "", bottom, "")
 
     # --- posição local sem deslocamentos e normal do vértice ---
     world = node(mel, material, unreal.MaterialExpressionWorldPosition, -1400, 100)
@@ -183,7 +312,6 @@ def build(dest, report):
     offset.set_editor_property("b", True)
     offset.set_editor_property("a", False)
     mel.connect_material_expressions(custom, "", offset, "")
-    mel.connect_material_property(offset, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 
     mask = node(mel, material, unreal.MaterialExpressionComponentMask, -400, 450)
     mask.set_editor_property("r", False)
@@ -192,25 +320,95 @@ def build(dest, report):
     mask.set_editor_property("a", True)
     mel.connect_material_expressions(custom, "", mask, "")
 
-    strength = scalar_param(mel, material, "DentDarkening", 0.6, -400, 600)
+    darkening = scalar_param(mel, material, "DentDarkening", 0.6, -400, 600)
     scaled = node(mel, material, unreal.MaterialExpressionMultiply, -150, 500)
     mel.connect_material_expressions(mask, "", scaled, "A")
-    mel.connect_material_expressions(strength, "", scaled, "B")
+    mel.connect_material_expressions(darkening, "", scaled, "B")
     keep = node(mel, material, unreal.MaterialExpressionOneMinus, 50, 500)
     mel.connect_material_expressions(scaled, "", keep, "")
     painted = node(mel, material, unreal.MaterialExpressionMultiply, 250, 0)
     mel.connect_material_expressions(color, "", painted, "A")
     mel.connect_material_expressions(keep, "", painted, "B")
 
-    mel.connect_material_property(painted, "", unreal.MaterialProperty.MP_BASE_COLOR)
-    mel.connect_material_property(metallic, "", unreal.MaterialProperty.MP_METALLIC)
-    mel.connect_material_property(roughness, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    # --- tudo pelos atributos de material (é o único caminho do Python para o verniz) ---
+    attrs = node(mel, material, unreal.MaterialExpressionMakeMaterialAttributes, 550, 0)
+    for src, out, pin in ((painted, "", "BaseColor"), (metallic, "", "Metallic"), (roughness, "", "Roughness"), (body_n, "RGB", "Normal"),
+                          (offset, "", "WorldPositionOffset"), (coat, "", "ClearCoat"), (coat_rough, "", "ClearCoatRoughness"),
+                          (mra_tex, "B", "AmbientOcclusion")):
+        if not mel.connect_material_expressions(src, out, attrs, pin):
+            raise DentError("Ligação de material falhou: %s -> %s" % (src.get_name(), pin))
+    mel.connect_material_property(attrs, "", unreal.MaterialProperty.MP_MATERIAL_ATTRIBUTES)
 
     mel.recompile_material(material)
     if not eal.save_asset(path):
         raise DentError("Não consegui salvar " + path)
     report.append("material criado: " + path)
-    report.append("parâmetros: BaseColor, Metallic, Roughness, DentDarkening, D0P..D7P, D0R..D7R, D0D..D7D")
+    report.append("parâmetros: Paint Tint, Base Texture, MRA, Normal, MetalPaintMetallic, Roughness, ClearCoat, ClearCoatRoughness, FlakeTiling, "
+                  "FlakeStrength, DentDarkening, D0P..D7P, D0R..D7R, D0D..D7D")
+    dress_car(dest, material, report)
+
+
+def find_asset(name, cls):
+    for a in unreal.AssetRegistryHelpers.get_asset_registry().get_assets_by_path("/Game", recursive=True):
+        if str(a.asset_name) == name:
+            asset = unreal.load_asset(str(a.package_name))
+            if isinstance(asset, cls):
+                return asset
+    return None
+
+
+def make_instance(dest, name, parent, scalars=None, vectors=None, textures=None):
+    """Instância de material em <dest>, refeita no mesmo pacote se já existe."""
+    mel = unreal.MaterialEditingLibrary
+    path = dest + "/" + name
+    if unreal.EditorAssetLibrary.does_asset_exist(path):
+        mi = unreal.load_asset(path)
+    else:
+        mi = unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, dest, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    mel.set_material_instance_parent(mi, parent)
+    mel.clear_all_material_instance_parameters(mi)
+    for k, v in (scalars or {}).items():
+        mel.set_material_instance_scalar_parameter_value(mi, k, v)
+    for k, v in (vectors or {}).items():
+        mel.set_material_instance_vector_parameter_value(mi, k, unreal.LinearColor(v[0], v[1], v[2], 1.0))
+    for k, v in (textures or {}).items():
+        if v is not None:
+            mel.set_material_instance_texture_parameter_value(mi, k, v)
+    mel.update_material_instance(mi)
+    unreal.EditorAssetLibrary.save_asset(path)
+    return mi
+
+
+def dress_car(dest, paint, report):
+    """Veste o carro do template: pintura e chassi/janelas na carroceria, roda e pneu na roda (lote 16). Só mexe nas malhas que achar."""
+    body = find_asset("SM_SportsCar", unreal.StaticMesh)
+    if body is not None:
+        pintura = make_instance(dest, "MI_DNPintura", paint)
+        # chassi, grade e janelas: as texturas do chassi do template, verniz bem liso e sem flocos (vidro fumê opaco: o carro não tem interior)
+        chassi = make_instance(dest, "MI_DNChassi", paint, {"MetalPaintMetallic": 1.0, "FlakeStrength": 0.0, "ClearCoatRoughness": 0.02, "Roughness": 0.3},
+                               {"Paint Tint": (1.0, 0.992, 0.99)},
+                               {"Base Texture": find_texture("T_SportsCar_Chasis_D", "/Engine/EngineResources/WhiteSquareTexture"),
+                                "MRA": find_texture("T_SportsCar_Chasis_MRA", "/Engine/EngineResources/WhiteSquareTexture"),
+                                "Normal": find_texture("T_SportsCar_Chasis_N", "/Engine/EngineMaterials/DefaultNormal")})
+        slots = [str(s.material_slot_name) for s in body.get_editor_property("static_materials")]
+        for i, slot in enumerate(slots):
+            body.set_material(i, pintura if "Body" in slot else chassi)
+        unreal.EditorAssetLibrary.save_asset(body.get_path_name().split(".")[0])
+        report.append("carroceria %s: slots %s -> pintura no 'Body', chassi nos outros" % (body.get_path_name(), slots))
+    wheel = find_asset("SM_SportsCar_Wheel", unreal.StaticMesh)
+    wheel_parent = find_asset("M_SportsCar_Wheel", unreal.Material)
+    if wheel is not None and wheel_parent is not None:
+        roda = make_instance(dest, "MI_DNRoda", wheel_parent, {"Metallic1": 1.0, "Roughness1": 0.22, "Metallic2": 1.0, "Roughness2": 0.12},
+                             {"BaseColor1": (0.55, 0.56, 0.58), "BaseColor2": (0.9, 0.9, 0.9)})
+        pneu = make_instance(dest, "MI_DNPneu", wheel_parent, {"Metallic1": 0.0, "Roughness1": 0.88, "Metallic2": 0.0, "Roughness2": 0.75},
+                             {"BaseColor1": (0.022, 0.022, 0.022), "BaseColor2": (0.09, 0.09, 0.09)},
+                             {"Normal": find_texture("T_SportsCar_Tire_N", "/Engine/EngineMaterials/DefaultNormal"),
+                              "Masks": find_texture("T_SportsCar_Tire_M_TGA", "/Engine/EngineResources/WhiteSquareTexture")})
+        slots = [str(s.material_slot_name) for s in wheel.get_editor_property("static_materials")]
+        for i, slot in enumerate(slots):
+            wheel.set_material(i, pneu if "Tire" in slot else roda)
+        unreal.EditorAssetLibrary.save_asset(wheel.get_path_name().split(".")[0])
+        report.append("roda %s: slots %s -> pneu no 'Tire', aro nos outros" % (wheel.get_path_name(), slots))
 
 
 def main():
