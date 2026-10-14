@@ -2,12 +2,16 @@
 Exporta em lote os objetos de uma coleção do Blender como FBX, com escala, eixos e unidade
 certos para o Unreal Engine.
 
-*** NÃO TESTADO CONTRA O BLENDER REAL ***
-O Blender não está instalado no PC onde este script foi escrito (nem no PATH, nem no registro,
-nem em Program Files). Só a lógica que não usa o Blender (argumentos, trava da pasta de saída,
-relatório) foi testada, com um módulo `bpy` de mentira. Todas as chamadas de `bpy` abaixo foram
-escritas de memória e estão marcadas como SUPOSIÇÃO onde não foram conferidas contra a
-documentação do Blender instalado. Para validar: instale o Blender e rode o exemplo abaixo.
+Testado em 14 out 2026 com o Blender 5.2.2 LTS
+(C:\Program Files\Blender Foundation\Blender 5.2\blender.exe) e importado no Unreal 5.8:
+- escala: 1 m no Blender chega como 100 cm no Unreal (caixa de 2 x 1 x 0,5 m virou 200 x 100 x 50);
+- eixos, com o padrão -Z/Y: +X do Blender vira +X do Unreal, +Y do Blender vira -Y do Unreal e
+  +Z continua +Z. Os dois lados ficam certos (a esquerda do Blender continua a esquerda), então
+  MODELE O CARRO COM A FRENTE PARA +X no Blender;
+- pivô: com --center (padrão) a posição do objeto é zerada e o pivô fica onde está a origem do
+  objeto no Blender; rotação e escala do objeto são aplicadas nos vértices.
+Atenção: transform_apply altera o objeto na cena aberta. Em modo -b o .blend não é salvo, então
+o arquivo fica intacto; numa janela aberta do Blender, não salve depois de rodar.
 
 Uso (modo background, sem janela):
 
@@ -38,10 +42,8 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ALLOWED_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "Sandbox"))
 
-# SUPOSIÇÃO: -Z para frente e Y para cima é o padrão do exportador FBX do Blender e a combinação
-# mais citada para Unreal. O Unreal converte do eixo gravado no FBX para o seu (X à frente, Z para
-# cima). Se, depois de importar, a frente do modelo apontar para o lado errado, troque com
-# --forward / --up. Confira com um modelo que tenha uma frente óbvia (um carro).
+# -Z para frente e Y para cima é o padrão do exportador FBX do Blender. Conferido no Unreal 5.8
+# (ver cabeçalho): com esse par, +X do Blender chega como +X (a frente do carro no Unreal).
 DEFAULT_FORWARD = "-Z"
 DEFAULT_UP = "Y"
 VALID_AXES = ("X", "Y", "Z", "-X", "-Y", "-Z")
@@ -108,15 +110,14 @@ def fbx_options(forward, up):
         "axis_forward": forward,
         "axis_up": up,
         # Unidade: o Blender trabalha em metros, o Unreal em centímetros. Com apply_unit_scale
-        # ligado o FBX carrega a unidade do cena e 1 m no Blender vira 100 unidades no Unreal.
-        # SUPOSIÇÃO: vale para uma cena com Unit System = Metric e Unit Scale = 1.
+        # ligado o FBX carrega a unidade da cena e 1 m no Blender vira 100 unidades no Unreal.
+        # Conferido com Unit System = Metric e Unit Scale = 1 (o padrão); outra escala não foi testada.
         "apply_unit_scale": True,
         # global_scale 1 + FBX_SCALE_NONE: nenhuma escala extra por cima da conversão acima.
         "global_scale": 1.0,
         "apply_scale_options": "FBX_SCALE_NONE",
         # Aplica a conversão de eixos nos vértices em vez de só gravar uma rotação no objeto,
-        # para o modelo não chegar ao Unreal girado 90 graus. SUPOSIÇÃO: costuma ser o desejado
-        # para Static Mesh; confira ao importar.
+        # para o modelo não chegar ao Unreal girado 90 graus (conferido: chega sem giro).
         "bake_space_transform": True,
         # Modificadores (Subdivision, Mirror...) valem na exportação.
         "use_mesh_modifiers": True,
@@ -135,7 +136,7 @@ def write_report(path, lines):
         handle.write("\n".join(lines) + "\n")
 
 
-# Esta parte usa o Blender (bpy). SUPOSIÇÃO: nomes e parâmetros conferidos só de memória.
+# Esta parte usa o Blender (bpy). Rodada sem erro no Blender 5.2.2.
 
 def export_collection(args, report):
     import bpy  # só existe dentro do Blender
