@@ -58,6 +58,10 @@ trimestral, quebre o próximo trimestre em sprints de duas semanas.
 
 Nenhum asset entra no projeto sem uma linha em `docs/licencas.csv`.
 
+- **Modelos 3D em comum aos 4 jogos:** antes de baixar ou gerar, procure na aba
+  "Modelos 3D" do doc do estúdio e no repositório privado `Felipebonamigo/acervo-3d`.
+  Modelo novo entra nos dois no mesmo dia, além da linha em `docs/licencas.csv`.
+
 - **Permitido:** CC0, CC BY com crédito, conteúdo da Epic com licença só para
   Unreal (City Sample e gratuitos do Fab), pacotes GDC da Sonniss, modelos do
   Meshy gratuito com crédito, e o que o Felipe criar.
