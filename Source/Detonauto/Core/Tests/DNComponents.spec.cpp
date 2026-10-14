@@ -88,7 +88,9 @@ void FDNTurboComponentSpec::Define()
 			FDNTurboConfig Config;
 			Config.MaxBar = 40.f;
 			Config.TakedownSetsBarTo = 40.f;
+			TestEqual("MaxBar padrao do Core", C->GetMaxBar(), FDNTurboConfig().MaxBar);
 			C->Configure(Config);
+			TestEqual("MaxBar da config nova", C->GetMaxBar(), 40.f);
 			C->Step(Frame(0.1f, false, true));
 			TestEqual("barra da config nova", C->GetBar(), 40.f);
 		});

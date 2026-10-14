@@ -12,6 +12,10 @@
 	],
 	"Plugins": [
 		{
+			"Name": "ChaosVehiclesPlugin",
+			"Enabled": true
+		},
+		{
 			"Name": "AndroidFileServer",
 			"Enabled": false
 		}

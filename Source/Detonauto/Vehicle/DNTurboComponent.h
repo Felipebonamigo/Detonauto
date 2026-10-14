@@ -41,6 +41,8 @@ public:
 
 	const FDNTurboState& GetState() const { return State; }
 	float GetBar() const { return State.Bar; }
+	/** O teto da barra da configuração atual (para a UI desenhar a barra em fração). */
+	float GetMaxBar() const { return Config.MaxBar; }
 	bool IsActive() const { return State.bActive; }
 
 	FDNOnTurboActiveChanged OnActiveChanged;
