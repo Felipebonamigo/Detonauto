@@ -3,7 +3,7 @@
     Roda os testes de Automation do projeto sem janela e resume aprovados/reprovados.
 .EXAMPLE
     .\Tools\Unreal\test.ps1 -Uproject Sandbox\VeiculoTeste\VeiculoTeste.uproject
-    .\Tools\Unreal\test.ps1 -Uproject X.uproject -Filter Detonauto.Score -TimeoutSeconds 900
+    .\Tools\Unreal\test.ps1 -Uproject X.uproject -Filter Detonauto.Pontuacao -TimeoutSeconds 900
 .NOTES
     Código de saída: 0 tudo passou; 1 algum teste falhou, nenhum teste rodou,
     timeout ou erro do script. Grava só em <projeto>\Saved.
