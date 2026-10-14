@@ -55,8 +55,12 @@ SETS = [
     ("MeioFio", "brushed_concrete", 250.0),
     ("Fachada", "clay_plaster", 200.0),
 ]
-# tons das fachadas (multiplicam a cor da textura): gelo, areia, terracota clara, cinza azulado
+# tons das fachadas de reboco (multiplicam a cor da textura): gelo, areia, terracota clara, cinza azulado; a quinta é de concreto
 FACADE_TINTS = [(1.0, 1.0, 1.0), (0.95, 0.85, 0.68), (0.92, 0.66, 0.52), (0.72, 0.78, 0.84)]
+FLOOR_HEIGHTS = (300, 350)   # pé-direito dos andares [cm]
+GROUND_FLOOR_CM = 450.0      # térreo com vitrine
+# trechos de prédios baixos e recuados (x inicial, x final, lado), para o sol de fim de tarde entrar na calçada
+LOW_ZONES = [(-9000.0, -3000.0, -1), (6000.0, 12000.0, 1), (20000.0, 26000.0, -1), (-30000.0, -24000.0, 1)]
 
 # geometria da rua [cm]
 ROAD_X0, ROAD_X1 = -56000.0, 64000.0
@@ -275,6 +279,121 @@ def build_flat_master(report):
     return m
 
 
+# Interior mapping (salas falsas por paralaxe), procedural, sem textura. Entradas: WP posição no mundo [cm], V vetor para a câmera,
+# N normal da fachada, Room tamanho da sala [cm], Off origem das salas [cm], Pane largura do painel de vidro [cm].
+# Saída: rgb = cor da sala vista pelo vidro, a = máscara do caixilho (1 = montante).
+INTERIOR_HLSL = """
+float3 rs = max(Room, 1.0);
+float3 n = normalize(N);
+float3 p = (WP - n * 2.0 - Off) / rs;
+float3 cell = floor(p);
+float3 l = p - cell;
+float3 d = -V / rs;
+d = sign(d) * max(abs(d), 1e-5);
+float3 t = (step(0.0, d) - l) / d;
+float tm = min(min(t.x, t.y), t.z);
+float r = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
+float lit = r > 0.4 ? 1.0 : 0.18;
+float3 wall = lerp(float3(0.62, 0.56, 0.46), float3(0.45, 0.5, 0.56), frac(r * 7.13));
+float3 col;
+if (tm == t.z)
+{
+    col = d.z < 0.0 ? float3(0.28, 0.19, 0.12) : float3(0.8, 0.79, 0.75);
+}
+else if ((tm == t.x && abs(n.x) > 0.5) || (tm == t.y && abs(n.y) > 0.5))
+{
+    col = wall * 0.75;
+}
+else
+{
+    col = wall;
+}
+float depth = saturate(tm * length(d * rs) / 700.0);
+col *= lerp(1.0, 0.45, depth) * lit;
+float u = abs(n.x) > 0.5 ? WP.y : WP.x;
+float m = frac(u / max(Pane, 1.0));
+float frame = (m < 0.025 || m > 0.975) ? 1.0 : 0.0;
+return float4(col, frame);
+"""
+
+
+def build_window_master(report):
+    """Vidro dos prédios: reflexo (vidro liso), salas falsas por interior mapping e caixilho de alumínio."""
+    path = MAT_DIR + "/M_DNLookdevJanela"
+    mel = unreal.MaterialEditingLibrary
+    m = recreate(path, unreal.Material, unreal.MaterialFactoryNew())
+
+    def param(cls, name, value, x, y):
+        p = expr(m, cls, x, y)
+        p.set_editor_property("parameter_name", name)
+        p.set_editor_property("default_value", value)
+        return p
+
+    world = expr(m, unreal.MaterialExpressionWorldPosition, -1400, -200)
+    cam = expr(m, unreal.MaterialExpressionCameraVectorWS, -1400, -100)
+    normal = expr(m, unreal.MaterialExpressionVertexNormalWS, -1400, 0)
+    room = param(unreal.MaterialExpressionVectorParameter, "RoomSizeCm", unreal.LinearColor(450.0, 450.0, 300.0, 0.0), -1400, 100)
+    off = param(unreal.MaterialExpressionVectorParameter, "RoomOffsetCm", unreal.LinearColor(0.0, 0.0, 0.0, 0.0), -1400, 250)
+    pane = param(unreal.MaterialExpressionScalarParameter, "PaneWidthCm", 150.0, -1400, 400)
+
+    custom = expr(m, unreal.MaterialExpressionCustom, -1000, 0)
+    custom.set_editor_property("code", INTERIOR_HLSL)
+    custom.set_editor_property("description", "Salas falsas (interior mapping)")
+    custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT4)
+    inputs = []
+    for name in ("WP", "V", "N", "Room", "Off", "Pane"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    custom.set_editor_property("inputs", inputs)
+    for src, pin in ((world, "WP"), (cam, "V"), (normal, "N"), (room, "Room"), (off, "Off"), (pane, "Pane")):
+        connect(src, "", custom, pin)
+
+    interior = mask(m, custom, "rgb", -750, -100)
+    frame = mask(m, custom, "a", -750, 100)
+
+    glass = param(unreal.MaterialExpressionVectorParameter, "CorVidro", unreal.LinearColor(0.01, 0.012, 0.015, 1.0), -750, -400)
+    frame_col = param(unreal.MaterialExpressionVectorParameter, "CorCaixilho", unreal.LinearColor(0.09, 0.09, 0.095, 1.0), -750, -300)
+    base = expr(m, unreal.MaterialExpressionLinearInterpolate, -450, -350)
+    connect(glass, "", base, "A")
+    connect(frame_col, "", base, "B")
+    connect(frame, "", base, "Alpha")
+    rough = expr(m, unreal.MaterialExpressionLinearInterpolate, -450, -200)
+    rough.set_editor_property("const_a", 0.04)
+    rough.set_editor_property("const_b", 0.45)
+    connect(frame, "", rough, "Alpha")
+    metal = expr(m, unreal.MaterialExpressionLinearInterpolate, -450, -50)
+    metal.set_editor_property("const_a", 0.0)
+    metal.set_editor_property("const_b", 0.8)
+    connect(frame, "", metal, "Alpha")
+
+    # sala acesa: emissivo atrás do vidro, mais fraco no ângulo rasante (onde o vidro só reflete)
+    fresnel = expr(m, unreal.MaterialExpressionFresnel, -750, 300)
+    see = expr(m, unreal.MaterialExpressionOneMinus, -600, 300)
+    connect(fresnel, "", see, "")
+    no_frame = expr(m, unreal.MaterialExpressionOneMinus, -600, 150)
+    connect(frame, "", no_frame, "")
+    bright = param(unreal.MaterialExpressionScalarParameter, "BrilhoInterior", 120.0, -600, 450)
+    e1 = expr(m, unreal.MaterialExpressionMultiply, -400, 100)
+    connect(interior, "", e1, "A")
+    connect(no_frame, "", e1, "B")
+    e2 = expr(m, unreal.MaterialExpressionMultiply, -250, 200)
+    connect(e1, "", e2, "A")
+    connect(see, "", e2, "B")
+    e3 = expr(m, unreal.MaterialExpressionMultiply, -100, 250)
+    connect(e2, "", e3, "A")
+    connect(bright, "", e3, "B")
+
+    mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
+    mel.connect_material_property(e3, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    unreal.EditorAssetLibrary.save_asset(path)
+    report.append("material criado: " + path)
+    return m
+
+
 def instance(parent, name, scalars=None, vectors=None, textures=None):
     path = MAT_DIR + "/" + name
     mel = unreal.MaterialEditingLibrary
@@ -303,9 +422,18 @@ def build_materials(textures, report):
                 mats["Fachada%d" % i] = instance(surface, "MI_Fachada%d" % i, {"Tile": tile_cm}, {"Tint": tint}, tex)
         else:
             mats[name] = instance(surface, "MI_" + name, {"Tile": tile_cm}, None, tex)
+    # quinta fachada: concreto aparente (a textura do meio-fio, clara)
+    concrete = {"Cor": textures[TEX_DIR + "/T_MeioFio_D"], "Normal": textures[TEX_DIR + "/T_MeioFio_N"], "ARM": textures[TEX_DIR + "/T_MeioFio_ARM"]}
+    mats["Fachada%d" % len(FACADE_TINTS)] = instance(surface, "MI_Fachada%d" % len(FACADE_TINTS), {"Tile": 250.0}, {"Tint": (1.15, 1.12, 1.08)}, concrete)
     mats["FaixaBranca"] = instance(flat, "MI_FaixaBranca", {"Aspereza": 0.6}, {"Cor": (0.75, 0.75, 0.72)})
     mats["FaixaAmarela"] = instance(flat, "MI_FaixaAmarela", {"Aspereza": 0.6}, {"Cor": (0.80, 0.52, 0.04)})
-    mats["Vidro"] = instance(flat, "MI_Vidro", {"Aspereza": 0.06, "Metal": 0.0}, {"Cor": (0.015, 0.02, 0.025)})
+    # vidro com salas falsas: uma instância por pé-direito (as salas precisam casar com os andares) e uma para as vitrines do térreo
+    window = build_window_master(report)
+    for floor_cm in FLOOR_HEIGHTS:
+        mats["Janela%d" % floor_cm] = instance(window, "MI_Janela%d" % floor_cm, {"PaneWidthCm": 150.0},
+                                               {"RoomSizeCm": (450.0, 450.0, floor_cm), "RoomOffsetCm": (0.0, 0.0, SIDEWALK_TOP + GROUND_FLOOR_CM)})
+    mats["Vitrine"] = instance(window, "MI_Vitrine", {"PaneWidthCm": 250.0, "BrilhoInterior": 160.0},
+                               {"RoomSizeCm": (700.0, 700.0, GROUND_FLOOR_CM), "RoomOffsetCm": (0.0, 0.0, SIDEWALK_TOP)})
     report.append("instâncias de material: %d" % len(mats))
     return mats
 
@@ -363,27 +491,37 @@ def build_buildings(b, report):
     rng = random.Random(15)  # semente fixa: a cena é igual em toda execução
     front = LANE_CM + CURB_W + SIDEWALK_W
     total = 0
+    low = 0
     for side in (-1, 1):
         x = ROAD_X0
         while x < ROAD_X1:
             width = rng.uniform(1400.0, 2600.0)
-            floors = rng.randint(4, 12)
-            height = 450.0 + floors * 300.0
+            in_low_zone = any(z0 <= x < z1 and s == side for z0, z1, s in LOW_ZONES)
+            if in_low_zone:
+                # baixo e recuado: 1 ou 2 andares, 6 a 12 m para dentro (deixa o sol entrar na calçada)
+                floors = rng.randint(1, 2)
+                setback = rng.uniform(600.0, 1200.0)
+                low += 1
+            else:
+                floors = rng.randint(4, 12)
+                setback = rng.choice((0.0, 0.0, 150.0, 300.0))
+            floor_cm = rng.choice(FLOOR_HEIGHTS + (FLOOR_HEIGHTS[0],))
+            height = GROUND_FLOOR_CM + floors * floor_cm
             depth = rng.uniform(1500.0, 2200.0)
-            setback = rng.choice((0.0, 0.0, 150.0))
-            mat = "Fachada%d" % rng.randrange(len(FACADE_TINTS))
+            mat = "Fachada%d" % rng.randrange(len(FACADE_TINTS) + 1)
             y_face = side * (front + setback)
             y0, y1 = sorted((y_face, y_face + side * depth))
             b.box("Predio_%+d_%02d" % (side, total), x, x + width, y0, y1, SIDEWALK_TOP - 5.0, SIDEWALK_TOP + height, mat)
             # vidro na fachada da rua: vitrine no térreo e uma faixa por andar, 2 cm para fora da parede
             gy0, gy1 = sorted((y_face, y_face - side * 2.0))
-            b.box("Vitrine_%+d_%02d" % (side, total), x + 150.0, x + width - 150.0, gy0, gy1, SIDEWALK_TOP + 40.0, SIDEWALK_TOP + 320.0, "Vidro")
+            b.box("Vitrine_%+d_%02d" % (side, total), x + 150.0, x + width - 150.0, gy0, gy1, SIDEWALK_TOP + 40.0, SIDEWALK_TOP + GROUND_FLOOR_CM - 90.0, "Vitrine")
+            window_h = floor_cm * 0.5
             for f in range(floors):
-                z0 = SIDEWALK_TOP + 450.0 + f * 300.0 + 70.0
-                b.box("Janelas_%+d_%02d_%02d" % (side, total, f), x + 120.0, x + width - 120.0, gy0, gy1, z0, z0 + 150.0, "Vidro")
+                z0 = SIDEWALK_TOP + GROUND_FLOOR_CM + f * floor_cm + (floor_cm - window_h) * 0.45
+                b.box("Janelas_%+d_%02d_%02d" % (side, total, f), x + 120.0, x + width - 120.0, gy0, gy1, z0, z0 + window_h, "Janela%d" % floor_cm)
             total += 1
             x += width + rng.choice((0.0, 0.0, 200.0, 400.0))
-    report.append("prédios: %d (blocos simples no lugar dos prédios do City Sample, que não estão no PC)" % total)
+    report.append("prédios: %d, dos quais %d baixos e recuados (blocos simples no lugar dos prédios do City Sample, que não estão no PC)" % (total, low))
 
 
 def build_light(b):
