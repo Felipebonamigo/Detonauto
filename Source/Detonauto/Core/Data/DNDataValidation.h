@@ -39,6 +39,12 @@ struct FDNDataValidation
 	/** Exatamente uma linha; finitos; limites e fatores > 0; PartDetachZoneDamage e DestroyedTotalDamage em (0, 1]; MaxDents e MaxActive inteiros >= 1. */
 	static TArray<FString> ValidateDamage(const TArray<FDNDamageConfigEntry>& Rows);
 
+	/**
+	 *  Uma ou mais linhas (presets); a linha "Padrao" é obrigatória. Cada campo tem uma faixa fechada (ver DNDataValidation.cpp);
+	 *  RearGripFactor x HandbrakeRearGrip >= 0,295 (abaixo disso o carro roda com o freio de mão: docs/presets-carro.md).
+	 */
+	static TArray<FString> ValidateCars(const TArray<FDNCarConfigEntry>& Rows);
+
 	/** Todas as tabelas, com as referências entre elas. */
 	static TArray<FString> ValidateAll(const FDNData& Data);
 

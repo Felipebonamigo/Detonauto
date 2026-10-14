@@ -510,6 +510,54 @@ TArray<FString> FDNDataValidation::ValidateDamage(const TArray<FDNDamageConfigEn
 	return Errors;
 }
 
+TArray<FString> FDNDataValidation::ValidateCars(const TArray<FDNCarConfigEntry>& Rows)
+{
+	constexpr const TCHAR* CarsFile = TEXT("Cars.csv");
+	// Faixas fechadas: as mesmas que o protótipo de teste limitava em silêncio (Sandbox, lote 8). Aqui são recusadas.
+	// Produto mínimo da aderência traseira com o freio de mão cheio: medido no Chaos 5.8 com o freio a 3000
+	// (docs/presets-carro.md): 0,32 = 12 graus de deslizamento; 0,30 = 37 a 41; 0,294 = 77; 0,28 = 90 (o carro roda).
+	constexpr float MinRearGripProduct = 0.295f;
+
+	TArray<FString> Errors;
+	CheckIds(CarsFile, Rows, Errors);
+	if (!Rows.ContainsByPredicate([](const FDNCarConfigEntry& E) { return E.Id.Equals(TEXT("Padrao"), ESearchCase::IgnoreCase); }))
+	{
+		Errors.Add(FString::Printf(TEXT("%s: falta a linha 'Padrao' (é o carro do template e o usado quando o preset pedido não existe)."), CarsFile));
+	}
+
+	for (const FDNCarConfigEntry& E : Rows)
+	{
+		const FDNCarConfigRow& R = E.Row;
+		const FString& Id = E.Id;
+		auto Range = [&](const TCHAR* Field, float Value, float Min, float Max) { return CheckRange(CarsFile, Id, Field, Value, Min, true, Max, true, Errors); };
+		Range(TEXT("MassKg"), R.MassKg, 100.0f, 10000.0f);
+		Range(TEXT("MaxTorque"), R.MaxTorque, 50.0f, 5000.0f);
+		Range(TEXT("LateralGrip"), R.LateralGrip, 0.1f, 5.0f);
+		Range(TEXT("SuspensionStiffness"), R.SuspensionStiffness, 10.0f, 2000.0f);
+		Range(TEXT("SteeringGain"), R.SteeringGain, 0.1f, 3.0f);
+		Range(TEXT("CenterOfMassDropCm"), R.CenterOfMassDropCm, 0.0f, 60.0f);
+		Range(TEXT("SuspensionDampingRatio"), R.SuspensionDampingRatio, 0.05f, 1.0f);
+		Range(TEXT("SuspensionTravelCm"), R.SuspensionTravelCm, 2.0f, 40.0f);
+		Range(TEXT("RollbarScaling"), R.RollbarScaling, 0.0f, 1.0f);
+		const bool bRear = Range(TEXT("RearGripFactor"), R.RearGripFactor, 0.2f, 2.0f);
+		const bool bBrake = Range(TEXT("HandbrakeRearGrip"), R.HandbrakeRearGrip, 0.05f, 1.5f);
+		Range(TEXT("HandbrakeRampInSeconds"), R.HandbrakeRampInSeconds, 0.01f, 3.0f);
+		Range(TEXT("HandbrakeRampOutSeconds"), R.HandbrakeRampOutSeconds, 0.01f, 3.0f);
+		Range(TEXT("HandbrakeTorque"), R.HandbrakeTorque, 0.0f, 20000.0f);
+		Range(TEXT("CameraDistanceCm"), R.CameraDistanceCm, 150.0f, 2000.0f);
+		Range(TEXT("CameraHeightCm"), R.CameraHeightCm, 0.0f, 600.0f);
+		Range(TEXT("CameraFov"), R.CameraFov, 60.0f, 120.0f);
+		Range(TEXT("NitroAccelMps2"), R.NitroAccelMps2, 0.0f, 40.0f);
+
+		if (bRear && bBrake && R.RearGripFactor * R.HandbrakeRearGrip < MinRearGripProduct)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': RearGripFactor (%.3f) x HandbrakeRearGrip (%.3f) = %.4f, abaixo do mínimo 0,295: com o freio de mão cheio o carro roda (docs/presets-carro.md). Ajuste os dois campos em passos de 0,02."),
+				CarsFile, *Id, R.RearGripFactor, R.HandbrakeRearGrip, R.RearGripFactor * R.HandbrakeRearGrip));
+		}
+	}
+	return Errors;
+}
+
 TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 {
 	TArray<FString> Errors;
@@ -523,5 +571,6 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateCrash(Data.CrashConfig));
 	Errors.Append(ValidateTakedown(Data.TakedownConfig));
 	Errors.Append(ValidateDamage(Data.DamageConfig));
+	Errors.Append(ValidateCars(Data.CarConfigs));
 	return Errors;
 }

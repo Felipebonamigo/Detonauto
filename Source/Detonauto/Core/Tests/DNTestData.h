@@ -76,6 +76,30 @@ namespace DNTest
 		return R;
 	}
 
+	inline FDNCarConfigRow CarRow(const FDNCarConfig& C = FDNCarConfig())
+	{
+		FDNCarConfigRow R;
+		R.MassKg = C.MassKg;
+		R.MaxTorque = C.MaxTorque;
+		R.LateralGrip = C.LateralGrip;
+		R.SuspensionStiffness = C.SuspensionStiffness;
+		R.SteeringGain = C.SteeringGain;
+		R.CenterOfMassDropCm = C.CenterOfMassDropCm;
+		R.SuspensionDampingRatio = C.SuspensionDampingRatio;
+		R.SuspensionTravelCm = C.SuspensionTravelCm;
+		R.RollbarScaling = C.RollbarScaling;
+		R.RearGripFactor = C.RearGripFactor;
+		R.HandbrakeRearGrip = C.HandbrakeRearGrip;
+		R.HandbrakeRampInSeconds = C.HandbrakeRampInSeconds;
+		R.HandbrakeRampOutSeconds = C.HandbrakeRampOutSeconds;
+		R.HandbrakeTorque = C.HandbrakeTorque;
+		R.CameraDistanceCm = C.CameraDistanceCm;
+		R.CameraHeightCm = C.CameraHeightCm;
+		R.CameraFov = C.CameraFov;
+		R.NitroAccelMps2 = C.NitroAccelMps2;
+		return R;
+	}
+
 	template <typename EntryType, typename RowType>
 	EntryType Entry(const RowType& Row, const TCHAR* Id = TEXT("padrao"))
 	{
@@ -89,6 +113,7 @@ namespace DNTest
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }
 	inline FDNDamageConfigEntry DamageEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNDamageConfigEntry>(DamageRow(), Id); }
+	inline FDNCarConfigEntry CarEntry(const TCHAR* Id = TEXT("Padrao")) { return Entry<FDNCarConfigEntry>(CarRow(), Id); }
 
 	/**
 	 *  Subsistema de GameInstance sem mundo: a classe exige um UGameInstance como dono (ClassWithin), então cada um ganha

@@ -14,6 +14,7 @@
 //   Crash.csv           Id + os campos de FDNCrashConfig (uma linha)
 //   Takedown.csv        Id + os campos de FDNTakedownConfig (uma linha)
 //   Damage.csv          Id + os campos de FDNDamageConfig (uma linha)
+//   Cars.csv            Id + os campos de FDNCarConfig (uma linha por preset; "Padrao" obrigatória)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -27,6 +28,7 @@
 #include "Core/DNCrash.h"
 #include "Core/DNTakedown.h"
 #include "Core/DNDamage.h"
+#include "Core/DNCar.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -345,6 +347,56 @@ struct FDNDamageConfigRow : public FTableRowBase
 	}
 };
 
+/** Data/Cars.csv (uma linha por preset; a linha "Padrao" é obrigatória). Significado de cada campo: FDNCarConfig em Core/DNCar.h. */
+USTRUCT(BlueprintType)
+struct FDNCarConfigRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MassKg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MaxTorque = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LateralGrip = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SuspensionStiffness = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SteeringGain = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CenterOfMassDropCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SuspensionDampingRatio = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SuspensionTravelCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float RollbarScaling = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float RearGripFactor = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeRearGrip = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeRampInSeconds = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeRampOutSeconds = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeTorque = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CameraDistanceCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CameraHeightCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CameraFov = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float NitroAccelMps2 = 0.0f;
+
+	FDNCarConfig ToConfig() const
+	{
+		FDNCarConfig C;
+		C.MassKg = MassKg;
+		C.MaxTorque = MaxTorque;
+		C.LateralGrip = LateralGrip;
+		C.SuspensionStiffness = SuspensionStiffness;
+		C.SteeringGain = SteeringGain;
+		C.CenterOfMassDropCm = CenterOfMassDropCm;
+		C.SuspensionDampingRatio = SuspensionDampingRatio;
+		C.SuspensionTravelCm = SuspensionTravelCm;
+		C.RollbarScaling = RollbarScaling;
+		C.RearGripFactor = RearGripFactor;
+		C.HandbrakeRearGrip = HandbrakeRearGrip;
+		C.HandbrakeRampInSeconds = HandbrakeRampInSeconds;
+		C.HandbrakeRampOutSeconds = HandbrakeRampOutSeconds;
+		C.HandbrakeTorque = HandbrakeTorque;
+		C.CameraDistanceCm = CameraDistanceCm;
+		C.CameraHeightCm = CameraHeightCm;
+		C.CameraFov = CameraFov;
+		C.NitroAccelMps2 = NitroAccelMps2;
+		return C;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -363,6 +415,7 @@ using FDNTurboConfigEntry = TDNTableEntry<FDNTurboConfigRow>;
 using FDNCrashConfigEntry = TDNTableEntry<FDNCrashConfigRow>;
 using FDNTakedownConfigEntry = TDNTableEntry<FDNTakedownConfigRow>;
 using FDNDamageConfigEntry = TDNTableEntry<FDNDamageConfigRow>;
+using FDNCarConfigEntry = TDNTableEntry<FDNCarConfigRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -377,4 +430,5 @@ struct FDNData
 	TArray<FDNCrashConfigEntry> CrashConfig;
 	TArray<FDNTakedownConfigEntry> TakedownConfig;
 	TArray<FDNDamageConfigEntry> DamageConfig;
+	TArray<FDNCarConfigEntry> CarConfigs;
 };

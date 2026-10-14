@@ -82,6 +82,34 @@ void FDNDataToConfigSpec::Define()
 			TestEqual("ZoneHalfAngleDegrees", C.ZoneHalfAngleDegrees, 44.f);
 		});
 
+		It("Car", [this]()
+		{
+			FDNCarConfigRow R;
+			R.MassKg = 1201.f; R.MaxTorque = 851.f; R.LateralGrip = 1.1f; R.SuspensionStiffness = 171.f; R.SteeringGain = 1.2f;
+			R.CenterOfMassDropCm = 26.f; R.SuspensionDampingRatio = 0.56f; R.SuspensionTravelCm = 19.f; R.RollbarScaling = 0.06f;
+			R.RearGripFactor = 0.86f; R.HandbrakeRearGrip = 0.36f; R.HandbrakeRampInSeconds = 0.13f; R.HandbrakeRampOutSeconds = 0.71f;
+			R.HandbrakeTorque = 3001.f; R.CameraDistanceCm = 811.f; R.CameraHeightCm = 186.f; R.CameraFov = 96.f; R.NitroAccelMps2 = 13.f;
+			const FDNCarConfig C = R.ToConfig();
+			TestEqual("MassKg", C.MassKg, 1201.f);
+			TestEqual("MaxTorque", C.MaxTorque, 851.f);
+			TestEqual("LateralGrip", C.LateralGrip, 1.1f);
+			TestEqual("SuspensionStiffness", C.SuspensionStiffness, 171.f);
+			TestEqual("SteeringGain", C.SteeringGain, 1.2f);
+			TestEqual("CenterOfMassDropCm", C.CenterOfMassDropCm, 26.f);
+			TestEqual("SuspensionDampingRatio", C.SuspensionDampingRatio, 0.56f);
+			TestEqual("SuspensionTravelCm", C.SuspensionTravelCm, 19.f);
+			TestEqual("RollbarScaling", C.RollbarScaling, 0.06f);
+			TestEqual("RearGripFactor", C.RearGripFactor, 0.86f);
+			TestEqual("HandbrakeRearGrip", C.HandbrakeRearGrip, 0.36f);
+			TestEqual("HandbrakeRampInSeconds", C.HandbrakeRampInSeconds, 0.13f);
+			TestEqual("HandbrakeRampOutSeconds", C.HandbrakeRampOutSeconds, 0.71f);
+			TestEqual("HandbrakeTorque", C.HandbrakeTorque, 3001.f);
+			TestEqual("CameraDistanceCm", C.CameraDistanceCm, 811.f);
+			TestEqual("CameraHeightCm", C.CameraHeightCm, 186.f);
+			TestEqual("CameraFov", C.CameraFov, 96.f);
+			TestEqual("NitroAccelMps2", C.NitroAccelMps2, 13.f);
+		});
+
 		It("Damage", [this]()
 		{
 			FDNDamageConfigRow R;
