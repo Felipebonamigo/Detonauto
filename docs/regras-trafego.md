@@ -90,3 +90,27 @@ em `Core/Tests/DNTraffic.spec.cpp`; trocar a decisão é trocar o teste.
 | `PlanSpawns` | `clamp(Alvo - Ativos, 0, MaxSpawnPorQuadro)` calculado em **int64**, sem estourar. Alvo, ativos ou máximo negativos valem 0 |
 | Q7. `Data/TrafficSettings.csv` | **Exatamente uma linha** (id `padrao`); zero ou mais de uma é erro de validação. `MaxSpawnPerFrame` é inteiro maior que zero. Os outros cinco são decimais finitos maiores que zero, com `WakeDistanceM < WakeAheadM < DespawnDistanceM` (estrito). Valores iniciais: 6,0; 25,0; 20,0; 200,0; 2,0; 2 |
 | Conversão | `FDNTrafficSettingsRow::ToSettings()` entrega os mesmos números no tipo puro `FDNTrafficSettings`, que é o que as regras de `Core/` recebem |
+
+## Lote 13b: correções da revisão independente (14 out 2026)
+
+A revisão do código do lote 13 achou cinco defeitos no tráfego. Decisões do par (sessão da nuvem) e o que mudou. Testes em
+`Core/Tests/DNTraffic.spec.cpp` (S1 a S6) e `Core/Tests/DNTrafficWorld.spec.cpp` (G1 a G3, "Sem jogador").
+
+| Defeito | Causa | Correção |
+|---|---|---|
+| Carros em trilho atravessavam uns aos outros | Corpos cinemáticos não colidem entre si, e cada carro tinha uma velocidade sorteada | Cada carro em trilho segue o da frente na mesma faixa (`FDNTrafficGeometry::LeaderAhead` + `FDNTraffic::FollowSpeed`): folga mínima de 8 m entre para-choques, volta à própria velocidade a partir de 20 m, para atrás de um carro parado. O jogador também conta como carro da frente. No fim da trilha os de trás param em fila, com folga |
+| Ao acordar, o carro virava uma caixa que freava até parar em ~12 m | Só a velocidade era copiada; o atrito do cubo com o piso (média de 0,7 e 1,0) freava a 0,85 g | Enquanto "dirige" (até a primeira batida com dano, `AddedZoneDamage > 0` ou destruído), o carro acordado usa um material físico de atrito `RollingFriction` (0,02) combinado pelo **mínimo** com o piso; depois da batida, volta ao atrito normal |
+| Ônibus e caminhão não acordavam antes de uma batida de traseira | A distância entre centros (7,8 m numa traseira de ônibus) passava dos 6 m | Acordar mede a **folga entre as caixas** (`FDNTrafficGeometry::NearestGapM`): na linha entre os centros, a distância menos o quanto cada caixa avança nessa direção. `WakeDistanceM` continua 6 m, agora de folga |
+| Sem jogador, o tráfego sumia e as vagas se perdiam | Sem jogador, a posição dele virava 1e9 e todo carro ficava "atrás e longe" | `FDNTrafficGeometryInput::bHasPlayer`: sem jogador a distância é NaN e nada acorda nem some por causa dele (impacto e vizinho físico ainda acordam) |
+| A rodada nunca silenciava | (1) o fim da rodada olhava todos os carros Physics, inclusive os que só andam; (2) na medição "todos Physics", a velocidade imposta a cada quadro vencia o contato e o carro empurrava o destroço como um trator | O silêncio olha só os **destroços** (`MaxWreckSpeedMs`: Physics que já levou batida com dano) e o jogador; o "manter velocidade" da medição acaba no primeiro contato que não é o piso. A rodada começa só na primeira batida **no jogador** (antes, um contato tráfego com tráfego ligava o relógio) |
+
+Medido (`crash-probe.ps1 -Kmh 130 -Traffic 40`): Rail: menor folga em trilho 8,0 m; primeiro impacto com o jogador a 2,3 s; a rodada
+silencia em 12,3 s; 19 carros acordaram e 12 seguiam rolando a 12,5 m/s no fim. Physics (só medição): a rodada silencia em 24,5 s (antes
+batia no teto de 30 s); os destroços ainda se mexem até ~20 s porque os carros sem motorista continuam chegando à pilha.
+
+Dados novos em `Data/TrafficSettings.csv`: `FollowMinGapM` (8,0), `FollowCatchUpGapM` (20,0) e `RollingFriction` (0,02). Validação:
+maiores que zero e finitos, `FollowMinGapM < FollowCatchUpGapM`, `RollingFriction <= 1`.
+
+Fica para depois: os carros acordados que dirigem não seguem o da frente (só o atrito baixo); o espaçamento no nascimento continua o de
+`PlanSlots` (30 m entre centros, 19 m ou mais entre para-choques mesmo com ônibus); a cadeia de batidas da medição "todos Physics" não
+tem motorista.
