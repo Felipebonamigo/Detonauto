@@ -150,6 +150,23 @@ void FDNDataToConfigSpec::Define()
 			TestEqual("DestroyedTotalDamage", C.DestroyedTotalDamage, 0.6f);
 			TestEqual("MaxActive", C.MaxActive, 25);
 		});
+
+		It("TrafficSettings (ToSettings)", [this]()
+		{
+			FDNTrafficSettingsRow R;
+			R.WakeDistanceM = 5.f; R.WakeAheadM = 24.f; R.WakeAheadMinClosingKmh = 19.f; R.DespawnDistanceM = 199.f; R.StillSpeedMs = 1.9f;
+			R.MaxSpawnPerFrame = 3; R.FollowMinGapM = 7.f; R.FollowCatchUpGapM = 21.f; R.RollingFriction = 0.03f;
+			const FDNTrafficSettings S = R.ToSettings();
+			TestEqual("WakeDistanceM", S.WakeDistanceM, 5.f);
+			TestEqual("WakeAheadM", S.WakeAheadM, 24.f);
+			TestEqual("WakeAheadMinClosingKmh", S.WakeAheadMinClosingKmh, 19.f);
+			TestEqual("DespawnDistanceM", S.DespawnDistanceM, 199.f);
+			TestEqual("StillSpeedMs", S.StillSpeedMs, 1.9f);
+			TestEqual("MaxSpawnPerFrame", S.MaxSpawnPerFrame, 3);
+			TestEqual("FollowMinGapM", S.FollowMinGapM, 7.f);
+			TestEqual("FollowCatchUpGapM", S.FollowCatchUpGapM, 21.f);
+			TestEqual("RollingFriction", S.RollingFriction, 0.03f);
+		});
 	});
 }
 

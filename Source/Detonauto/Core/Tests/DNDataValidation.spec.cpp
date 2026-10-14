@@ -509,6 +509,33 @@ void FDNDataTrafficSettingsSpec::Define()
 			ExpectError(*this, TEXT("WakeAhead = Despawn"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 200.f, 20.f, 200.f) }), { TEXT("WakeAheadM"), TEXT("DespawnDistanceM"), TEXT("menor") });
 			ExpectError(*this, TEXT("WakeAhead > Despawn"), FDNDataValidation::ValidateTrafficSettings({ Settings(TEXT("padrao"), 6.f, 300.f, 20.f, 200.f) }), { TEXT("WakeAheadM"), TEXT("DespawnDistanceM"), TEXT("menor") });
 		});
+
+		// lote 13b: seguir o carro da frente e rolar depois de acordar
+		auto Follow = [](float MinGap, float CatchUp, float Rolling)
+		{
+			FDNTrafficSettingsEntry E = Settings();
+			E.Row.FollowMinGapM = MinGap;
+			E.Row.FollowCatchUpGapM = CatchUp;
+			E.Row.RollingFriction = Rolling;
+			return E;
+		};
+
+		It("folgas de seguir e atrito de rolar: maiores que zero e finitos", [this, Follow, NaNf, Inff]()
+		{
+			ExpectClean(*this, TEXT("8, 20, 0,02"), FDNDataValidation::ValidateTrafficSettings({ Follow(8.f, 20.f, 0.02f) }));
+			ExpectError(*this, TEXT("FollowMinGapM 0"), FDNDataValidation::ValidateTrafficSettings({ Follow(0.f, 20.f, 0.02f) }), { TEXT("FollowMinGapM"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("FollowCatchUpGapM NaN"), FDNDataValidation::ValidateTrafficSettings({ Follow(8.f, NaNf, 0.02f) }), { TEXT("FollowCatchUpGapM"), TEXT("finito") });
+			ExpectError(*this, TEXT("RollingFriction 0"), FDNDataValidation::ValidateTrafficSettings({ Follow(8.f, 20.f, 0.f) }), { TEXT("RollingFriction"), TEXT("maior que zero") });
+			ExpectError(*this, TEXT("RollingFriction inf"), FDNDataValidation::ValidateTrafficSettings({ Follow(8.f, 20.f, Inff) }), { TEXT("RollingFriction"), TEXT("finito") });
+		});
+
+		It("exige FollowMinGapM < FollowCatchUpGapM (estrito) e RollingFriction de no maximo 1", [this, Follow]()
+		{
+			ExpectError(*this, TEXT("min = alcance"), FDNDataValidation::ValidateTrafficSettings({ Follow(20.f, 20.f, 0.02f) }), { TEXT("FollowMinGapM"), TEXT("FollowCatchUpGapM"), TEXT("menor") });
+			ExpectError(*this, TEXT("min > alcance"), FDNDataValidation::ValidateTrafficSettings({ Follow(25.f, 20.f, 0.02f) }), { TEXT("FollowMinGapM"), TEXT("FollowCatchUpGapM"), TEXT("menor") });
+			ExpectClean(*this, TEXT("atrito 1"), FDNDataValidation::ValidateTrafficSettings({ Follow(8.f, 20.f, 1.f) }));
+			ExpectError(*this, TEXT("atrito 1,01"), FDNDataValidation::ValidateTrafficSettings({ Follow(8.f, 20.f, 1.01f) }), { TEXT("RollingFriction"), TEXT("1") });
+		});
 	});
 }
 BEGIN_DEFINE_SPEC(FDNDataLoaderSpec, "Detonauto.Dados.Carregador",

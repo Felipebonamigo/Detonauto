@@ -97,6 +97,15 @@ void FDNDataFilesSpec::Define()
 				TestEqual("DespawnDistanceM", S.DespawnDistanceM, 200.0f);
 				TestEqual("StillSpeedMs", S.StillSpeedMs, 2.0f);
 				TestEqual("MaxSpawnPerFrame", S.MaxSpawnPerFrame, 2);
+				TestEqual("FollowMinGapM", S.FollowMinGapM, 8.0f);
+				TestEqual("FollowCatchUpGapM", S.FollowCatchUpGapM, 20.0f);
+				TestEqual("RollingFriction", S.RollingFriction, 0.02f);
+				// deriva: o CSV é igual ao padrão da struct pura em todos os campos novos
+				const FDNTrafficSettings Csv = S.ToSettings();
+				const FDNTrafficSettings Def;
+				TestEqual("deriva FollowMinGapM", Csv.FollowMinGapM, Def.FollowMinGapM);
+				TestEqual("deriva FollowCatchUpGapM", Csv.FollowCatchUpGapM, Def.FollowCatchUpGapM);
+				TestEqual("deriva RollingFriction", Csv.RollingFriction, Def.RollingFriction);
 			}
 		});
 

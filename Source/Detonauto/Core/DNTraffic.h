@@ -18,7 +18,7 @@ enum class EDNTrafficLevel : uint8
 /** Os números do tráfego. Valores iniciais; moram em Data/TrafficSettings.csv. */
 struct FDNTrafficSettings
 {
-	/** Veículo Physics a esta distância (inclusive) acorda o Rail [m]. */
+	/** Veículo Physics a esta folga entre as caixas (inclusive) acorda o Rail [m] (FDNTrafficGeometry::NearestGapM). */
 	float WakeDistanceM = 6.0f;
 	/** Jogador a menos desta distância (estrito), na frente, acorda o Rail [m]. */
 	float WakeAheadM = 25.0f;
@@ -30,6 +30,12 @@ struct FDNTrafficSettings
 	float StillSpeedMs = 2.0f;
 	/** Máximo de veículos criados por quadro. */
 	int32 MaxSpawnPerFrame = 2;
+	/** Folga mínima entre para-choques atrás do carro da frente na mesma faixa [m] (FollowSpeed). */
+	float FollowMinGapM = 8.0f;
+	/** A partir desta folga o carro em trilho volta à própria velocidade [m] (FollowSpeed). Maior que FollowMinGapM. */
+	float FollowCatchUpGapM = 20.0f;
+	/** Atrito do carro acordado enquanto ele ainda "dirige" (rolando), até a primeira batida com dano. Combina pelo mínimo com o piso. */
+	float RollingFriction = 0.02f;
 };
 
 /** O que NextLevel precisa saber de um veículo, calculado por quem chama. Os padrões são "nada acontecendo". */
@@ -40,7 +46,7 @@ struct FDNTrafficVehicleInput
 	/** Força do impacto registrado no veículo neste quadro, de qualquer origem. Acima de 0 acorda. */
 	float ImpactForce = 0.0f;
 
-	/** Distância entre centros ao veículo Physics mais próximo (jogador, rival ou outro tráfego). Máximo = nenhum. */
+	/** Folga entre as caixas até o veículo Physics mais próximo (jogador, rival ou outro tráfego) [m]. Máximo = nenhum. */
 	float NearestPhysicsDistanceM = TNumericLimits<float>::Max();
 
 	/** Distância em linha reta entre centros até o jogador [m]. */
@@ -98,4 +104,14 @@ struct FDNTraffic
 
 	/** Quantos veículos criar neste quadro: clamp(Target - Active, 0, MaxPerFrame), em int64, sem estourar. Negativos valem 0. */
 	static int32 PlanSpawns(int32 Target, int32 Active, int32 MaxPerFrame);
+
+	/**
+	 *  Velocidade do carro em trilho atrás do carro da frente [m/s] (lote 13b; corpos cinemáticos não colidem entre si, então quem
+	 *  não segue atravessa). Decisões S1 a S6 em Core/Tests/DNTraffic.spec.cpp:
+	 *   - folga >= FollowCatchUpGapM, sem líder ou folga NaN: a própria velocidade;
+	 *   - entre a mínima e a de alcance: mistura linear entre a do líder (na mínima) e a própria (na de alcance);
+	 *   - abaixo da mínima: líder x folga / mínima (a folga volta a crescer); folga <= 0: parado;
+	 *   - nunca passa da própria; líder NaN ou de ré conta como parado; própria NaN ou negativa: parado.
+	 */
+	static float FollowSpeed(const FDNTrafficSettings& Settings, float DesiredMs, float GapM, float LeaderSpeedMs);
 };

@@ -1,4 +1,5 @@
 #include "Core/DNTrafficWorld.h"
+#include <limits>
 #include "Math/RandomStream.h"
 
 namespace
@@ -131,6 +132,13 @@ FDNTrafficVehicleInput FDNTrafficGeometry::BuildInput(const FDNTrafficGeometryIn
 	Out.bCrashRoundActive = In.bCrashRoundActive;
 	Out.SpeedMs = static_cast<float>(In.VehicleVelocityCmS.Size() / 100.0);
 
+	if (!In.bHasPlayer)
+	{
+		// NextLevel trata NaN como "não": nem a regra da frente acorda nem o despawn por distância age
+		Out.PlayerDistanceM = std::numeric_limits<float>::quiet_NaN();
+		return Out;
+	}
+
 	const FVector ToPlayer = In.PlayerPositionCm - In.VehiclePositionCm;
 	Out.PlayerDistanceM = static_cast<float>(ToPlayer.Size() / 100.0);
 	Out.PlayerProjectionOnVehicleForwardM = ProjectM(ToPlayer, In.VehicleForward);
@@ -157,4 +165,73 @@ float FDNTrafficGeometry::NearestDistanceM(const FVector& PositionCm, const TArr
 		}
 	}
 	return Best == TNumericLimits<double>::Max() ? TNumericLimits<float>::Max() : static_cast<float>(Best / 100.0);
+}
+
+namespace
+{
+	/** Eixo de avanço no plano, unitário (avanço inválido: +X). */
+	FVector2D Axis2D(const FVector& Forward)
+	{
+		const FVector2D F(Forward.X, Forward.Y);
+		const double L = F.Size();
+		return (L > 1.0e-9 && FMath::IsFinite(L)) ? F / L : FVector2D(1.0, 0.0);
+	}
+
+	/** Quanto a caixa avança na direção Dir (unitária) [m]: meio comprimento x |cos| + meia largura x |sen|. */
+	double SupportM(const FDNTrafficBody& B, const FVector2D& Dir)
+	{
+		const FVector2D F = Axis2D(B.Forward);
+		const FVector2D R(-F.Y, F.X);
+		return FMath::Abs(FVector2D::DotProduct(Dir, F)) * B.HalfLengthM + FMath::Abs(FVector2D::DotProduct(Dir, R)) * B.HalfWidthM;
+	}
+}
+
+float FDNTrafficGeometry::BoxGapM(const FDNTrafficBody& A, const FDNTrafficBody& B)
+{
+	const FVector2D D(B.PositionCm.X - A.PositionCm.X, B.PositionCm.Y - A.PositionCm.Y);
+	const double Dist = D.Size();
+	if (!FMath::IsFinite(Dist))
+	{
+		return std::numeric_limits<float>::quiet_NaN();
+	}
+	const FVector2D Dir = Dist > 1.0e-6 ? D / Dist : Axis2D(A.Forward); // mesmo ponto: mede no eixo de A (sempre sobreposto)
+	return static_cast<float>(Dist / 100.0 - SupportM(A, Dir) - SupportM(B, Dir));
+}
+
+float FDNTrafficGeometry::NearestGapM(const FDNTrafficBody& Self, const TArray<FDNTrafficBody>& Others)
+{
+	float Best = TNumericLimits<float>::Max();
+	for (const FDNTrafficBody& Other : Others)
+	{
+		const float Gap = BoxGapM(Self, Other);
+		if (FMath::IsFinite(Gap) && Gap < Best)
+		{
+			Best = Gap;
+		}
+	}
+	return Best;
+}
+
+FDNTrafficLeader FDNTrafficGeometry::LeaderAhead(const FDNTrafficBody& Self, const TArray<FDNTrafficBody>& Others, float LaneHalfWidthM)
+{
+	FDNTrafficLeader Leader;
+	const FVector2D F = Axis2D(Self.Forward);
+	const FVector2D R(-F.Y, F.X);
+	for (const FDNTrafficBody& Other : Others)
+	{
+		const FVector2D D((Other.PositionCm.X - Self.PositionCm.X) / 100.0, (Other.PositionCm.Y - Self.PositionCm.Y) / 100.0);
+		const double Along = FVector2D::DotProduct(D, F);
+		const double Side = FMath::Abs(FVector2D::DotProduct(D, R));
+		if (!(Along > 0.0) || !(Side < LaneHalfWidthM)) // NaN cai fora
+		{
+			continue;
+		}
+		const float Gap = static_cast<float>(Along - Self.HalfLengthM - SupportM(Other, F));
+		if (Gap < Leader.GapM)
+		{
+			Leader.GapM = Gap;
+			Leader.SpeedMs = static_cast<float>(FVector2D::DotProduct(FVector2D(Other.VelocityCmS.X, Other.VelocityCmS.Y), F) / 100.0);
+		}
+	}
+	return Leader;
 }

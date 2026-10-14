@@ -443,6 +443,154 @@ void FDNTrafficGeometrySpec::Define()
 			TestEqual("so NaN", FDNTrafficGeometry::NearestDistanceM(P, { FVector(NaNf, 0, 0) }), TNumericLimits<float>::Max());
 		});
 	});
+
+	Describe("Sem jogador (lote 13b)", [this]()
+	{
+		It("sem jogador: distancia NaN; nada acorda pelo jogador e nada some (o veiculo e a vaga ficam)", [this]()
+		{
+			FDNTrafficGeometryInput I = Base();
+			I.bHasPlayer = false;
+			I.PlayerPositionCm = FVector(1.0e9, 0, 0);
+			const FDNTrafficVehicleInput R = FDNTrafficGeometry::BuildInput(I);
+			TestTrue("distancia NaN", FMath::IsNaN(R.PlayerDistanceM));
+			TestEqual("Rail fica Rail", FDNTraffic::NextLevel(FDNTrafficSettings(), R), EDNTrafficLevel::Rail);
+			I.Level = EDNTrafficLevel::Physics;
+			TestEqual("Physics fica Physics, mesmo fora da rodada", FDNTraffic::NextLevel(FDNTrafficSettings(), FDNTrafficGeometry::BuildInput(I)), EDNTrafficLevel::Physics);
+		});
+
+		It("sem jogador, impacto e vizinho fisico ainda acordam", [this]()
+		{
+			FDNTrafficGeometryInput I = Base();
+			I.bHasPlayer = false;
+			I.ImpactForce = 10.f;
+			TestEqual("impacto", FDNTraffic::NextLevel(FDNTrafficSettings(), FDNTrafficGeometry::BuildInput(I)), EDNTrafficLevel::Physics);
+			I.ImpactForce = 0.f;
+			I.NearestPhysicsDistanceM = 1.f;
+			TestEqual("vizinho", FDNTraffic::NextLevel(FDNTrafficSettings(), FDNTrafficGeometry::BuildInput(I)), EDNTrafficLevel::Physics);
+		});
+	});
+}
+
+// Lote 13b: folgas entre caixas (para acordar) e o carro da frente na mesma faixa (para seguir). Decisões:
+//  G1 a folga entre duas caixas é medida na linha entre os centros: distância - o quanto cada caixa avança nessa direção
+//     (meio comprimento x |cos| + meia largura x |sen| em relação ao próprio eixo); é uma aproximação que nunca acorda tarde
+//     demais numa batida de frente ou de traseira; negativa = sobrepostas;
+//  G2 o líder é o veículo à frente (no eixo de avanço de quem segue) a menos de meia faixa de lado; a folga até ele desconta o
+//     meio comprimento de quem segue e o quanto o líder avança no eixo de quem segue; a velocidade dele é a projeção no mesmo eixo;
+//  G3 sem ninguém: folga máxima (nenhum) e velocidade 0; posição NaN é ignorada.
+namespace
+{
+	FDNTrafficBody Body(const FVector& PosCm, const FVector& Forward, float HalfLengthM, float HalfWidthM, const FVector& VelCmS = FVector::ZeroVector)
+	{
+		FDNTrafficBody B;
+		B.PositionCm = PosCm;
+		B.Forward = Forward;
+		B.HalfLengthM = HalfLengthM;
+		B.HalfWidthM = HalfWidthM;
+		B.VelocityCmS = VelCmS;
+		return B;
+	}
+}
+
+BEGIN_DEFINE_SPEC(FDNTrafficGapSpec, "Detonauto.Trafego.Folga",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+	const float NaNf = std::numeric_limits<float>::quiet_NaN();
+END_DEFINE_SPEC(FDNTrafficGapSpec)
+
+void FDNTrafficGapSpec::Define()
+{
+	Describe("BoxGapM e NearestGapM (G1)", [this]()
+	{
+		It("traseira de onibus: centros a 7,8 m, folga 0 (acorda), onde a distancia entre centros (7,8 > 6) nao acordava", [this]()
+		{
+			const FDNTrafficBody Bus = Body(FVector(0, 0, 0), FVector::ForwardVector, 5.5f, 1.25f);
+			const FDNTrafficBody Car = Body(FVector(-780, 0, 0), FVector::ForwardVector, 2.3f, 0.9f);
+			TestEqual("folga", FDNTrafficGeometry::BoxGapM(Bus, Car), 0.f, 1e-3f);
+		});
+
+		It("lado a lado em faixas vizinhas (3,5 m): folga 3,5 - 0,9 - 0,9", [this]()
+		{
+			const FDNTrafficBody A = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.3f, 0.9f);
+			const FDNTrafficBody B = Body(FVector(0, 350, 0), FVector::ForwardVector, 2.3f, 0.9f);
+			TestEqual("folga", FDNTrafficGeometry::BoxGapM(A, B), 1.7f, 1e-3f);
+		});
+
+		It("caixa girada 90 graus avanca a meia largura na direcao", [this]()
+		{
+			const FDNTrafficBody A = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.f, 1.f);
+			const FDNTrafficBody B = Body(FVector(600, 0, 0), FVector::RightVector, 2.f, 1.f);
+			TestEqual("folga", FDNTrafficGeometry::BoxGapM(A, B), 3.f, 1e-3f);
+		});
+
+		It("sobrepostas: folga negativa; no mesmo ponto tambem", [this]()
+		{
+			const FDNTrafficBody A = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.f, 1.f);
+			TestTrue("200 cm a frente", FDNTrafficGeometry::BoxGapM(A, Body(FVector(200, 0, 0), FVector::ForwardVector, 2.f, 1.f)) < 0.f);
+			TestTrue("mesmo ponto", FDNTrafficGeometry::BoxGapM(A, A) < 0.f);
+		});
+
+		It("NearestGapM: a menor folga; vazia ou so NaN: maximo", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.f, 1.f);
+			TestEqual("vazia", FDNTrafficGeometry::NearestGapM(Self, {}), TNumericLimits<float>::Max());
+			TestEqual("so NaN", FDNTrafficGeometry::NearestGapM(Self, { Body(FVector(NaNf, 0, 0), FVector::ForwardVector, 2.f, 1.f) }), TNumericLimits<float>::Max());
+			const TArray<FDNTrafficBody> Others = { Body(FVector(2000, 0, 0), FVector::ForwardVector, 2.f, 1.f), Body(FVector(0, 500, 0), FVector::ForwardVector, 2.f, 1.f),
+				Body(FVector(NaNf, 0, 0), FVector::ForwardVector, 2.f, 1.f) };
+			TestEqual("lado (5 - 1 - 1)", FDNTrafficGeometry::NearestGapM(Self, Others), 3.f, 1e-3f);
+		});
+	});
+
+	Describe("LeaderAhead (G2, G3)", [this]()
+	{
+		It("na mesma faixa a frente: folga entre para-choques e velocidade no eixo de quem segue", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.3f, 0.9f);
+			const FDNTrafficLeader L = FDNTrafficGeometry::LeaderAhead(Self, { Body(FVector(2000, 50, 0), FVector::ForwardVector, 2.3f, 0.9f, FVector(1000, 0, 0)) }, 1.75f);
+			TestEqual("folga 20 - 2,3 - 2,3", L.GapM, 15.4f, 1e-3f);
+			TestEqual("velocidade 10 m/s", L.SpeedMs, 10.f, 1e-3f);
+		});
+
+		It("atras, ou na faixa do lado (3,5 m), nao conta: sem lider", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.3f, 0.9f);
+			const FDNTrafficLeader L = FDNTrafficGeometry::LeaderAhead(Self, { Body(FVector(-2000, 0, 0), FVector::ForwardVector, 2.3f, 0.9f),
+				Body(FVector(2000, 350, 0), FVector::ForwardVector, 2.3f, 0.9f) }, 1.75f);
+			TestEqual("folga", L.GapM, TNumericLimits<float>::Max());
+			TestEqual("velocidade", L.SpeedMs, 0.f);
+		});
+
+		It("escolhe o mais perto; onibus desconta o meio comprimento dele", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.3f, 0.9f);
+			const FDNTrafficLeader L = FDNTrafficGeometry::LeaderAhead(Self, { Body(FVector(5000, 0, 0), FVector::ForwardVector, 2.3f, 0.9f),
+				Body(FVector(3000, 0, 0), FVector::ForwardVector, 5.5f, 1.25f, FVector(500, 0, 0)) }, 1.75f);
+			TestEqual("folga 30 - 2,3 - 5,5", L.GapM, 22.2f, 1e-3f);
+			TestEqual("velocidade do onibus", L.SpeedMs, 5.f, 1e-3f);
+		});
+
+		It("o sentido e o de quem segue: na contramao (avanco -X) o lider esta em X menor", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(0, 0, 0), -FVector::ForwardVector, 2.f, 1.f);
+			const FDNTrafficLeader L = FDNTrafficGeometry::LeaderAhead(Self, { Body(FVector(-1500, 0, 0), -FVector::ForwardVector, 2.f, 1.f, FVector(-800, 0, 0)),
+				Body(FVector(1500, 0, 0), -FVector::ForwardVector, 2.f, 1.f) }, 1.75f);
+			TestEqual("folga 15 - 2 - 2", L.GapM, 11.f, 1e-3f);
+			TestEqual("velocidade 8 m/s no sentido de quem segue", L.SpeedMs, 8.f, 1e-3f);
+		});
+
+		It("o proprio veiculo na lista (mesma posicao) nao e lider: o gerente passa todos, inclusive quem segue", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(100, 0, 0), FVector::ForwardVector, 2.3f, 0.9f, FVector(1500, 0, 0));
+			const FDNTrafficLeader L = FDNTrafficGeometry::LeaderAhead(Self, { Self, Body(FVector(4100, 0, 0), FVector::ForwardVector, 2.3f, 0.9f) }, 1.75f);
+			TestEqual("o lider e o de 40 m a frente", L.GapM, 35.4f, 1e-3f);
+		});
+
+		It("lider sobreposto (folga negativa) ainda conta; posicao NaN e ignorada", [this]()
+		{
+			const FDNTrafficBody Self = Body(FVector(0, 0, 0), FVector::ForwardVector, 2.f, 1.f);
+			TestTrue("sobreposto", FDNTrafficGeometry::LeaderAhead(Self, { Body(FVector(300, 0, 0), FVector::ForwardVector, 2.f, 1.f) }, 1.75f).GapM < 0.f);
+			TestEqual("NaN", FDNTrafficGeometry::LeaderAhead(Self, { Body(FVector(NaNf, 0, 0), FVector::ForwardVector, 2.f, 1.f) }, 1.75f).GapM, TNumericLimits<float>::Max());
+		});
+	});
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS

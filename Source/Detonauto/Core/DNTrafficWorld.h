@@ -92,9 +92,29 @@ struct FDNTrafficGeometryInput
 	FVector VehicleForward = FVector::ForwardVector;
 	FVector VehicleVelocityCmS = FVector::ZeroVector;
 
+	/** Sem jogador (ainda não ligado, ou destruído): as regras do jogador não valem; nada acorda nem some por causa dele. */
+	bool bHasPlayer = true;
 	FVector PlayerPositionCm = FVector::ZeroVector;
 	FVector PlayerForward = FVector::ForwardVector;
 	FVector PlayerVelocityCmS = FVector::ZeroVector;
+};
+
+/** Um veículo nas contas de folga (lote 13b): caixa no plano, com avanço, meias medidas [m] e velocidade [cm/s]. */
+struct FDNTrafficBody
+{
+	FVector PositionCm = FVector::ZeroVector;
+	/** Eixo de avanço; só conta o plano (X, Y). */
+	FVector Forward = FVector::ForwardVector;
+	float HalfLengthM = 2.3f;
+	float HalfWidthM = 0.9f;
+	FVector VelocityCmS = FVector::ZeroVector;
+};
+
+/** O carro da frente na mesma faixa: folga entre para-choques [m] (máximo = nenhum) e a velocidade dele no eixo de quem segue [m/s]. */
+struct FDNTrafficLeader
+{
+	float GapM = TNumericLimits<float>::Max();
+	float SpeedMs = 0.0f;
 };
 
 struct FDNTrafficGeometry
@@ -103,9 +123,27 @@ struct FDNTrafficGeometry
 	 *  Monta a entrada de NextLevel (W4): distância em linha reta [m], projeções nos eixos de avanço [m] e velocidade de aproximação
 	 *  [km/h] (positiva = a distância entre os centros está diminuindo), mais a velocidade escalar do veículo [m/s]. Avanço de
 	 *  tamanho zero ou NaN dá projeção 0. Mesmo ponto: aproximação 0. Posição NaN: distância NaN (NextLevel trata NaN como "não").
+	 *  Sem jogador (bHasPlayer falso): distância NaN, projeções e aproximação 0, ou seja, nada acorda nem some por causa do jogador.
 	 */
 	static FDNTrafficVehicleInput BuildInput(const FDNTrafficGeometryInput& Input);
 
 	/** Menor distância entre centros [m] de Position às posições de Others [cm]. Lista vazia ou só NaN: máximo (nenhum). */
 	static float NearestDistanceM(const FVector& PositionCm, const TArray<FVector>& OthersCm);
+
+	/**
+	 *  Folga entre duas caixas [m] (G1): na linha entre os centros, a distância menos o quanto cada caixa avança nessa direção
+	 *  (meio comprimento x |cos| + meia largura x |sen| no eixo de cada uma). Negativa = sobrepostas. Aproximação que não acorda tarde
+	 *  numa batida de frente ou de traseira (a distância entre centros acordava tarde demais para ônibus e caminhão).
+	 */
+	static float BoxGapM(const FDNTrafficBody& A, const FDNTrafficBody& B);
+
+	/** Menor BoxGapM de Self até Others. Vazia ou só NaN: máximo (nenhum). */
+	static float NearestGapM(const FDNTrafficBody& Self, const TArray<FDNTrafficBody>& Others);
+
+	/**
+	 *  O carro da frente de Self (G2, G3): o mais perto à frente no eixo de avanço de Self, a menos de LaneHalfWidthM de lado. A folga
+	 *  desconta o meio comprimento de Self e o quanto o líder avança nesse eixo (pode ser negativa: sobrepostos). Ninguém: folga máxima
+	 *  e velocidade 0. Posição NaN é ignorada.
+	 */
+	static FDNTrafficLeader LeaderAhead(const FDNTrafficBody& Self, const TArray<FDNTrafficBody>& Others, float LaneHalfWidthM);
 };

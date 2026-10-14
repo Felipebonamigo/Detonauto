@@ -569,4 +569,79 @@ void FDNTrafficRailSpec::Define()
 		});
 	});
 }
+
+// Lote 13b: carro em trilho segue o da frente na mesma faixa sem atravessá-lo (corpos cinemáticos não colidem entre si).
+// Decisões:
+//  S1 sem líder (folga máxima) ou folga >= FollowCatchUpGapM: anda na própria velocidade;
+//  S2 entre FollowMinGapM e FollowCatchUpGapM: mistura linear entre a velocidade do líder (na folga mínima) e a própria (na de alcance);
+//  S3 na folga mínima anda igual ao líder; abaixo dela, mais devagar que o líder (líder x folga / mínima), para a folga voltar a crescer;
+//     folga zero ou negativa: parado;
+//  S4 nunca passa da própria velocidade (líder mais rápido não puxa);
+//  S5 líder parado: aproxima-se devagar e para na folga mínima, sem encostar;
+//  S6 entrada inválida: própria velocidade NaN ou negativa = parado; velocidade do líder NaN ou negativa = líder parado;
+//     folga NaN = sem líder.
+BEGIN_DEFINE_SPEC(FDNTrafficFollowSpec, "Detonauto.Trafego.Seguir",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+	FDNTrafficSettings Settings; // folga mínima 8 m, de alcance 20 m
+END_DEFINE_SPEC(FDNTrafficFollowSpec)
+
+void FDNTrafficFollowSpec::Define()
+{
+	It("S1: sem lider, ou com folga de alcance ou mais, anda na propria velocidade", [this]()
+	{
+		TestEqual("sem lider", FDNTraffic::FollowSpeed(Settings, 20.f, TNumericLimits<float>::Max(), 5.f), 20.f);
+		TestEqual("folga 20 (alcance)", FDNTraffic::FollowSpeed(Settings, 20.f, 20.f, 5.f), 20.f);
+		TestEqual("folga 50", FDNTraffic::FollowSpeed(Settings, 20.f, 50.f, 5.f), 20.f);
+	});
+
+	It("S2: entre a minima e a de alcance, mistura linear entre lider e propria", [this]()
+	{
+		TestEqual("folga 14 (meio): 15", FDNTraffic::FollowSpeed(Settings, 20.f, 14.f, 10.f), 15.f, 1e-4f);
+		TestEqual("folga 11 (um quarto): 12,5", FDNTraffic::FollowSpeed(Settings, 20.f, 11.f, 10.f), 12.5f, 1e-4f);
+	});
+
+	It("S3: na folga minima anda igual ao lider; abaixo, mais devagar; folga zero ou negativa, parado", [this]()
+	{
+		TestEqual("folga 8", FDNTraffic::FollowSpeed(Settings, 20.f, 8.f, 10.f), 10.f, 1e-4f);
+		TestEqual("folga 4: metade do lider", FDNTraffic::FollowSpeed(Settings, 20.f, 4.f, 10.f), 5.f, 1e-4f);
+		TestEqual("folga 0", FDNTraffic::FollowSpeed(Settings, 20.f, 0.f, 10.f), 0.f);
+		TestEqual("folga -2 (sobreposto)", FDNTraffic::FollowSpeed(Settings, 20.f, -2.f, 10.f), 0.f);
+	});
+
+	It("S4: lider mais rapido nao puxa acima da propria velocidade", [this]()
+	{
+		TestEqual("folga 10", FDNTraffic::FollowSpeed(Settings, 15.f, 10.f, 30.f), 15.f, 1e-4f);
+		TestEqual("folga 8", FDNTraffic::FollowSpeed(Settings, 15.f, 8.f, 30.f), 15.f, 1e-4f);
+		TestEqual("folga 4", FDNTraffic::FollowSpeed(Settings, 15.f, 4.f, 30.f), 7.5f, 1e-4f);
+	});
+
+	It("S5: atras de um lider parado, para na folga minima sem encostar", [this]()
+	{
+		float GapM = 30.f;
+		const float Dt = 1.f / 60.f;
+		for (int32 i = 0; i < 60 * 60; ++i)
+		{
+			GapM -= FDNTraffic::FollowSpeed(Settings, 18.f, GapM, 0.f) * Dt;
+		}
+		TestTrue(FString::Printf(TEXT("depois de 60 s a folga (%.3f m) fica entre 8 e 8,1 m"), GapM), GapM >= 8.f && GapM < 8.1f);
+	});
+
+	It("S6: entrada invalida", [this]()
+	{
+		TestEqual("propria NaN: parado", FDNTraffic::FollowSpeed(Settings, NaN, 50.f, 10.f), 0.f);
+		TestEqual("propria negativa: parado", FDNTraffic::FollowSpeed(Settings, -5.f, 50.f, 10.f), 0.f);
+		TestEqual("lider NaN conta como parado", FDNTraffic::FollowSpeed(Settings, 20.f, 8.f, NaN), 0.f);
+		TestEqual("lider de re conta como parado", FDNTraffic::FollowSpeed(Settings, 20.f, 8.f, -3.f), 0.f);
+		TestEqual("folga NaN: sem lider", FDNTraffic::FollowSpeed(Settings, 20.f, NaN, 0.f), 20.f);
+	});
+
+	It("as folgas vem da configuracao", [this]()
+	{
+		FDNTrafficSettings S;
+		S.FollowMinGapM = 4.f;
+		S.FollowCatchUpGapM = 12.f;
+		TestEqual("folga 8 agora e o meio", FDNTraffic::FollowSpeed(S, 20.f, 8.f, 10.f), 15.f, 1e-4f);
+		TestEqual("folga 12 ja e alcance", FDNTraffic::FollowSpeed(S, 20.f, 12.f, 10.f), 20.f);
+	});
+}
 #endif // WITH_DEV_AUTOMATION_TESTS

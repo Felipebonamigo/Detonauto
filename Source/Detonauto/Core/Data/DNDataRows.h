@@ -9,7 +9,8 @@
 //   Landmarks.csv       Id, CityId, Name, Kind, ShortText, SourceNote, NeedsReview
 //   Crossings.csv       Id, CityId, Order, Bronze, Silver, Gold
 //   TrafficVehicles.csv Id, Name, ValueCash, MassKg, Class
-//   TrafficSettings.csv Id, WakeDistanceM, WakeAheadM, WakeAheadMinClosingKmh, DespawnDistanceM, StillSpeedMs, MaxSpawnPerFrame (uma linha)
+//   TrafficSettings.csv Id, WakeDistanceM, WakeAheadM, WakeAheadMinClosingKmh, DespawnDistanceM, StillSpeedMs, MaxSpawnPerFrame,
+//                       FollowMinGapM, FollowCatchUpGapM, RollingFriction (uma linha)
 //   Turbo.csv           Id + os campos de FDNTurboConfig, na mesma ordem (uma linha, id "padrao")
 //   Crash.csv           Id + os campos de FDNCrashConfig (uma linha)
 //   Takedown.csv        Id + os campos de FDNTakedownConfig (uma linha)
@@ -187,6 +188,18 @@ struct FDNTrafficSettingsRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MaxSpawnPerFrame = 2;
 
+	/** Folga mínima atrás do carro da frente na mesma faixa [m]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float FollowMinGapM = 8.0f;
+
+	/** Folga a partir da qual o carro em trilho volta à própria velocidade [m]. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float FollowCatchUpGapM = 20.0f;
+
+	/** Atrito do carro acordado que ainda "dirige" (rolando), até a primeira batida com dano. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float RollingFriction = 0.02f;
+
 	/** Os mesmos números no tipo puro usado pelas regras de Core/. */
 	FDNTrafficSettings ToSettings() const
 	{
@@ -197,6 +210,9 @@ struct FDNTrafficSettingsRow : public FTableRowBase
 		S.DespawnDistanceM = DespawnDistanceM;
 		S.StillSpeedMs = StillSpeedMs;
 		S.MaxSpawnPerFrame = MaxSpawnPerFrame;
+		S.FollowMinGapM = FollowMinGapM;
+		S.FollowCatchUpGapM = FollowCatchUpGapM;
+		S.RollingFriction = RollingFriction;
 		return S;
 	}
 };

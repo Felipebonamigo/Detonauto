@@ -85,6 +85,9 @@ namespace DNTest
 		R.DespawnDistanceM = C.DespawnDistanceM;
 		R.StillSpeedMs = C.StillSpeedMs;
 		R.MaxSpawnPerFrame = C.MaxSpawnPerFrame;
+		R.FollowMinGapM = C.FollowMinGapM;
+		R.FollowCatchUpGapM = C.FollowCatchUpGapM;
+		R.RollingFriction = C.RollingFriction;
 		return R;
 	}
 

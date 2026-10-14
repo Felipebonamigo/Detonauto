@@ -306,6 +306,18 @@ TArray<FString> FDNDataValidation::ValidateTrafficSettings(const TArray<FDNTraff
 		{
 			Errors.Add(FString::Printf(TEXT("%s, linha '%s': WakeAheadM (%f) precisa ser menor que DespawnDistanceM (%f)."), SettingsFile, *S.Id, R.WakeAheadM, R.DespawnDistanceM));
 		}
+
+		// lote 13b: seguir o carro da frente e rolar depois de acordar
+		const bool bMinGap = CheckPositiveFinite(SettingsFile, S.Id, TEXT("FollowMinGapM"), R.FollowMinGapM, Errors);
+		const bool bCatchUp = CheckPositiveFinite(SettingsFile, S.Id, TEXT("FollowCatchUpGapM"), R.FollowCatchUpGapM, Errors);
+		if (bMinGap && bCatchUp && R.FollowMinGapM >= R.FollowCatchUpGapM)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': FollowMinGapM (%f) precisa ser menor que FollowCatchUpGapM (%f)."), SettingsFile, *S.Id, R.FollowMinGapM, R.FollowCatchUpGapM));
+		}
+		if (CheckPositiveFinite(SettingsFile, S.Id, TEXT("RollingFriction"), R.RollingFriction, Errors) && R.RollingFriction > 1.0f)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': RollingFriction precisa ser no máximo 1 (veio %f)."), SettingsFile, *S.Id, R.RollingFriction));
+		}
 	}
 	return Errors;
 }

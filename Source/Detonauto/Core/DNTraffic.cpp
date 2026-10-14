@@ -97,6 +97,30 @@ FDNRailAdvance FDNTraffic::AdvanceOnRail(float Distance, float Speed, float Delt
 	return Result;
 }
 
+float FDNTraffic::FollowSpeed(const FDNTrafficSettings& Settings, float DesiredMs, float GapM, float LeaderSpeedMs)
+{
+	if (!FMath::IsFinite(DesiredMs) || DesiredMs <= 0.0f)
+	{
+		return 0.0f;
+	}
+	if (!FMath::IsFinite(GapM) || GapM >= Settings.FollowCatchUpGapM)
+	{
+		return DesiredMs; // sem líder, ou longe dele
+	}
+	if (GapM <= 0.0f)
+	{
+		return 0.0f;
+	}
+	const float Leader = FMath::Min(FMath::IsFinite(LeaderSpeedMs) ? FMath::Max(LeaderSpeedMs, 0.0f) : 0.0f, DesiredMs);
+	const float MinGap = Settings.FollowMinGapM;
+	if (GapM <= MinGap)
+	{
+		return Leader * GapM / MinGap;
+	}
+	const float Blend = (GapM - MinGap) / (Settings.FollowCatchUpGapM - MinGap);
+	return Leader + (DesiredMs - Leader) * Blend;
+}
+
 int32 FDNTraffic::PlanSpawns(int32 Target, int32 Active, int32 MaxPerFrame)
 {
 	const int64 Missing = static_cast<int64>(FMath::Max(Target, 0)) - static_cast<int64>(FMath::Max(Active, 0));
