@@ -208,8 +208,9 @@ void FDNDataDamageDriftSpec::Define()
 			TestEqual("MaxActive", D.MaxActive, 24);
 			TestEqual("MorphCurveExponent (docs/regras-dano-visual.md)", D.MorphCurveExponent, 0.7f);
 			TestEqual("MorphRisePerSecond", D.MorphRisePerSecond, 10.0f);
-			TestEqual("WearChipCoverage (docs/regras-dano-visual.md, lote 17b)", D.WearChipCoverage, 0.5f);
-			TestEqual("WearChipSizeCm", D.WearChipSizeCm, 14.0f);
+			// lote 17b: 0,5 e 14 cm cobriam metade da lataria em 1,0 (parecia camuflagem na captura); lascas menores e mais raras
+			TestEqual("WearChipCoverage (docs/regras-dano-visual.md, lote 17b)", D.WearChipCoverage, 0.2f);
+			TestEqual("WearChipSizeCm", D.WearChipSizeCm, 6.0f);
 			TestEqual("WearScratch", D.WearScratch, 0.6f);
 			TestEqual("WearSoot", D.WearSoot, 0.5f);
 		});
