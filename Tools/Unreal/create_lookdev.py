@@ -436,7 +436,8 @@ def build_materials(textures, report):
     for floor_cm in FLOOR_HEIGHTS:
         mats["Janela%d" % floor_cm] = instance(window, "MI_Janela%d" % floor_cm, {"PaneWidthCm": 150.0},
                                                {"RoomSizeCm": (450.0, 450.0, floor_cm), "RoomOffsetCm": (0.0, 0.0, SIDEWALK_TOP + GROUND_FLOOR_CM)})
-    mats["Vitrine"] = instance(window, "MI_Vitrine", {"PaneWidthCm": 250.0, "BrilhoInterior": 2000.0},
+    # 16b: 2000 deixava as vitrines brancas de longe (revisão do par); 900 fica mais clara que os andares de cima, sem estourar
+    mats["Vitrine"] = instance(window, "MI_Vitrine", {"PaneWidthCm": 250.0, "BrilhoInterior": 900.0},
                                {"RoomSizeCm": (700.0, 700.0, GROUND_FLOOR_CM), "RoomOffsetCm": (0.0, 0.0, SIDEWALK_TOP)})
     report.append("instâncias de material: %d" % len(mats))
     return mats
@@ -491,7 +492,7 @@ def build_street(b):
         n += 1
 
 
-FACADES = []  # (x inicial, x final, lado, y da fachada) de cada prédio, para prender as lanternas
+FACADES = []  # (x inicial, x final, lado, y da fachada) de cada prédio (prendia as lanternas de parede, que saíram no 16b)
 
 
 def build_buildings(b, report):
@@ -602,7 +603,9 @@ def open_empty_map(report):
 # --- mobiliário de rua (modelos CC0 do Poly Haven; uma linha por modelo em docs/licencas.csv) ---
 
 PROP_DIR = ROOT + "/Props"
-PROPS = ("street_lamp_01", "street_lamp_02", "metal_trash_can", "modular_street_seating", "fire_hydrant", "jacaranda_tree")
+# 16b: o poste moderno (dn_street_light, feito por Tools/Blender/make_street_light.py, mesmo formato de pasta) entrou no lugar do
+# lampião (street_lamp_01), e as lanternas de parede antigas (street_lamp_02) saíram: destoavam de uma avenida de hoje
+PROPS = ("dn_street_light", "metal_trash_can", "modular_street_seating", "fire_hydrant", "jacaranda_tree")
 SKIP_SETS = ("_aged", "_rust")  # variações gastas ficam de fora: as limpas bastam e pesam menos
 
 
@@ -760,7 +763,37 @@ def import_props(models_root, report):
         bounds = mesh.get_bounds()
         report.append("mobiliário %s: extensão %s cm, slots %s" % (ph_id, bounds.box_extent, ", ".join(chosen)))
         meshes[ph_id] = mesh
+    if "jacaranda_tree" in meshes:
+        keep_foliage(meshes["jacaranda_tree"], "T_jacaranda_tree_leaves_alpha", report)
     return meshes
+
+
+def keep_foliage(mesh, alpha_name, report):
+    """
+    16b, "jacarandá com pouca folha": as folhas são cartões recortados por uma máscara de 1k. Nos mips de longe a média da máscara
+    cai abaixo do corte (0,333) e as folhas somem; e o Nanite, ao simplificar a copa, encolhe a área dos cartões. Corrige as duas
+    coisas: mips que preservam a cobertura da máscara e Nanite preservando área. Roda a cada execução (vale para malha reaproveitada).
+    """
+    path = PROP_DIR + "/Textures/" + alpha_name
+    tex = unreal.load_asset(path)
+    if isinstance(tex, unreal.Texture2D):
+        tex.set_editor_property("do_scale_mips_for_alpha_coverage", True)
+        tex.set_editor_property("alpha_coverage_thresholds", unreal.Vector4(0.333, 0.0, 0.0, 0.0))  # a máscara é lida no R
+        unreal.EditorAssetLibrary.save_asset(path)
+        report.append("folhagem: %s com cobertura preservada nos mips" % alpha_name)
+    else:
+        report.append("folhagem: máscara %s não encontrada" % path)
+    settings = mesh.get_editor_property("nanite_settings")
+    applied = None
+    if hasattr(unreal, "NaniteShapePreservation"):
+        settings.set_editor_property("shape_preservation", unreal.NaniteShapePreservation.PRESERVE_AREA)
+        applied = "shape_preservation = PRESERVE_AREA"
+    else:
+        settings.set_editor_property("preserve_area", True)
+        applied = "preserve_area = True"
+    mesh.set_editor_property("nanite_settings", settings)
+    unreal.EditorAssetLibrary.save_asset(mesh.get_path_name().split(".")[0])
+    report.append("folhagem: Nanite de %s com %s" % (mesh.get_name(), applied))
 
 
 def build_props(b, props, report):
@@ -783,7 +816,7 @@ def build_props(b, props, report):
         x = ROAD_X0 + 1000.0
         n = 0
         while x < ROAD_X1 - 500.0:
-            place("street_lamp_01", x, side * (LANE_CM + CURB_W + 60.0), -90.0 * side)
+            place("dn_street_light", x, side * (LANE_CM + CURB_W + 60.0), -90.0 * side)  # o braço (+X do modelo) vira para a pista
             n += 1
             x += 2500.0
         x = ROAD_X0 + 1500.0 + (700.0 if side > 0 else 0.0)
@@ -795,10 +828,6 @@ def build_props(b, props, report):
         while x < ROAD_X1 - 500.0:
             place("fire_hydrant", x, side * (LANE_CM + CURB_W + 45.0), 0.0)
             x += 7000.0
-    # lanterna de parede (street_lamp_02 é a cabeça sem poste): no meio da fachada, a 2,8 m da calçada, de prédio sim, prédio não
-    for i, (fx0, fx1, side, y_face) in enumerate(FACADES):
-        if i % 2 == 0:
-            place("street_lamp_02", (fx0 + fx1) * 0.5, y_face - side * 25.0, -90.0 * side, z=SIDEWALK_TOP + 280.0)
     for z0, z1, side in LOW_ZONES:
         x = z0 + 600.0
         while x < z1 - 600.0:
