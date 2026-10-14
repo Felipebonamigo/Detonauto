@@ -56,6 +56,9 @@ protected:
 	 *  amassadas (-DNParkedDamage=0 a 1, padrão 1; 0 = intactos). Até 12. */
 	void SpawnParkedCars(int32 Count);
 
+	/** Batida real na cena de aparência (lote 17b, -DNWallAheadM=M): barreira de concreto atravessando a rua a M metros da largada. */
+	void SpawnWallAhead(float DistanceM);
+
 	/** Roteiro de teclas (-DNKeys): pressiona e solta teclas REAIS pelo PlayerController, o mesmo caminho do teclado do jogador. */
 	void KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds);
 

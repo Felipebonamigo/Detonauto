@@ -6,6 +6,10 @@
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/CollisionProfile.h"
+#include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -102,6 +106,11 @@ void ADNVehicleTestGameMode::StartPlay()
 	{
 		SpawnParkedCars(FMath::Min(ParkedCars, 12));
 	}
+	float WallAheadM = 0.0f;
+	if (FParse::Value(Cmd, TEXT("DNWallAheadM="), WallAheadM) && WallAheadM > 0.0f)
+	{
+		SpawnWallAhead(WallAheadM);
+	}
 	bProbe = FParse::Param(Cmd, TEXT("DNCarProbe"));
 	if (bProbe)
 	{
@@ -144,6 +153,39 @@ void ADNVehicleTestGameMode::SpawnParkedCars(int32 Count)
 		}
 	}
 	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: %d de %d carro(s) estacionado(s) com dano %.2f nas 5 zonas"), Spawned, Count, Damage);
+}
+
+void ADNVehicleTestGameMode::SpawnWallAhead(float DistanceM)
+{
+	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+	const FTransform Base = Spot ? Spot->GetActorTransform() : FTransform(FVector(0.0f, 0.0f, 120.0f));
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!Cube)
+	{
+		UE_LOG(LogDetonauto, Error, TEXT("ADNVehicleTestGameMode: sem o cubo da engine; barreira não criada"));
+		return;
+	}
+	// barreira de concreto atravessando a rua inteira (30 m), 1 m de espessura e 3 m de altura, com o pé no chão (z = 0 na cena)
+	FVector Location = Base.TransformPosition(FVector(DistanceM * 100.0f, 0.0f, 0.0f));
+	Location.Z = 150.0f;
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AStaticMeshActor* WallActor = GetWorld()->SpawnActor<AStaticMeshActor>(Location, Base.Rotator(), Params);
+	if (!WallActor)
+	{
+		return;
+	}
+	UStaticMeshComponent* Comp = WallActor->GetStaticMeshComponent();
+	Comp->SetMobility(EComponentMobility::Movable);
+	Comp->SetStaticMesh(Cube);
+	Comp->SetWorldScale3D(FVector(1.0f, 30.0f, 3.0f));
+	Comp->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+	// o concreto do meio-fio da cena de aparência, se existir (no mapa de teste, o material do cubo)
+	if (UMaterialInterface* Concrete = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Detonauto/Lookdev/Materials/MI_MeioFio.MI_MeioFio")))
+	{
+		Comp->SetMaterial(0, Concrete);
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: barreira a %.0f m à frente da largada"), DistanceM);
 }
 
 ADNVehicle* ADNVehicleTestGameMode::FindVehicle() const
