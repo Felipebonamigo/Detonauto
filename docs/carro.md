@@ -8,8 +8,11 @@ cópias de teste. O Sandbox fica como estava, só de referência (`Tools/Unreal/
 
 | O quê | Onde |
 |---|---|
-| Presets (números do carro) | `Data/Cars.csv` (`Id` + as 18 colunas de `FDNCarConfig`), validados por `FDNDataValidation::ValidateCars` |
+| Presets (números do carro) | `Data/Cars.csv` (`Id` + as 19 colunas de `FDNCarConfig`, entre elas a assistência de derrapagem `DriftAssist*`), validados por `FDNDataValidation::ValidateCars` |
 | Struct pura e rampa do freio de mão | `Source/Detonauto/Core/DNCar.h` |
+| Assistência de derrapagem (regra pura) | `Source/Detonauto/Core/DNDriftAssist.h` |
+| Modos de câmera (tecla C) | `Data/Cameras.csv` + `Source/Detonauto/Core/DNCamera.h` |
+| Conta das rodas visuais (giro e esterço no espaço certo) | `Source/Detonauto/Core/DNWheelVisual.h` |
 | Parâmetros do material de amassado, lado da batida, agrupador de contatos | `Source/Detonauto/Core/DNDentParams.h` |
 | O carro (Chaos Vehicles em C++, câmera, entrada, HUD, amassado) | `Source/Detonauto/Vehicle/DNVehicle.*` |
 | Rodas (sem Blueprint) | `Source/Detonauto/Vehicle/DNVehicleWheels.h` |
@@ -31,7 +34,7 @@ Feche o editor, compile e rode:
 .\Tools\Unreal\vehicle-probe.ps1 -Uproject Detonauto.uproject -Play
 ```
 
-Teclas (as mesmas do protótipo): W/S acelera e freia, A/D esterça, Espaço = freio de mão, **Shift = turbo**, 1/2/3/0 = presets
+Teclas (as mesmas do protótipo): W/S acelera e freia, A/D esterça, Espaço = freio de mão, **Shift = turbo**, **C = próxima câmera**, 1/2/3/0 = presets
 `arcade-1`/`arcade-2`/`arcade-3`/`Padrao`, T/Y/U = batida simulada na frente (pequena, média, máxima), G/H/J = no lado esquerdo,
 V = limpa os amassados. O HUD mostra preset, velocidade, turbo e amassados. Para mudar um número do carro, edite `Data/Cars.csv`
 e jogue de novo (o arquivo é lido ao abrir o jogo; valor fora da faixa é recusado no log, com o campo e a linha).
@@ -65,7 +68,7 @@ Significado de cada coluna, o que cada preset muda e o roteiro de teste: [`prese
 4. **Faixas de cada campo** (inclusivas): `MassKg` 100–10000, `MaxTorque` 50–5000, `LateralGrip` 0,1–5, `SuspensionStiffness` 10–2000,
    `SteeringGain` 0,1–3, `CenterOfMassDropCm` 0–60, `SuspensionDampingRatio` 0,05–1, `SuspensionTravelCm` 2–40, `RollbarScaling` 0–1,
    `RearGripFactor` 0,2–2, `HandbrakeRearGrip` 0,05–1,5, `HandbrakeRamp{In,Out}Seconds` 0,01–3, `HandbrakeTorque` 0–20000,
-   `CameraDistanceCm` 150–2000, `CameraHeightCm` 0–600, `CameraFov` 60–120, `NitroAccelMps2` 0–40.
+   `NitroAccelMps2` 0–40, `DriftAssistStartDeg` 0–80, `DriftAssistGain` 0–500, `DriftAssistMax` 0–2000 (ganho e teto são um par: os dois zero ou os dois maiores que zero). **As colunas de câmera saíram deste arquivo (lote 14): a câmera agora é `Data/Cameras.csv`.**
 5. **`Cars.csv` não herda as linhas `Arcade` e `Pesado`** do `TestCars.csv`: eram do lote 4 e nenhuma tecla as usa.
 6. **Dados pelo subsistema.** `UDNGameDataSubsystem` ganhou `GetDamageConfig()` (padrão se `Damage.csv` é inválido, como as outras) e
    `TryGetCarConfig(Id)` (falso se o preset não existe **ou** `Cars.csv` é inválido: com a tabela inválida nenhum preset vale).
@@ -89,6 +92,10 @@ Troca de preset andando (cenário `Switch`): a velocidade se mantém (55,9 -> 55
 para `Padrao`) e o câmbio volta a engatar em ~0,2 s. Turbo (cenário `Turbo`, `arcade-1`): a barra gasta 25 por segundo (100 -> 70 em 1,2 s)
 e o carro chega a 122 km/h aos 2,4 s. Batida na parede a 128 km/h: variação de velocidade de 44,7 m/s, amassado de 25 cm e carro destruído
 pelas regras do dano.
+
+## Lote 14 (playtest 1)
+
+Bugs de rodas, amassado e curva, a assistência de derrapagem, o turbo e as cinco câmeras: [`lote-14.md`](lote-14.md) (causas, medidas e o que ficou anotado para depois).
 
 ## O que ainda não existe
 

@@ -74,3 +74,19 @@ O que só aparece jogando. Antes: feche o editor, `Tools/Unreal/build.ps1 -Uproj
    fazem batidas simuladas; V limpa. Passando de 8 amassados o material não mostra mais (tem 8 espaços).
 7. **Piso.** O atrito do piso é 1,0 como a pista do template. Se o carro parecer "escorregadio" demais ou de menos, **diga**: o
    número está em `ADNTestArena::FloorFriction` e muda a derrapada de todos os presets.
+
+## 8. Lote 14 (playtest 1 corrigido): o que só se confirma jogando
+
+Detalhes das causas e das medidas em [`lote-14.md`](lote-14.md). Antes: compilar (editor fechado) e abrir com `vehicle-probe.ps1 -Uproject Detonauto.uproject -Play`.
+
+1. **Rodas.** Acelere e vire: as rodas giram no eixo certo, as da frente esterçam, sem borrão (o desfoque de movimento está desligado).
+2. **Amassado.** T, Y ou U: a câmera gira para a frente-esquerda por 3 s e a quina da frente aparece amassada; G, H ou J amassam a porta. Uma batida real de frente
+   na parede (60 m à frente, no mapa com parede) amassa e conta no HUD. Diga se o amassado real parece pouco no meio da frente.
+3. **Câmeras.** C troca: alta-longe (padrão), alta-muito-longe, capô, frente-para-choque, motorista. O motorista **não tem interior** e mostra o chassi por dentro (falta o
+   modelo); as outras quatro devem estar boas. Diga qual quer como padrão e se as distâncias estão certas.
+4. **arcade-2.** Fora do Espaço ele não deve mais derrapar sozinho (curva com o pé no fundo desliza uns 5 graus); com o Espaço ele derrapa.
+5. **Assistência.** Em arcade-2 e arcade-3, Espaço a 100 km/h com o volante todo de lado deve rodar até ~50 graus e voltar sozinho, sem dar a volta completa. Se parecer
+   "grudado" ou "artificial", dizer; os números são `DriftAssistStartDeg/Gain/Max` em `Data/Cars.csv`.
+6. **Turbo.** Shift: medido +59 a +70% de velocidade em 3 s a partir de 60 km/h. Agora o campo de visão abre 12 graus enquanto está ativo. Se continuar fraco, diga quanto mais.
+7. **Curva.** O nosso carro vira mais fechado que o do template (medido). O que o Felipe chama de "dura"? Volante pesado, demora a virar, ou vira demais? Com a resposta,
+   a proposta do `lote-14.md` (esterço menor em alta velocidade, esterço de teclado mais lento) vira coluna de `Cars.csv`.
