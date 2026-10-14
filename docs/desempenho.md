@@ -223,6 +223,63 @@ para o editor; o jogo empacotado não usa esse modo.
 
 **Para repetir:** `Tools/Unreal/measure.ps1` (feche o editor antes). O script depende do GameMode de medição `DNMeasureGameMode`. Uma cópia de referência está em `Tools/Unreal/measure-gamemode/`, com um README que diz de que ela depende e como copiá-la para o projeto. A versão que roda hoje vive no projeto de teste, em `Sandbox/` (fora do Git).
 
+## Lote 15: base de renderização e perfil "alvo PS5" (14 out 2026)
+
+### O que mudou em `Config/DefaultEngine.ini`
+
+Cada nome foi conferido no código da engine 5.8 antes de gravar. Medido no jogo (`-ExecCmds` com o nome da variável imprime o valor e
+quem definiu):
+
+| Variável | Antes (padrão do código) | Depois | Para quê |
+|---|---|---|---|
+| `r.DynamicGlobalIlluminationMethod` | 0, nenhuma | 1, Lumen | luz indireta do sol, do céu e de emissivos |
+| `r.ReflectionMethod` | 2, só de tela | 1, Lumen | reflexo do céu, dos prédios e dos carros |
+| `r.Shadow.Virtual.Enable` | 0 | 1, sombras virtuais | sombra nítida de perto e de longe |
+| `r.GenerateMeshDistanceFields` | 0 | 1 | Lumen por software e sombra do Sky Light |
+| `r.AntiAliasingMethod` | 4, TSR | 4, TSR (agora escrito) | anti-aliasing e reconstrução de resolução |
+| `r.AllowStaticLighting` | padrão | False | tudo dinâmico; menos variações de shader |
+| `r.ClearCoatNormal` | padrão | True | pintura automotiva com verniz (passo 4 do plano visual) |
+| `r.SkinCache.CompileShaders` | padrão | True | alvos de deformação do dano por zona (passo 5) |
+| `r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange` | padrão | True | exposição em EV100 |
+| `r.EyeAdaptation.CachedLightingPreExposure` (em `[SystemSettings]`) | 4 | 8 | com 4 o Lumen e a captura do céu cortavam a luz acima de EV 12 (a engine avisava na tela); 8 cobre EV -4 a 16 |
+
+**Conclusão:** até o lote 14 o jogo rodava **sem Lumen, sem sombras virtuais e sem campos de distância** (confirmado no log, "LastSetBy:
+Constructor"). Ray tracing por hardware continua desligado (decisão: Lumen por software para o alvo de 60 fps no nível do PS5). Mudar
+essas linhas obriga a engine a recompilar todos os shaders uma vez (vários minutos na primeira abertura).
+
+### O perfil "alvo PS5"
+
+`Config/DefaultDeviceProfiles.ini`, perfil `DN_AlvoPS5`: Lumen, sombras, reflexos, efeitos, folhagem e shading em "alto" (2); distância
+de visão, texturas, anti-aliasing e pós-processo em "épico" (3); resolução interna 100% numa janela de 1920x1080 (1080p interno).
+
+- Uso: `vehicle-probe.ps1 ... -AlvoPS5` (liga `-DeviceProfile=DN_AlvoPS5`).
+- **Armadilha:** o `Saved/Config/WindowsEditor/GameUserSettings.ini` da máquina (configuração do usuário, fora do Git) reaplica os grupos
+  `sg.*` por cima do perfil. Por isso o `-AlvoPS5` também manda os mesmos valores como comandos de console, lidos do próprio `.ini` do
+  perfil (um lugar só). O arquivo do usuário não é tocado. Conferido no log: `sg.GlobalIlluminationQuality = "2" LastSetBy: Console`.
+
+### Medição da cena de aparência (`Tools/Unreal/lookdev-measure.ps1`)
+
+RTX 4070 Ti + Ryzen 7 5800X3D, janela 1920x1080, perfil `DN_AlvoPS5`, VSync desligado, `t.MaxFPS 0`, CSV Profiler. Cena: `L_Lookdev`
+(1327 atores, 112 prédios em blocos, céu, nuvens volumétricas, neblina, Lumen, sombras virtuais) com o carro do jogador e sem tráfego.
+
+| Cenário | Frame média / p95 | Game | Draw | GPU média / p95 | Quadros |
+|---|---|---|---|---|---|
+| parado, câmera de jogo olhando a rua contra o sol | 5,06 / 6,32 ms | 1,44 / 2,35 ms | 5,05 / 6,31 ms | 4,71 / 6,06 ms | 1977 em 10 s |
+| andando, acelerador no fundo (6 a 14 s) | 5,33 / 6,66 ms | 1,55 / 2,23 ms | 5,32 / 6,65 ms | 4,97 / 6,29 ms | 1500 em 8 s |
+
+Um quadro isolado medido com `profilegpu` (parado, 18 s): 5,1 ms de GPU, dos quais o TSR leva uns 0,37 ms.
+
+**Quanto confiar:**
+
+- **Janela sem foco = medição inválida.** Com a janela do jogo fora do primeiro plano, o jogo fica travado em 60 fps mesmo com
+  `t.MaxFPS 0`, a placa baixa o clock e o tempo de GPU parece três vezes maior (o mesmo cenário deu 5,1 ms com foco e 16,9 ms travado,
+  593 quadros em 10 s). O script descarta sozinho uma medição com ~60 quadros por segundo e média acima de 16 ms.
+- Em parte das execuções havia outro Unreal aberto no PC (outro projeto); o script avisa quando há. As duas linhas da tabela foram
+  medidas sem ele.
+- **A placa é bem mais forte que o alvo.** Estimativa, não medida: uma GPU no nível do PS5 leva perto do dobro do tempo da 4070 Ti, ou
+  seja, uns 10 ms de GPU nesta cena. Sobra orçamento para tráfego, dano e efeitos, mas cada um precisa ser medido aqui de novo.
+- A cena é de blocos simples. Com prédios do City Sample (malhas densas, materiais com várias camadas) o custo sobe.
+
 ## Para o Felipe testar na Sprint 6
 
 1. Abra o carro do template, jogue com Alt+P e digite `stat unit`.
