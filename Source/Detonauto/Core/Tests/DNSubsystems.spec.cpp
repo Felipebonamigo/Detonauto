@@ -136,6 +136,58 @@ void FDNGameDataSubsystemSpec::Define()
 			TestEqual("padrao", Sub->GetTakedownConfig().MinRelativeSpeedKmh, FDNTakedownConfig().MinRelativeSpeedKmh);
 		});
 
+		It("a configuracao do dano vem do CSV; invalida volta ao padrao (S1)", [this]()
+		{
+			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();
+			Sub->Reload();
+			TestEqual("MaxDents do CSV real", Sub->GetDamageConfig().MaxDents, FDNDamageConfig().MaxDents);
+
+			FDNData Data;
+			Data.DamageConfig = { DNTest::DamageEntry() };
+			Data.DamageConfig[0].Row.MaxDents = 5;
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->ApplyData(MoveTemp(Data), {});
+			TestEqual("MaxDents da linha", Sub->GetDamageConfig().MaxDents, 5);
+
+			FDNData Bad;
+			Bad.DamageConfig = { DNTest::DamageEntry() };
+			Bad.DamageConfig[0].Row.MaxDents = 5;
+			Bad.DamageConfig[0].Row.DentMaxDepthCm = -1.f; // invalida
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->ApplyData(MoveTemp(Bad), {});
+			TestEqual("dano invalido volta ao padrao", Sub->GetDamageConfig().MaxDents, FDNDamageConfig().MaxDents);
+		});
+
+		It("TryGetCarConfig acha o preset sem diferenciar a caixa; id desconhecido ou tabela invalida: falso", [this]()
+		{
+			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();
+			FDNCarConfig Out;
+			TestFalse("antes de carregar", Sub->TryGetCarConfig(TEXT("Padrao"), Out));
+
+			Sub->Reload();
+			TestTrue("arcade-2 do CSV real", Sub->TryGetCarConfig(TEXT("arcade-2"), Out));
+			TestTrue("o freio de mao do arcade-2 solta a traseira", Out.HandbrakeRearGrip < 1.f);
+			TestTrue("caixa diferente", Sub->TryGetCarConfig(TEXT("ARCADE-1"), Out));
+			TestEqual("e e o arcade-1", Out.SuspensionStiffness, 170.f);
+			TestFalse("nao existe", Sub->TryGetCarConfig(TEXT("arcade-9"), Out));
+			TestEqual("falha nao mexe na saida", Out.SuspensionStiffness, 170.f);
+
+			FDNData Data;
+			Data.CarConfigs = { DNTest::CarEntry(), DNTest::CarEntry(TEXT("outro")) };
+			Data.CarConfigs[1].Row.MassKg = 1234.f;
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->ApplyData(MoveTemp(Data), {});
+			TestTrue("linha de teste", Sub->TryGetCarConfig(TEXT("outro"), Out));
+			TestEqual("massa da linha", Out.MassKg, 1234.f);
+
+			FDNData Bad;
+			Bad.CarConfigs = { DNTest::CarEntry() };
+			Bad.CarConfigs[0].Row.MassKg = 1.f; // invalida
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->ApplyData(MoveTemp(Bad), {});
+			TestFalse("tabela invalida: nenhum preset vale", Sub->TryGetCarConfig(TEXT("Padrao"), Out));
+		});
+
 		It("recarregar substitui o estado anterior (nao acumula erros)", [this]()
 		{
 			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();

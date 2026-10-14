@@ -39,6 +39,13 @@ public:
 	FDNTurboConfig GetTurboConfig() const;
 	FDNCrashConfig GetCrashConfig() const;
 	FDNTakedownConfig GetTakedownConfig() const;
+	FDNDamageConfig GetDamageConfig() const;
+
+	/**
+	 *  O preset de carro de Data/Cars.csv (sem diferenciar a caixa). Falso, sem mexer em Out, se o preset não existe ou se a
+	 *  tabela Cars.csv é inválida: com a tabela inválida nenhum preset vale, nem o Padrao; quem chama decide o que fazer.
+	 */
+	bool TryGetCarConfig(const FString& Id, FDNCarConfig& Out) const;
 
 private:
 	FDNData Data;
@@ -47,4 +54,6 @@ private:
 	bool bTurboValid = false;
 	bool bCrashValid = false;
 	bool bTakedownValid = false;
+	bool bDamageValid = false;
+	bool bCarsValid = false;
 };
