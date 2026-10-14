@@ -3,6 +3,7 @@
 #include "Detonauto.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 
 ADNTrafficManager::ADNTrafficManager()
 {
@@ -30,6 +31,37 @@ void ADNTrafficManager::BeginPlay()
 	{
 		UE_LOG(LogDetonauto, Error, TEXT("ADNTrafficManager: sem carros de trafego (TrafficVehicles.csv invalido ou nao carregado); nenhum carro vai nascer"));
 	}
+
+	// "rolando": combina pelo mínimo com o piso, senão a média com o atrito 1,0 do piso daria ~0,5 e o carro frearia do mesmo jeito
+	RollingMaterial = NewObject<UPhysicalMaterial>(this, TEXT("DN_TrafficRolling"));
+	RollingMaterial->Friction = Settings.RollingFriction;
+	RollingMaterial->FrictionCombineMode = EFrictionCombineMode::Min;
+	RollingMaterial->bOverrideFrictionCombineMode = true;
+	RollingMaterial->Restitution = 0.0f;
+}
+
+void ADNTrafficManager::SetPlayer(AActor* InPlayer)
+{
+	Player = InPlayer;
+	if (Player)
+	{
+		const FBox Local = Player->CalculateComponentsBoundingBoxInLocalSpace(true);
+		if (Local.IsValid)
+		{
+			PlayerHalfSizeCm = Local.GetExtent();
+		}
+	}
+}
+
+FDNTrafficBody ADNTrafficManager::PlayerBody() const
+{
+	FDNTrafficBody B;
+	B.PositionCm = Player->GetActorLocation();
+	B.Forward = Player->GetActorForwardVector();
+	B.HalfLengthM = PlayerHalfSizeCm.X / 100.0f;
+	B.HalfWidthM = PlayerHalfSizeCm.Y / 100.0f;
+	B.VelocityCmS = Player->GetVelocity();
+	return B;
 }
 
 void ADNTrafficManager::Configure(const FDNTrafficRoadConfig& InRoad, int32 InTargetCount, int32 InSeed, int32 InPoolMax, bool bInAllPhysics)
@@ -107,6 +139,7 @@ void ADNTrafficManager::SpawnFromPlan()
 		// a trilha vai até o fim da estrada (a favor) ou até 150 m depois do início dela (contrária: o piso de teste continua ali), para
 		// o carro não parar no meio de uma medição
 		const float RailLengthCm = (Slot.bOncoming ? Slot.PositionM + OncomingOvershootM : Road.LengthM - Slot.PositionM) * 100.0f;
+		Vehicle->SetRollingMaterial(RollingMaterial);
 		Vehicle->Activate(Spec, Start, Direction, Slot.SpeedKmh, RailLengthCm, DamageConfig);
 		++Stats.Spawned;
 		if (bAllPhysics)
@@ -125,26 +158,27 @@ FDNTrafficGeometryInput ADNTrafficManager::MakeGeometry(const ADNTrafficVehicle*
 	G.VehiclePositionCm = Vehicle->GetPositionCm();
 	G.VehicleForward = Vehicle->GetForward();
 	G.VehicleVelocityCmS = Vehicle->GetVelocityCmS();
+	G.bHasPlayer = Player != nullptr; // sem jogador: nada acorda nem some por causa dele (o tick do gerente pode vir antes do SetPlayer)
 	if (Player)
 	{
 		G.PlayerPositionCm = Player->GetActorLocation();
 		G.PlayerForward = Player->GetActorForwardVector();
 		G.PlayerVelocityCmS = Player->GetVelocity();
 	}
-	else
-	{
-		G.PlayerPositionCm = FVector(1.0e9, 0.0, 0.0); // sem jogador: muito longe
-	}
 	return G;
 }
 
-void ADNTrafficManager::UpdateRailVehicle(ADNTrafficVehicle* Vehicle, float DeltaTime, const TArray<FVector>& PhysicsPositions)
+void ADNTrafficManager::UpdateRailVehicle(ADNTrafficVehicle* Vehicle, float DeltaTime, const TArray<FDNTrafficBody>& AllBodies, const TArray<FDNTrafficBody>& PhysicsBodies)
 {
+	// segue o carro da frente na mesma faixa (todos os outros veículos, inclusive o jogador, contam como possíveis líderes)
+	const FDNTrafficLeader Leader = FDNTrafficGeometry::LeaderAhead(Vehicle->AsBody(), AllBodies, Road.LaneWidthM * 0.5f);
+	Stats.MinRailGapM = FMath::Min(Stats.MinRailGapM, Leader.GapM);
+	Vehicle->FollowLeader(Settings, Leader);
 	Vehicle->AdvanceRail(DeltaTime);
 
 	FDNTrafficGeometryInput G = MakeGeometry(Vehicle);
 	G.ImpactForce = Vehicle->TakePendingImpact();
-	G.NearestPhysicsDistanceM = FDNTrafficGeometry::NearestDistanceM(G.VehiclePositionCm, PhysicsPositions);
+	G.NearestPhysicsDistanceM = FDNTrafficGeometry::NearestGapM(Vehicle->AsBody(), PhysicsBodies);
 	switch (FDNTraffic::NextLevel(Settings, FDNTrafficGeometry::BuildInput(G)))
 	{
 	case EDNTrafficLevel::Physics:
@@ -177,17 +211,23 @@ void ADNTrafficManager::Tick(float DeltaSeconds)
 	}
 	SpawnFromPlan();
 
-	// posições dos veículos Physics: o jogador e os carros de tráfego já acordados
-	TArray<FVector> PhysicsPositions;
+	// caixas de todos os veículos (para seguir o da frente) e só dos Physics: o jogador e os carros já acordados (para acordar)
+	TArray<FDNTrafficBody> AllBodies;
+	TArray<FDNTrafficBody> PhysicsBodies;
 	if (Player)
 	{
-		PhysicsPositions.Add(Player->GetActorLocation());
+		AllBodies.Add(PlayerBody());
+		PhysicsBodies.Add(AllBodies.Last());
 	}
 	for (const ADNTrafficVehicle* Vehicle : Pool)
 	{
-		if (Vehicle && Vehicle->IsActive() && Vehicle->GetLevel() == EDNTrafficLevel::Physics)
+		if (Vehicle && Vehicle->IsActive())
 		{
-			PhysicsPositions.Add(Vehicle->GetPositionCm());
+			AllBodies.Add(Vehicle->AsBody());
+			if (Vehicle->GetLevel() == EDNTrafficLevel::Physics)
+			{
+				PhysicsBodies.Add(AllBodies.Last());
+			}
 		}
 	}
 
@@ -201,6 +241,8 @@ void ADNTrafficManager::Tick(float DeltaSeconds)
 	Stats.ActiveRail = 0;
 	Stats.ActivePhysics = 0;
 	Stats.RailHitsBeforeWake = 0;
+	Stats.DrivingPhysics = 0;
+	double DrivingSpeedSum = 0.0;
 	for (ADNTrafficVehicle* Vehicle : Pool)
 	{
 		if (!Vehicle || !Vehicle->IsActive())
@@ -209,7 +251,7 @@ void ADNTrafficManager::Tick(float DeltaSeconds)
 		}
 		if (Vehicle->GetLevel() == EDNTrafficLevel::Rail)
 		{
-			UpdateRailVehicle(Vehicle, DeltaSeconds, PhysicsPositions);
+			UpdateRailVehicle(Vehicle, DeltaSeconds, AllBodies, PhysicsBodies);
 		}
 		else if (bCheckPhysics)
 		{
@@ -218,17 +260,23 @@ void ADNTrafficManager::Tick(float DeltaSeconds)
 		if (Vehicle->IsActive())
 		{
 			(Vehicle->GetLevel() == EDNTrafficLevel::Rail ? Stats.ActiveRail : Stats.ActivePhysics) += 1;
+			if (Vehicle->GetLevel() == EDNTrafficLevel::Physics && Vehicle->IsDriving())
+			{
+				++Stats.DrivingPhysics;
+				DrivingSpeedSum += Vehicle->GetSpeedMs();
+			}
 		}
 		Stats.RailHitsBeforeWake += Vehicle->GetRailHitsBeforeWake();
 	}
+	Stats.DrivingPhysicsMeanSpeedMs = Stats.DrivingPhysics > 0 ? static_cast<float>(DrivingSpeedSum / Stats.DrivingPhysics) : 0.0f;
 }
 
-float ADNTrafficManager::MaxPhysicsSpeedMs() const
+float ADNTrafficManager::MaxWreckSpeedMs() const
 {
 	float Max = 0.0f;
 	for (const ADNTrafficVehicle* Vehicle : Pool)
 	{
-		if (Vehicle && Vehicle->IsActive() && Vehicle->GetLevel() == EDNTrafficLevel::Physics)
+		if (Vehicle && Vehicle->IsActive() && Vehicle->GetLevel() == EDNTrafficLevel::Physics && !Vehicle->IsDriving())
 		{
 			Max = FMath::Max(Max, Vehicle->GetSpeedMs());
 		}

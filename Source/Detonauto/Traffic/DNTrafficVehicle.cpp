@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -63,12 +64,15 @@ void ADNTrafficVehicle::Activate(const FDNTrafficVehicleEntry& Spec, const FVect
 	Body->SetSimulatePhysics(false);
 	Body->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	Body->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	Body->SetPhysMaterialOverride(nullptr);
 	DamageState.Reset();
 	ImpactGrouper = FDNImpactGrouper();
 	PendingImpact = 0.0f;
 	RailHitsBeforeWake = 0;
+	bDriving = true;
 
 	const FBoxLook Look = LookOf(Spec.Row.Class);
+	HalfSizeCm = Look.SizeCm * 0.5f;
 	Body->SetWorldScale3D(Look.SizeCm / (2.0f * CubeHalfCm));
 	if (UMaterialInstanceDynamic* Dynamic = Body->CreateAndSetMaterialInstanceDynamic(0))
 	{
@@ -82,7 +86,8 @@ void ADNTrafficVehicle::Activate(const FDNTrafficVehicleEntry& Spec, const FVect
 	RailDirection = Direction.GetSafeNormal2D();
 	RailDistanceCm = 0.0f;
 	RailLengthCm = InRailLengthCm;
-	RailSpeedCmS = SpeedKmh / 0.036f;
+	DesiredSpeedCmS = SpeedKmh / 0.036f;
+	RailSpeedCmS = DesiredSpeedCmS;
 
 	// o carro olha para o sentido da trilha
 	SetActorLocationAndRotation(RailStart, RailDirection.Rotation(), false, nullptr, ETeleportType::TeleportPhysics);
@@ -114,12 +119,14 @@ void ADNTrafficVehicle::AdvanceRail(float DeltaTime)
 	if (Step.bError)
 	{
 		RailSpeedCmS = 0.0f;
+		DesiredSpeedCmS = 0.0f;
 		return;
 	}
 	RailDistanceCm = Step.Distance;
 	if (Step.bReachedEnd)
 	{
-		RailSpeedCmS = 0.0f; // chegou ao fim da trilha: para
+		RailSpeedCmS = 0.0f; // chegou ao fim da trilha: para (os de trás param atrás dele, com folga)
+		DesiredSpeedCmS = 0.0f;
 	}
 	// sem varredura: o corpo cinemático é arrastado pela física (empurra o jogador), e a batida chega por OnBodyHit
 	SetActorLocation(RailStart + RailDirection * RailDistanceCm, false, nullptr, ETeleportType::None);
@@ -135,9 +142,32 @@ void ADNTrafficVehicle::WakeUp()
 	Level = EDNTrafficLevel::Physics;
 	Body->SetSimulatePhysics(true);
 	Body->SetMassOverrideInKg(NAME_None, MassKg, true);
+	if (bDriving && RollingMaterial)
+	{
+		Body->SetPhysMaterialOverride(RollingMaterial); // rola até a primeira batida com dano, em vez de frear como uma caixa
+	}
 	Body->SetPhysicsLinearVelocity(Velocity);
 	VelocityBeforeStepCmS = Velocity;
 	SetActorTickEnabled(true);
+}
+
+void ADNTrafficVehicle::FollowLeader(const FDNTrafficSettings& Settings, const FDNTrafficLeader& Leader)
+{
+	if (Level == EDNTrafficLevel::Rail)
+	{
+		RailSpeedCmS = FDNTraffic::FollowSpeed(Settings, DesiredSpeedCmS / 100.0f, Leader.GapM, Leader.SpeedMs) * 100.0f;
+	}
+}
+
+FDNTrafficBody ADNTrafficVehicle::AsBody() const
+{
+	FDNTrafficBody B;
+	B.PositionCm = GetPositionCm();
+	B.Forward = GetActorForwardVector(); // o real: um carro acordado pode ter girado
+	B.HalfLengthM = HalfSizeCm.X / 100.0f;
+	B.HalfWidthM = HalfSizeCm.Y / 100.0f;
+	B.VelocityCmS = GetVelocityCmS();
+	return B;
 }
 
 FVector ADNTrafficVehicle::GetPositionCm() const
@@ -170,10 +200,10 @@ void ADNTrafficVehicle::Tick(float DeltaSeconds)
 	}
 	// fecha a janela de contatos vencida e guarda a velocidade ANTES do passo de física deste quadro (como no carro do jogador)
 	FlushImpacts(GetWorld()->GetTimeSeconds());
-	if (bMaintainSpeed && RailSpeedCmS > 0.0f)
+	if (bMaintainSpeed && bDriving && DesiredSpeedCmS > 0.0f)
 	{
 		const FVector Current = Body->GetPhysicsLinearVelocity();
-		Body->SetPhysicsLinearVelocity(FVector(RailDirection.X * RailSpeedCmS, RailDirection.Y * RailSpeedCmS, Current.Z));
+		Body->SetPhysicsLinearVelocity(FVector(RailDirection.X * DesiredSpeedCmS, RailDirection.Y * DesiredSpeedCmS, Current.Z));
 	}
 	VelocityBeforeStepCmS = Body->GetPhysicsLinearVelocity();
 }
@@ -192,6 +222,9 @@ void ADNTrafficVehicle::OnBodyHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 		++RailHitsBeforeWake; // sem velocidade medida: o gerente acorda o carro no quadro seguinte
 		return;
 	}
+	// medição "todos em Physics": a velocidade imposta a cada quadro vence o contato, e o carro empurrava o destroço da frente como um
+	// trator (a rodada nunca silenciava). No primeiro contato que não é o piso, para de impor a velocidade (lote 13b)
+	bMaintainSpeed = false;
 
 	const double Now = GetWorld()->GetTimeSeconds();
 	FlushImpacts(Now);
@@ -218,6 +251,12 @@ void ADNTrafficVehicle::FlushImpacts(double Now)
 	Impact.Zone = FDNDentParams::ZoneOfLocalPoint(Group.LocalPoint, FVector::ZeroVector, FVector(CubeHalfCm, CubeHalfCm, CubeHalfCm));
 	Impact.LocalPositionCm = Group.LocalPoint;
 	const FDNDamageResult Result = FDNDamage::ApplyImpact(DamageConfig, DamageState, Impact);
+	if (bDriving && (Result.AddedZoneDamage > 0.0f || Result.bJustDestroyed))
+	{
+		// batida acima do limiar de dano: o motorista parou de dirigir; volta o atrito normal e acaba o "manter velocidade"
+		bDriving = false;
+		Body->SetPhysMaterialOverride(nullptr);
+	}
 	static int32 Logged = 0;
 	if (Logged < 40)
 	{

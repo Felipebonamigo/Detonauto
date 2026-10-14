@@ -8,7 +8,9 @@
 //  - A estrada de teste começa em RoadOriginCm e corre em +X (ADNTestArena). Faixa contrária anda em -X.
 //  - bAllPhysics (medição): todo carro já nasce Physics, para comparar o custo com o tráfego em trilhos.
 //  - Os carros de tráfego só nascem uma vez (os slots de PlanSlots acabam): quem passou do jogador e some não é reposto, a estrada de
-//    teste não tem fim para repor.
+//    teste não tem fim para repor. Sem jogador ligado, nada some (BuildInput sem jogador), então nenhuma vaga se perde no começo.
+//  - Lote 13b: cada carro em trilho segue o da frente na mesma faixa (LeaderAhead + FollowSpeed; o jogador também conta como carro da
+//    frente); acordar usa a folga entre as caixas (NearestGapM), não a distância entre centros.
 
 #pragma once
 
@@ -34,6 +36,11 @@ struct FDNTrafficStats
 	int32 Destroyed = 0;
 	/** Batidas que chegaram a um carro ainda em Rail (sem dano nesse primeiro contato). */
 	int32 RailHitsBeforeWake = 0;
+	/** Menor folga já vista entre um carro em trilho e o da frente [m] (lote 13b: perto da folga mínima ou mais; negativa = atravessou). */
+	float MinRailGapM = TNumericLimits<float>::Max();
+	/** Carros Physics que ainda dirigem (acordados sem batida com dano) e a velocidade média deles [m/s], neste quadro. */
+	int32 DrivingPhysics = 0;
+	float DrivingPhysicsMeanSpeedMs = 0.0f;
 };
 
 UCLASS()
@@ -47,8 +54,8 @@ public:
 	/** Liga o tráfego: quantos carros, semente, tamanho do pool e a estrada. Os slots de nascimento ficam planejados aqui. */
 	void Configure(const FDNTrafficRoadConfig& InRoad, int32 InTargetCount, int32 InSeed, int32 InPoolMax, bool bInAllPhysics);
 
-	/** O jogador (ou rival): alvo das regras de distância. */
-	void SetPlayer(AActor* InPlayer) { Player = InPlayer; }
+	/** O jogador (ou rival): alvo das regras de distância. Guarda as meias medidas da caixa dele (espaço local). */
+	void SetPlayer(AActor* InPlayer);
 
 	/** A rodada de Crash está ativa: Physics em movimento não some (docs/regras-trafego.md). */
 	void SetCrashRoundActive(bool bActive) { bCrashRoundActive = bActive; }
@@ -61,8 +68,12 @@ public:
 
 	const FDNTrafficStats& GetStats() const { return Stats; }
 
-	/** A maior velocidade [m/s] entre os carros de tráfego Physics (para o fim da rodada de Crash). */
-	float MaxPhysicsSpeedMs() const;
+	/**
+	 *  A maior velocidade [m/s] entre os DESTROÇOS: carros Physics que já levaram batida com dano (para o fim da rodada de Crash).
+	 *  Carro acordado que ainda dirige (rolando, ou mantendo a velocidade na medição) não conta: ele é trânsito, não destroço, e com
+	 *  ele a rodada nunca silenciava (lote 13b).
+	 */
+	float MaxWreckSpeedMs() const;
 
 	/** O carro de tráfego em batida: o jogador bateu em alguém (um aviso por contato). */
 	FDNOnTrafficVehicleImpact OnVehicleImpact;
@@ -77,7 +88,8 @@ private:
 	void SpawnFromPlan();
 	ADNTrafficVehicle* Acquire();
 	void Release(ADNTrafficVehicle* Vehicle);
-	void UpdateRailVehicle(ADNTrafficVehicle* Vehicle, float DeltaTime, const TArray<FVector>& PhysicsPositions);
+	void UpdateRailVehicle(ADNTrafficVehicle* Vehicle, float DeltaTime, const TArray<FDNTrafficBody>& AllBodies, const TArray<FDNTrafficBody>& PhysicsBodies);
+	FDNTrafficBody PlayerBody() const;
 	void CheckPhysicsVehicle(ADNTrafficVehicle* Vehicle);
 	FDNTrafficGeometryInput MakeGeometry(const ADNTrafficVehicle* Vehicle) const;
 	void HandleImpact(ADNTrafficVehicle* Vehicle, AActor* Other);
@@ -88,6 +100,13 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> Player;
+
+	/** Meias medidas da caixa do jogador no espaço local [cm]. */
+	FVector PlayerHalfSizeCm = FVector(235.0f, 115.0f, 60.0f);
+
+	/** Atrito de "rolando" para os carros acordados que ainda dirigem (RollingFriction, combinado pelo mínimo). */
+	UPROPERTY(Transient)
+	TObjectPtr<class UPhysicalMaterial> RollingMaterial;
 
 	FDNTrafficSettings Settings;
 	FDNDamageConfig DamageConfig;

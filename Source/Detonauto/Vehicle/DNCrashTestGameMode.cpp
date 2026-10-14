@@ -108,7 +108,12 @@ void ADNCrashTestGameMode::OnMultiplierPickup()
 
 void ADNCrashTestGameMode::HandleImpact(ADNTrafficVehicle* Vehicle, AActor* Other)
 {
-	// o contato de um carro de tráfego (com o jogador ou com outro carro) liga os relógios do fim da rodada
+	// a rodada começa na primeira batida no JOGADOR; depois dela, qualquer contato de tráfego (a reação em cadeia) conta. Antes, um
+	// carro acordado que encostava em outro já ligava o relógio e a rodada podia acabar sem o jogador bater (revisão do lote 13)
+	if (!CrashRound->GetState().bFirstImpactHappened && Other != FindVehicle())
+	{
+		return;
+	}
 	++ImpactEvents;
 	if (!CrashRound->GetState().bFirstImpactHappened)
 	{
@@ -158,9 +163,10 @@ void ADNCrashTestGameMode::LogResult()
 	const FDNCrashState& S = CrashRound->GetState();
 	const FDNTrafficStats& T = Traffic->GetStats();
 	UE_LOG(LogDetonauto, Display,
-		TEXT("DNCrash: RESULTADO pontos=%d destruidos=%d multiplicador=%d medalha=%s novo_recorde=%d duracao_da_rodada=%.2f s primeiro_impacto_em=%.2f s fim_em=%.2f s | trafego: nasceram=%d acordaram=%d despachados=%d (rail=%d physics=%d) batidas_em_rail_antes_de_acordar=%d eventos_de_impacto=%d registros_gravados=%d"),
+		TEXT("DNCrash: RESULTADO pontos=%d destruidos=%d multiplicador=%d medalha=%s novo_recorde=%d duracao_da_rodada=%.2f s primeiro_impacto_em=%.2f s fim_em=%.2f s | trafego: nasceram=%d acordaram=%d despachados=%d (rail=%d physics=%d) batidas_em_rail_antes_de_acordar=%d eventos_de_impacto=%d registros_gravados=%d menor_folga_em_trilho=%.1f m fisicos_dirigindo=%d a %.1f m/s"),
 		S.Score.Total, S.DestroyedCount, S.Multiplier, FDNMedals::ToString(Medal), bNewRecord ? 1 : 0, RoundDuration, FirstImpactAt, EndedAt,
-		T.Spawned, T.Woken, T.Despawned, T.ActiveRail, T.ActivePhysics, T.RailHitsBeforeWake, ImpactEvents, RecordRegistrations);
+		T.Spawned, T.Woken, T.Despawned, T.ActiveRail, T.ActivePhysics, T.RailHitsBeforeWake, ImpactEvents, RecordRegistrations,
+		T.MinRailGapM, T.DrivingPhysics, T.DrivingPhysicsMeanSpeedMs);
 }
 
 float ADNCrashTestGameMode::PlayerSpeedMs(const ADNVehicle& Vehicle) const
@@ -259,7 +265,7 @@ void ADNCrashTestGameMode::DriveTrafficScenario(ADNVehicle& Vehicle, float Delta
 	else if (Elapsed >= Warmup)
 	{
 		const FDNTrafficStats& T = Traffic->GetStats();
-		UE_LOG(LogDetonauto, Display, TEXT("DNCrash: TRAFEGO t=%.1f s: nasceram=%d acordaram=%d despachados=%d ativos rail=%d physics=%d"), Elapsed, T.Spawned, T.Woken, T.Despawned, T.ActiveRail, T.ActivePhysics);
+		UE_LOG(LogDetonauto, Display, TEXT("DNCrash: TRAFEGO t=%.1f s: nasceram=%d acordaram=%d despachados=%d ativos rail=%d physics=%d menor_folga_em_trilho=%.1f m fisicos_dirigindo=%d a %.1f m/s"), Elapsed, T.Spawned, T.Woken, T.Despawned, T.ActiveRail, T.ActivePhysics, T.MinRailGapM, T.DrivingPhysics, T.DrivingPhysicsMeanSpeedMs);
 		FPlatformMisc::RequestExit(false);
 	}
 }
@@ -296,11 +302,18 @@ void ADNCrashTestGameMode::Tick(float DeltaSeconds)
 		DriveTrafficScenario(*Vehicle, DeltaSeconds);
 	}
 
-	// fim da rodada pelas regras do Core: a velocidade que vale é a dos veículos que estão em jogo (Physics): o jogador e o tráfego
-	// que já acordou. Carros em trilha andam sempre e nunca deixariam a rodada "silenciar".
+	// fim da rodada pelas regras do Core: a velocidade que vale é a do jogador e a dos destroços (tráfego que já levou batida com
+	// dano). Carros em trilha e acordados que ainda dirigem andam sempre e nunca deixariam a rodada "silenciar".
 	if (!bEnded && Scenario != EScenario::Traffic)
 	{
-		CrashRound->Step(DeltaSeconds, FMath::Max(PlayerSpeedMs(*Vehicle), Traffic->MaxPhysicsSpeedMs()));
+		const float PlayerMs = PlayerSpeedMs(*Vehicle);
+		const float WreckMs = Traffic->MaxWreckSpeedMs();
+		CrashRound->Step(DeltaSeconds, FMath::Max(PlayerMs, WreckMs));
+		// as duas entradas do "silêncio", uma vez por segundo depois do primeiro impacto (para ver o que segura a rodada)
+		if (CrashRound->GetState().bFirstImpactHappened && FMath::FloorToInt(Elapsed) != FMath::FloorToInt(Elapsed - DeltaSeconds))
+		{
+			UE_LOG(LogDetonauto, Display, TEXT("DNCrash: silencio t=%.0f s: jogador %.1f m/s, destroco mais rapido %.1f m/s"), Elapsed, PlayerMs, WreckMs);
+		}
 	}
 	UpdateHud(*Vehicle);
 }
