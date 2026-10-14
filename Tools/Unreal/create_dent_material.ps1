@@ -14,7 +14,8 @@ param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Dest = '/Game/Sandbox_Teste',
     [string]$EngineVersion,
-    [int]$TimeoutSeconds = 600
+    [int]$TimeoutSeconds = 600,
+    [switch]$InstancesOnly      # só refaz as instâncias e veste o carro (sem refazer o material-pai; ver o .py)
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Find-Unreal.ps1')
@@ -36,6 +37,7 @@ if (Test-Path -LiteralPath $report) { Remove-Item -LiteralPath $report -Force }
 
 # O commandlet trata a string de -Script= com escapes (\r viraria retorno de carro): use barras normais.
 $pyArgs = "`"$($script.Replace('\', '/'))`" --dest $Dest"
+if ($InstancesOnly) { $pyArgs += ' --instances-only' }
 
 # Python embutido não pode gravar .pyc na instalação da engine (também travado dentro do .py).
 $env:PYTHONDONTWRITEBYTECODE = '1'

@@ -92,10 +92,14 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(prog="create_dent_material.py", add_help=False)
     parser.add_argument("--dest", required=True)
     parser.add_argument("--report", default=None)
+    # atalho (16b): só refaz as instâncias e veste o carro, sem tocar no material-pai. Refazer o M_DNDentParent quebrou no 16b
+    # (Assertion !IsRooted em delete_all_material_expressions) depois que a carroceria com alvos (lote 17) passou a ser carregada
+    # pelo construtor do carro; enquanto a causa não é achada, mudança só de valores vai por aqui (docs/estado-atual.md)
+    parser.add_argument("--instances-only", action="store_true")
     try:
         return parser.parse_args(argv)
     except SystemExit:
-        raise DentError("Argumentos inválidos. Uso: --dest /Game/<pasta> [--report <arquivo>]")
+        raise DentError("Argumentos inválidos. Uso: --dest /Game/<pasta> [--report <arquivo>] [--instances-only]")
 
 
 def resolve_report(path_arg):
@@ -243,7 +247,7 @@ def build(dest, report):
     metallic = scalar_param(mel, material, "MetalPaintMetallic", 0.7, -1400, -560)
     roughness = scalar_param(mel, material, "Roughness", 0.4, -1400, -500)
     coat = scalar_param(mel, material, "ClearCoat", 1.0, -1400, -440)
-    coat_rough = scalar_param(mel, material, "ClearCoatRoughness", 0.03, -1400, -380)
+    coat_rough = scalar_param(mel, material, "ClearCoatRoughness", 0.04, -1400, -380)  # 16b: 0,03 a 0,05 (revisão do par)
 
     color = node(mel, material, unreal.MaterialExpressionMultiply, -1400, -750)
     mel.connect_material_expressions(base_tex, "RGB", color, "A")
@@ -251,7 +255,7 @@ def build(dest, report):
 
     # flocos: normal procedural repetida pelo UV, misturada à normal da carroceria na camada de baixo do verniz
     uv = node(mel, material, unreal.MaterialExpressionTextureCoordinate, -1900, 50)
-    tiling = scalar_param(mel, material, "FlakeTiling", 30.0, -1900, 150)
+    tiling = scalar_param(mel, material, "FlakeTiling", 60.0, -1900, 150)  # 16b: flocos menores (30 granulava de perto)
     flake_uv = node(mel, material, unreal.MaterialExpressionMultiply, -1700, 80)
     mel.connect_material_expressions(uv, "", flake_uv, "A")
     mel.connect_material_expressions(tiling, "", flake_uv, "B")
@@ -259,7 +263,7 @@ def build(dest, report):
     flake_n.set_editor_property("texture", flakes)
     flake_n.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
     mel.connect_material_expressions(flake_uv, "", flake_n, "UVs")
-    strength = scalar_param(mel, material, "FlakeStrength", 0.6, -1500, 250)
+    strength = scalar_param(mel, material, "FlakeStrength", 0.25, -1500, 250)  # 16b: 0,6 era forte demais (pintura parecia lixa)
     blend = node(mel, material, unreal.MaterialExpressionCustom, -1200, 0)
     blend.set_editor_property("code", "return normalize(float3(A.xy + B.xy * S, A.z));")
     blend.set_editor_property("description", "Flocos na normal")
@@ -386,9 +390,11 @@ def dress_car(dest, paint, report):
     """Veste o carro do template: pintura e chassi/janelas na carroceria, roda e pneu na roda (lote 16). Só mexe nas malhas que achar."""
     body = find_asset("SM_SportsCar", unreal.StaticMesh)
     if body is not None:
-        pintura = make_instance(dest, "MI_DNPintura", paint)
+        # 16b: os valores da pintura ficam explícitos na instância (não dependem do padrão do material-pai): flocos mais finos e
+        # mais fracos, verniz na faixa 0,03 a 0,05 pedida na revisão
+        pintura = make_instance(dest, "MI_DNPintura", paint, {"FlakeStrength": 0.25, "FlakeTiling": 60.0, "ClearCoatRoughness": 0.04})
         # chassi, grade e janelas: as texturas do chassi do template, verniz bem liso e sem flocos (vidro fumê opaco: o carro não tem interior)
-        chassi = make_instance(dest, "MI_DNChassi", paint, {"MetalPaintMetallic": 1.0, "FlakeStrength": 0.0, "ClearCoatRoughness": 0.02, "Roughness": 0.3},
+        chassi = make_instance(dest, "MI_DNChassi", paint, {"MetalPaintMetallic": 1.0, "FlakeStrength": 0.0, "ClearCoatRoughness": 0.03, "Roughness": 0.3},
                                {"Paint Tint": (1.0, 0.992, 0.99)},
                                {"Base Texture": find_texture("T_SportsCar_Chasis_D", "/Engine/EngineResources/WhiteSquareTexture"),
                                 "MRA": find_texture("T_SportsCar_Chasis_MRA", "/Engine/EngineResources/WhiteSquareTexture"),
@@ -421,7 +427,15 @@ def main():
     try:
         args = parse_args(sys.argv[1:])
         report_path = resolve_report(args.report)
-        build(args.dest, report)
+        if args.instances_only:
+            if not DEST_PATTERN.match(args.dest):
+                raise DentError("Destino recusado: '%s'. Só /Game/<pasta> do projeto é aceito." % args.dest)
+            parent = unreal.load_asset(args.dest + "/" + ASSET_NAME)
+            if not isinstance(parent, unreal.Material):
+                raise DentError("--instances-only precisa do material-pai já criado em " + args.dest)
+            dress_car(args.dest, parent, report)
+        else:
+            build(args.dest, report)
     except DentError as exc:
         error = str(exc)
     except Exception as exc:  # qualquer outro erro também derruba o processo, com mensagem
