@@ -5,7 +5,9 @@
 //  - turbo: UDNTurboComponent / FDNTurbo do Core. Shift = botão do turbo. Por enquanto só consome: os ganhos reais (contramão,
 //    raspão, derrapada, ar, takedown) entram quando houver os eventos. Em MODO DE TESTE (bTurboTestMode, ligado por padrão) a
 //    barra começa cheia e enche de novo 2 s depois de esvaziar, para dar para testar sem fim;
-//  - dano: FDNDamage do Core. A batida real vira amassado visual (material de deslocamento de vértices, docs/prototipo-amassado.md);
+//  - dano: FDNDamage do Core. A batida real vira amassado visual em duas camadas: a deformação grande de cada zona (alvos de
+//    deformação da carroceria, FDNDamageMorph, docs/regras-dano-visual.md) e, por cima, as mossas locais (material de deslocamento
+//    de vértices, docs/prototipo-amassado.md);
 //  - freio de mão (Espaço) tira aderência da traseira, com rampa de ida e de volta (FDNHandbrakeRamp);
 //  - HUD de debug na tela: preset, velocidade, turbo e amassados.
 //
@@ -30,9 +32,11 @@
 #include "Core/DNCamera.h"
 #include "Core/DNGameDataSubsystem.h"
 #include "Core/DNDamage.h"
+#include "Core/DNDamageMorph.h"
 #include "Core/DNDentParams.h"
 #include "DNVehicle.generated.h"
 
+class UMeshComponent;
 class UStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -85,9 +89,10 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;
 
-	/** A malha estática da carroceria (a que recebe o material de amassado). */
+	/** A carroceria (a que recebe o material de amassado): SK_DNSportsCarBody, com os faróis e os 5 alvos de deformação do dano
+	 *  por zona (lote 17, Tools/Unreal/damage-body.ps1); sem ela, a malha estática SM_SportsCar do template. */
 	UPROPERTY(Transient)
-	TObjectPtr<UStaticMeshComponent> BodyComp;
+	TObjectPtr<UMeshComponent> BodyComp;
 
 	/** As quatro rodas visuais, na ordem FL, FR, BL, BR. */
 	UPROPERTY(Transient)
@@ -152,8 +157,16 @@ public:
 	/** Até 8 amassados de profundidade máxima espalhados pela carroceria (para tirar foto). */
 	void ApplyDemoDents(int32 Count);
 
-	/** Tira todos os amassados. */
+	/** Tira todos os amassados (e desamassa a carroceria: os alvos de deformação voltam a 0). */
 	void ClearDents();
+
+	/** Ferramenta de captura (console ou EXEC: do -DNKeys): leva a zona (0 frente, 1 traseira, 2 esquerda, 3 direita, 4 teto) a
+	 *  pelo menos Damage (0 a 1), sem batida. Os alvos de deformação seguem a regra de sempre (FDNDamageMorph). */
+	UFUNCTION(Exec)
+	void DNZone(int32 Zone, float Damage);
+
+	/** Peso atual do alvo de deformação da zona (0 a 1); 0 sem a carroceria com alvos. */
+	float MorphWeight(int32 Zone) const { return Zone >= 0 && Zone < FDNDamageMorph::ZoneCount ? MorphWeights[Zone] : 0.0f; }
 
 	int32 DentCount() const { return DamageState.Dents.Num(); }
 	int32 MaxDentCount() const { return DamageConfig.MaxDents; }
@@ -207,9 +220,14 @@ protected:
 
 	void PushDentsToMaterial();
 
+	/** Leva os pesos dos alvos de deformação na direção do dano de cada zona (FDNDamageMorph) e aplica na carroceria. */
+	void UpdateDamageMorphs(float DeltaSeconds);
+
 	/** Fecha a janela de contatos vencida e aplica a batida (o maior valor da janela). */
 	void FlushImpacts(double Now);
 	void GetBodyBox(FVector& OutCenter, FVector& OutExtent) const;
+	/** Limites locais da malha da carroceria (estática ou com esqueleto); falso sem malha. */
+	bool BodyAssetBounds(FBoxSphereBounds& OutBounds) const;
 
 	void CreateInputAssets();
 
@@ -237,6 +255,8 @@ protected:
 
 	FDNDamageConfig DamageConfig;
 	FDNDamageState DamageState;
+	/** Peso de cada alvo de deformação, na ordem de EDNDamageZone (sobe com o dano, nunca desce). */
+	float MorphWeights[FDNDamageMorph::ZoneCount] = {};
 	float MaxRealDeltaVMs = 0.0f;
 	int32 RealImpactCount = 0;
 	int32 LoggedImpacts = 0;

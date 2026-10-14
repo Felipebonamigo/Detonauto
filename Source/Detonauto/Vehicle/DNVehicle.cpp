@@ -31,6 +31,7 @@ namespace
 {
 	// Assets do carro esportivo do template, migrados para Content/Detonauto (Tools/Unreal/migrate_sports_car.ps1).
 	const TCHAR* SkeletalMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SK_SportsCar");
+	const TCHAR* DamageBodyPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SK_DNSportsCarBody");
 	const TCHAR* BodyMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar");
 	const TCHAR* GlassMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Glass");
 	const TCHAR* WheelMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Wheel");
@@ -69,7 +70,8 @@ ADNVehicle::ADNVehicle()
 	GetMesh()->SetSimulatePhysics(true);
 	GetMesh()->SetCollisionProfileName(FName("Vehicle"));
 
-	// --- partes visuais (estáticas), presas ao esqueleto ---
+	// --- partes visuais, presas ao esqueleto ---
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> DamageBody(DamageBodyPath);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyMesh(BodyMeshPath);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GlassMesh(GlassMeshPath);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> WheelMesh(WheelMeshPath);
@@ -82,13 +84,25 @@ ADNVehicle::ADNVehicle()
 		Comp->SetStaticMesh(Asset);
 		return Comp;
 	};
-	if (BodyMesh.Succeeded())
+	if (DamageBody.Succeeded())
 	{
-		BodyComp = MakeVisual(TEXT("Body"), BodyMesh.Object, NAME_None);
+		// lote 17: a carroceria com os faróis (SM_SportsCar_Glass) unidos, para andarem juntos com a lataria amassada
+		USkeletalMeshComponent* Skin = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("BodySkin"));
+		Skin->SetupAttachment(GetMesh());
+		Skin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Skin->SetSkeletalMesh(DamageBody.Object);
+		BodyComp = Skin;
 	}
-	if (GlassMesh.Succeeded())
+	else
 	{
-		MakeVisual(TEXT("Glass"), GlassMesh.Object, NAME_None);
+		if (BodyMesh.Succeeded())
+		{
+			BodyComp = MakeVisual(TEXT("Body"), BodyMesh.Object, NAME_None);
+		}
+		if (GlassMesh.Succeeded())
+		{
+			MakeVisual(TEXT("Glass"), GlassMesh.Object, NAME_None);
+		}
 	}
 	if (WheelMesh.Succeeded())
 	{
@@ -474,6 +488,9 @@ void ADNVehicle::Tick(float DeltaSeconds)
 	FlushImpacts(GetWorld()->GetTimeSeconds());
 	VelocityBeforeStepCmS = GetMesh()->GetPhysicsLinearVelocity();
 
+	// dano visual, camada 1: a carroceria amassa por zona (o dano da batida que acabou de fechar já entra neste quadro)
+	UpdateDamageMorphs(DeltaSeconds);
+
 	// freio de mão: a perda de aderência da traseira sobe e desce com rampa
 	HandbrakeRamp = FDNHandbrakeRamp::Step(HandbrakeRamp, bHandbrakeHeld, DeltaSeconds, Car.HandbrakeRampInSeconds, Car.HandbrakeRampOutSeconds);
 	ApplyWheelGrip(false);
@@ -705,12 +722,27 @@ void ADNVehicle::GetBodyBox(FVector& OutCenter, FVector& OutExtent) const
 {
 	OutCenter = FVector::ZeroVector;
 	OutExtent = FVector(230.0f, 100.0f, 70.0f); // só se a malha faltar
-	if (BodyComp && BodyComp->GetStaticMesh())
+	FBoxSphereBounds Bounds;
+	if (BodyAssetBounds(Bounds))
 	{
-		const FBoxSphereBounds Bounds = BodyComp->GetStaticMesh()->GetBounds();
 		OutCenter = Bounds.Origin;
 		OutExtent = Bounds.BoxExtent;
 	}
+}
+
+bool ADNVehicle::BodyAssetBounds(FBoxSphereBounds& OutBounds) const
+{
+	if (const UStaticMeshComponent* Static = Cast<UStaticMeshComponent>(BodyComp); Static && Static->GetStaticMesh())
+	{
+		OutBounds = Static->GetStaticMesh()->GetBounds();
+		return true;
+	}
+	if (const USkeletalMeshComponent* Skin = Cast<USkeletalMeshComponent>(BodyComp); Skin && Skin->GetSkeletalMeshAsset())
+	{
+		OutBounds = Skin->GetSkeletalMeshAsset()->GetImportedBounds(); // a malha intacta, como a do template
+		return true;
+	}
+	return false;
 }
 
 bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
@@ -719,7 +751,8 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 	{
 		return true;
 	}
-	if (!BodyComp || !BodyComp->GetStaticMesh())
+	FBoxSphereBounds BodyBounds;
+	if (!BodyAssetBounds(BodyBounds))
 	{
 		UE_LOG(LogDetonauto, Error, TEXT("DNDent: o carro não tem a malha da carroceria; amassado desligado"));
 		return false;
@@ -731,34 +764,39 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 		return false;
 	}
 
-	// Um material de amassado por slot. Se o slot já usa uma instância do material de amassado (a pintura e o chassi feitos por
-	// Tools/Unreal/create_dent_material.py, lote 16), o dinâmico nasce dela e o slot guarda o visual dele; senão nasce do material-pai
-	// (o carro antes do lote 16, que pintava os dois slots com a mesma cor e deixava as janelas da cor da carroceria).
+	// Um material de amassado por slot que já usa uma instância do material de amassado (a pintura e o chassi feitos por
+	// Tools/Unreal/create_dent_material.py, lote 16): o dinâmico nasce dela e o slot guarda o visual dele. Os outros slots (os
+	// faróis da carroceria do lote 17) ficam com o material deles, sem as mossas locais, como o vidro separado de antes.
 	OriginalBodyMaterials.Reset();
 	DentMaterials.Reset();
-	int32 KeptLook = 0;
+	FString Slots;
 	for (int32 i = 0; i < BodyComp->GetNumMaterials(); ++i)
 	{
 		UMaterialInterface* SlotMaterial = BodyComp->GetMaterial(i);
 		OriginalBodyMaterials.Add(SlotMaterial);
-		const bool bDentReady = SlotMaterial && SlotMaterial->GetBaseMaterial() == Parent->GetBaseMaterial();
-		KeptLook += bDentReady ? 1 : 0;
-		UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(bDentReady ? SlotMaterial : Parent, this);
+		Slots += FString::Printf(TEXT(" %d=%s(base %s)"), i, SlotMaterial ? *SlotMaterial->GetName() : TEXT("nenhum"),
+			SlotMaterial && SlotMaterial->GetBaseMaterial() ? *SlotMaterial->GetBaseMaterial()->GetName() : TEXT("nenhuma"));
+		if (!SlotMaterial || SlotMaterial->GetBaseMaterial() != Parent->GetBaseMaterial())
+		{
+			continue;
+		}
+		UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(SlotMaterial, this);
 		BodyComp->SetMaterial(i, Dynamic);
 		DentMaterials.Add(Dynamic);
 	}
 	DentMaterial = DentMaterials.IsEmpty() ? nullptr : DentMaterials[0];
 	if (!DentMaterial)
 	{
+		UE_LOG(LogDetonauto, Error, TEXT("DNDent: nenhum slot da carroceria usa o material de amassado (%s). Slots:%s. Rode Tools/Unreal/create_dent_material.ps1"),
+			*Parent->GetName(), *Slots);
 		return false;
 	}
-	UE_LOG(LogDetonauto, Display, TEXT("DNDent: %d de %d slot(s) da carroceria com o visual proprio (instancia do material de amassado)"), KeptLook, DentMaterials.Num());
 	PushDentsToMaterial(); // todos os slots desligados
 	{
 		FVector Center, Extent;
 		GetBodyBox(Center, Extent);
-		UE_LOG(LogDetonauto, Display, TEXT("DNDent: carroceria '%s': %d vertices, %d slot(s) de material, caixa local centro=%s extensao=%s"),
-			*BodyComp->GetStaticMesh()->GetName(), BodyComp->GetStaticMesh()->GetNumVertices(0), BodyComp->GetNumMaterials(), *Center.ToCompactString(), *Extent.ToCompactString());
+		UE_LOG(LogDetonauto, Display, TEXT("DNDent: carroceria '%s': %d de %d slot(s) de material com amassado, caixa local centro=%s extensao=%s"),
+			*BodyComp->GetName(), DentMaterials.Num(), BodyComp->GetNumMaterials(), *Center.ToCompactString(), *Extent.ToCompactString());
 	}
 
 	// batida real: o corpo físico avisa cada contato (paredes, outros carros)
@@ -827,6 +865,43 @@ void ADNVehicle::ClearDents()
 	MaxRealDeltaVMs = 0.0f;
 	RealImpactCount = 0;
 	PushDentsToMaterial();
+	// carro novo: os alvos voltam a 0 (a regra nunca desce o peso; quem zera é quem troca o carro)
+	FMemory::Memzero(MorphWeights);
+	if (USkeletalMeshComponent* Skin = Cast<USkeletalMeshComponent>(BodyComp))
+	{
+		Skin->ClearMorphTargets();
+	}
+}
+
+void ADNVehicle::UpdateDamageMorphs(float DeltaSeconds)
+{
+	USkeletalMeshComponent* Skin = Cast<USkeletalMeshComponent>(BodyComp);
+	if (!Skin)
+	{
+		return;
+	}
+	float Before[FDNDamageMorph::ZoneCount];
+	FMemory::Memcpy(Before, MorphWeights, sizeof(Before));
+	FDNDamageMorph::Weights(DamageConfig, DamageState, MorphWeights, DeltaSeconds);
+	for (int32 Zone = 0; Zone < FDNDamageMorph::ZoneCount; ++Zone)
+	{
+		if (MorphWeights[Zone] != Before[Zone])
+		{
+			Skin->SetMorphTarget(FName(FDNDamageMorph::TargetName(Zone)), MorphWeights[Zone], false);
+		}
+	}
+}
+
+void ADNVehicle::DNZone(int32 Zone, float Damage)
+{
+	if (Zone < 0 || Zone >= FDNDamageMorph::ZoneCount || !FMath::IsFinite(Damage))
+	{
+		UE_LOG(LogDetonauto, Warning, TEXT("DNZone: zona %d ou dano %f fora do esperado (zona 0 a 4, dano 0 a 1)"), Zone, Damage);
+		return;
+	}
+	float& ZoneDamage = DamageState.ZoneDamage[Zone];
+	ZoneDamage = FMath::Max(ZoneDamage, FMath::Clamp(Damage, 0.0f, 1.0f));
+	UE_LOG(LogDetonauto, Display, TEXT("DNZone: zona %d (%s) com dano %.2f"), Zone, FDNDamageMorph::TargetName(Zone), ZoneDamage);
 }
 
 void ADNVehicle::DentKey(const FInputActionValue& Value, int32 DentIndex)
