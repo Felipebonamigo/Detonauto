@@ -60,6 +60,19 @@ O que mais vende um jogo de batida é a câmera.
 - Hora do dia e direção do sol escolhidas para o carro do jogador não virar
   silhueta na aproximação.
 - Aprovação: o Felipe joga 10 rodadas e responde o roteiro curto de sensação.
+- Notas da revisão do lote 16b (cena de aparência), para o cruzamento:
+  - **Asfalto:** faixas pintadas e linha de retenção (nenhuma captura mostra
+    faixa); asfalto mais escuro, com variação de aspereza; marcas de pneu,
+    manchas de óleo, remendos e bocas de lobo. Fontes: CC0 do Poly Haven ou do
+    ambientCG, ou decalques próprios.
+  - **Fachadas:** os pilares laranja chapados ao fundo parecem provisórios; no
+    cruzamento, prédios do City Sample.
+  - **Vitrines:** a 900 nits não estouram, mas a "sala" é uma caixa cinza lisa;
+    usar interior falso com cubemap (função de material de interior da engine)
+    ou textura CC0.
+  - **Folhas:** brilho pontilhado (especular alto) nos jacarandás; conferir o
+    modelo de sombreamento de folhagem de duas faces, com especular mais baixo
+    e aspereza mais alta.
 
 ## Lote 21: som base
 

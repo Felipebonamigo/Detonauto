@@ -15,7 +15,7 @@ param(
     [string]$Dest = '/Game/Sandbox_Teste',
     [string]$EngineVersion,
     [int]$TimeoutSeconds = 600,
-    [switch]$InstancesOnly      # só refaz as instâncias e veste o carro (sem refazer o material-pai; ver o .py)
+    [switch]$InstancesOnly      # só refaz as instâncias e veste o carro (sem refazer o material-pai): mudança só de valores
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Find-Unreal.ps1')

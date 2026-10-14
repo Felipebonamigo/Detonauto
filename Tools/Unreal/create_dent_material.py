@@ -92,9 +92,7 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(prog="create_dent_material.py", add_help=False)
     parser.add_argument("--dest", required=True)
     parser.add_argument("--report", default=None)
-    # atalho (16b): só refaz as instâncias e veste o carro, sem tocar no material-pai. Refazer o M_DNDentParent quebrou no 16b
-    # (Assertion !IsRooted em delete_all_material_expressions) depois que a carroceria com alvos (lote 17) passou a ser carregada
-    # pelo construtor do carro; enquanto a causa não é achada, mudança só de valores vai por aqui (docs/estado-atual.md)
+    # só refaz as instâncias e veste o carro, sem tocar no material-pai: para mudança só de valores (mais rápido, sem recompilar)
     parser.add_argument("--instances-only", action="store_true")
     try:
         return parser.parse_args(argv)
