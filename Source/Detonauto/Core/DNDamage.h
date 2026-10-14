@@ -71,6 +71,15 @@ struct FDNDamageConfig
 	float MorphCurveExponent = 0.7f;
 	/** Subida máxima do peso dos alvos de deformação por segundo (10 = 0,1 s até o cheio; o metal não "cresce" devagar). */
 	float MorphRisePerSecond = 10.0f;
+	/** Desgaste da pintura (lote 17b, no material, pelo peso da zona): fração da superfície com tinta arrancada (primer e, no meio
+	 *  das lascas, metal nu) numa zona totalmente amassada. */
+	float WearChipCoverage = 0.5f;
+	/** Tamanho típico de uma lasca de tinta [cm]. */
+	float WearChipSizeCm = 14.0f;
+	/** Força dos riscos ao longo do carro (0 = nenhum, 1 = máximo). */
+	float WearScratch = 0.6f;
+	/** Escurecimento por fuligem e sujeira numa zona totalmente amassada (0 = nenhum, 1 = máximo). */
+	float WearSoot = 0.5f;
 	/** Máximo de peças soltas ativas ao mesmo tempo (corpos físicos). */
 	int32 MaxActive = 24;
 };

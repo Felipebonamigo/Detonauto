@@ -75,6 +75,10 @@ namespace DNTest
 		R.MaxActive = C.MaxActive;
 		R.MorphCurveExponent = C.MorphCurveExponent;
 		R.MorphRisePerSecond = C.MorphRisePerSecond;
+		R.WearChipCoverage = C.WearChipCoverage;
+		R.WearChipSizeCm = C.WearChipSizeCm;
+		R.WearScratch = C.WearScratch;
+		R.WearSoot = C.WearSoot;
 		return R;
 	}
 

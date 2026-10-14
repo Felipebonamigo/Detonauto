@@ -125,6 +125,22 @@ void FDNDataDamageSpec::Define()
 			Bad(TEXT("subida inf"), TEXT("MorphRisePerSecond"), [this](FDNDamageConfigRow& R) { R.MorphRisePerSecond = Inff; });
 		});
 
+		It("lote 17b: desgaste da pintura, cobertura em (0, 1], tamanho em (0, 200] cm, riscos e fuligem em [0, 1]", [this]()
+		{
+			Good(TEXT("valores do contrato"), [](FDNDamageConfigRow& R) { R.WearChipCoverage = 0.5f; R.WearChipSizeCm = 14.f; R.WearScratch = 0.6f; R.WearSoot = 0.5f; });
+			Bad(TEXT("cobertura 0"), TEXT("WearChipCoverage"), [](FDNDamageConfigRow& R) { R.WearChipCoverage = 0.f; });
+			Good(TEXT("cobertura 1"), [](FDNDamageConfigRow& R) { R.WearChipCoverage = 1.f; });
+			Bad(TEXT("cobertura 1,01"), TEXT("WearChipCoverage"), [](FDNDamageConfigRow& R) { R.WearChipCoverage = 1.01f; });
+			Bad(TEXT("tamanho 0"), TEXT("WearChipSizeCm"), [](FDNDamageConfigRow& R) { R.WearChipSizeCm = 0.f; });
+			Good(TEXT("tamanho 200"), [](FDNDamageConfigRow& R) { R.WearChipSizeCm = 200.f; });
+			Bad(TEXT("tamanho 201"), TEXT("WearChipSizeCm"), [](FDNDamageConfigRow& R) { R.WearChipSizeCm = 201.f; });
+			Good(TEXT("riscos 0 e fuligem 0"), [](FDNDamageConfigRow& R) { R.WearScratch = 0.f; R.WearSoot = 0.f; });
+			Bad(TEXT("riscos negativos"), TEXT("WearScratch"), [](FDNDamageConfigRow& R) { R.WearScratch = -0.01f; });
+			Bad(TEXT("riscos 1,01"), TEXT("WearScratch"), [](FDNDamageConfigRow& R) { R.WearScratch = 1.01f; });
+			Bad(TEXT("fuligem NaN"), TEXT("WearSoot"), [this](FDNDamageConfigRow& R) { R.WearSoot = NaNf; });
+			Bad(TEXT("fuligem 1,01"), TEXT("WearSoot"), [](FDNDamageConfigRow& R) { R.WearSoot = 1.01f; });
+		});
+
 		It("um erro nao esconde o outro: acumula todos", [this]()
 		{
 			FDNDamageConfigRow R = DNTest::DamageRow();
@@ -171,6 +187,10 @@ void FDNDataDamageDriftSpec::Define()
 			Same(TEXT("MaxActive"), Csv.MaxActive, Def.MaxActive);
 			Same(TEXT("MorphCurveExponent"), Csv.MorphCurveExponent, Def.MorphCurveExponent);
 			Same(TEXT("MorphRisePerSecond"), Csv.MorphRisePerSecond, Def.MorphRisePerSecond);
+			Same(TEXT("WearChipCoverage"), Csv.WearChipCoverage, Def.WearChipCoverage);
+			Same(TEXT("WearChipSizeCm"), Csv.WearChipSizeCm, Def.WearChipSizeCm);
+			Same(TEXT("WearScratch"), Csv.WearScratch, Def.WearScratch);
+			Same(TEXT("WearSoot"), Csv.WearSoot, Def.WearSoot);
 		});
 
 		It("o padrao da struct tem os valores do contrato (docs/regras-dano.md)", [this]()
@@ -188,6 +208,10 @@ void FDNDataDamageDriftSpec::Define()
 			TestEqual("MaxActive", D.MaxActive, 24);
 			TestEqual("MorphCurveExponent (docs/regras-dano-visual.md)", D.MorphCurveExponent, 0.7f);
 			TestEqual("MorphRisePerSecond", D.MorphRisePerSecond, 10.0f);
+			TestEqual("WearChipCoverage (docs/regras-dano-visual.md, lote 17b)", D.WearChipCoverage, 0.5f);
+			TestEqual("WearChipSizeCm", D.WearChipSizeCm, 14.0f);
+			TestEqual("WearScratch", D.WearScratch, 0.6f);
+			TestEqual("WearSoot", D.WearSoot, 0.5f);
 		});
 	});
 }

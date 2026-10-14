@@ -138,7 +138,12 @@ void FDNDataToConfigSpec::Define()
 			R.DentMinDeltaVMs = 2.5f; R.ZoneDestroyDeltaVMs = 31.f; R.DentMaxDepthCm = 26.f; R.DentDepthPerMs = 1.6f;
 			R.DentBaseRadiusCm = 31.f; R.MaxDents = 9; R.PartDetachDeltaVMs = 13.f; R.PartDetachZoneDamage = 0.7f;
 			R.DestroyedTotalDamage = 0.6f; R.MaxActive = 25; R.MorphCurveExponent = 0.8f; R.MorphRisePerSecond = 12.f;
+			R.WearChipCoverage = 0.4f; R.WearChipSizeCm = 20.f; R.WearScratch = 0.3f; R.WearSoot = 0.2f;
 			const FDNDamageConfig C = R.ToConfig();
+			TestEqual("WearChipCoverage", C.WearChipCoverage, 0.4f);
+			TestEqual("WearChipSizeCm", C.WearChipSizeCm, 20.f);
+			TestEqual("WearScratch", C.WearScratch, 0.3f);
+			TestEqual("WearSoot", C.WearSoot, 0.2f);
 			TestEqual("MorphCurveExponent", C.MorphCurveExponent, 0.8f);
 			TestEqual("MorphRisePerSecond", C.MorphRisePerSecond, 12.f);
 			TestEqual("DentMinDeltaVMs", C.DentMinDeltaVMs, 2.5f);

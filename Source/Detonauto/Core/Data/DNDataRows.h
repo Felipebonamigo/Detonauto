@@ -349,6 +349,10 @@ struct FDNDamageConfigRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxActive = 0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MorphCurveExponent = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MorphRisePerSecond = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WearChipCoverage = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WearChipSizeCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WearScratch = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WearSoot = 0.0f;
 
 	FDNDamageConfig ToConfig() const
 	{
@@ -365,6 +369,10 @@ struct FDNDamageConfigRow : public FTableRowBase
 		C.MaxActive = MaxActive;
 		C.MorphCurveExponent = MorphCurveExponent;
 		C.MorphRisePerSecond = MorphRisePerSecond;
+		C.WearChipCoverage = WearChipCoverage;
+		C.WearChipSizeCm = WearChipSizeCm;
+		C.WearScratch = WearScratch;
+		C.WearSoot = WearSoot;
 		return C;
 	}
 };

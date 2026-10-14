@@ -521,6 +521,11 @@ TArray<FString> FDNDataValidation::ValidateDamage(const TArray<FDNDamageConfigEn
 		// lote 17: alvos de deformação por zona
 		CheckRange(DamageFile, Id, TEXT("MorphCurveExponent"), R.MorphCurveExponent, 0.0f, false, 4.0f, true, Errors);
 		CheckRange(DamageFile, Id, TEXT("MorphRisePerSecond"), R.MorphRisePerSecond, 0.0f, false, 100.0f, true, Errors);
+		// lote 17b: desgaste da pintura
+		CheckRange(DamageFile, Id, TEXT("WearChipCoverage"), R.WearChipCoverage, 0.0f, false, 1.0f, true, Errors);
+		CheckRange(DamageFile, Id, TEXT("WearChipSizeCm"), R.WearChipSizeCm, 0.0f, false, 200.0f, true, Errors);
+		CheckRange(DamageFile, Id, TEXT("WearScratch"), R.WearScratch, 0.0f, true, 1.0f, true, Errors);
+		CheckRange(DamageFile, Id, TEXT("WearSoot"), R.WearSoot, 0.0f, true, 1.0f, true, Errors);
 	}
 	return Errors;
 }
