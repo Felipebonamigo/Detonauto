@@ -93,8 +93,13 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> WheelVisuals;
 
+	/** O primeiro dos materiais de amassado (ligado = não nulo). */
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DentMaterial;
+
+	/** Um material de amassado por slot da carroceria, cada um com o visual do slot (pintura; chassi e janelas). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> DentMaterials;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInterface>> OriginalBodyMaterials;

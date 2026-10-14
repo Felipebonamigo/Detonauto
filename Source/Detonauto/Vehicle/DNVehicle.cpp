@@ -38,6 +38,10 @@ namespace
 
 	const FName WheelBones[4] = { FName("Phys_Wheel_FL"), FName("Phys_Wheel_FR"), FName("Phys_Wheel_BL"), FName("Phys_Wheel_BR") };
 
+	/** Base da malha da roda em cada osso [graus em Z]: a malha tem o eixo do cubo no Y local; 180 vira a face do aro para o outro lado
+	 *  (as rodas da esquerda olham para -Y). Conferido na captura lateral (lote 16). */
+	const float WheelMeshBaseYaw[4] = { 180.0f, 0.0f, 180.0f, 0.0f };
+
 	/** Variações de velocidade das batidas simuladas: dão profundidade pequena (4,5 cm), média (12 cm) e máxima (25 cm). */
 	const float SimulatedDeltaV[3] = { 5.0f, 10.0f, 20.0f };
 
@@ -457,7 +461,7 @@ void ADNVehicle::UpdateWheelVisuals()
 		// tem o eixo do eixo-de-roda em Y, a roda girava em torno do eixo errado e ficava "de lado".)
 		const FVector LocOffsetComponent = -Wheel->GetSuspensionAxis() * Wheel->GetSuspensionOffset();
 		WheelVisuals[i]->SetRelativeLocationAndRotation(FDNWheelVisual::RelativeLocation(WheelBoneRotations[i], LocOffsetComponent),
-			FDNWheelVisual::RelativeRotation(WheelBoneRotations[i], Wheel->GetRotationAngle(), Wheel->GetSteerAngle()));
+			FDNWheelVisual::RelativeRotation(WheelBoneRotations[i], Wheel->GetRotationAngle(), Wheel->GetSteerAngle(), WheelMeshBaseYaw[i]));
 	}
 }
 
@@ -727,16 +731,28 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 		return false;
 	}
 
+	// Um material de amassado por slot. Se o slot já usa uma instância do material de amassado (a pintura e o chassi feitos por
+	// Tools/Unreal/create_dent_material.py, lote 16), o dinâmico nasce dela e o slot guarda o visual dele; senão nasce do material-pai
+	// (o carro antes do lote 16, que pintava os dois slots com a mesma cor e deixava as janelas da cor da carroceria).
 	OriginalBodyMaterials.Reset();
+	DentMaterials.Reset();
+	int32 KeptLook = 0;
 	for (int32 i = 0; i < BodyComp->GetNumMaterials(); ++i)
 	{
-		OriginalBodyMaterials.Add(BodyComp->GetMaterial(i));
+		UMaterialInterface* SlotMaterial = BodyComp->GetMaterial(i);
+		OriginalBodyMaterials.Add(SlotMaterial);
+		const bool bDentReady = SlotMaterial && SlotMaterial->GetBaseMaterial() == Parent->GetBaseMaterial();
+		KeptLook += bDentReady ? 1 : 0;
+		UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(bDentReady ? SlotMaterial : Parent, this);
+		BodyComp->SetMaterial(i, Dynamic);
+		DentMaterials.Add(Dynamic);
 	}
-	DentMaterial = UMaterialInstanceDynamic::Create(Parent, this);
-	for (int32 i = 0; i < BodyComp->GetNumMaterials(); ++i)
+	DentMaterial = DentMaterials.IsEmpty() ? nullptr : DentMaterials[0];
+	if (!DentMaterial)
 	{
-		BodyComp->SetMaterial(i, DentMaterial);
+		return false;
 	}
+	UE_LOG(LogDetonauto, Display, TEXT("DNDent: %d de %d slot(s) da carroceria com o visual proprio (instancia do material de amassado)"), KeptLook, DentMaterials.Num());
 	PushDentsToMaterial(); // todos os slots desligados
 	{
 		FVector Center, Extent;
@@ -756,16 +772,15 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 
 void ADNVehicle::PushDentsToMaterial()
 {
-	if (!DentMaterial)
-	{
-		return;
-	}
 	for (int32 i = 0; i < FDNDentParams::MaxSlots; ++i)
 	{
 		const FDNDentParams::FSlot Slot = FDNDentParams::Slot(DamageState.Dents, i);
-		DentMaterial->SetVectorParameterValue(FDNDentParams::PositionName(i), Slot.Position);
-		DentMaterial->SetScalarParameterValue(FDNDentParams::RadiusName(i), Slot.Radius);
-		DentMaterial->SetScalarParameterValue(FDNDentParams::DepthName(i), Slot.Depth);
+		for (UMaterialInstanceDynamic* Dynamic : DentMaterials) // todos os slots deformam juntos (sem fresta entre pintura e janela)
+		{
+			Dynamic->SetVectorParameterValue(FDNDentParams::PositionName(i), Slot.Position);
+			Dynamic->SetScalarParameterValue(FDNDentParams::RadiusName(i), Slot.Radius);
+			Dynamic->SetScalarParameterValue(FDNDentParams::DepthName(i), Slot.Depth);
+		}
 	}
 }
 

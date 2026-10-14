@@ -1,7 +1,16 @@
-// Testes da conta das rodas visuais (lote 14, B1): o giro (pitch) e o esterçamento (yaw) que o Chaos calcula valem no espaço do
-// COMPONENTE (como no FAnimNode_WheelController do template), e a roda visual está presa a um osso que pode ter qualquer orientação.
-// A rotação relativa ao osso precisa ser Osso^-1 x Giro x Osso. Com a conta errada (aplicar o giro no espaço do osso) a roda gira
-// em torno do eixo errado quando o osso não tem o eixo da roda em Y: foi o "rodas de lado" do playtest 1.
+// Testes da conta das rodas visuais. O giro (pitch) e o esterçamento (yaw) que o Chaos calcula valem no espaço do COMPONENTE (como no
+// FAnimNode_WheelController do template), e a roda visual é uma malha estática presa a um osso que pode ter qualquer orientação.
+//
+// Lote 14 (B1) fez Osso^-1 x Giro x Osso: o giro ficou no eixo certo, mas a malha herdava a orientação do osso. Os ossos das rodas do
+// SportsCar estão girados ±90 graus em Z no pose de referência e a malha da roda tem o eixo do cubo no Y local: com aquela conta o
+// eixo da roda apontava para a frente do carro ("rodas de lado", visto de lado; de trás o erro se disfarça). Os testes do lote 14 só
+// olhavam o eixo do giro, não o da malha.
+//
+// Decisões (lote 16):
+//  R1 a orientação da malha no espaço do componente é Giro x Base, qualquer que seja o osso (a relativa é Osso^-1 x Giro x Base);
+//  R2 sem giro nem esterço, o eixo do cubo da malha (Y local) fica no Y do componente; Base = 180 graus em Z vira a malha para o
+//     outro lado (face do aro para fora nas rodas do lado oposto);
+//  R3 o giro puro é uma rotação em torno do Y do componente e o esterço puro em torno do Z, com qualquer osso.
 
 #include "Misc/AutomationTest.h"
 #include "Core/DNWheelVisual.h"
@@ -11,61 +20,70 @@
 BEGIN_DEFINE_SPEC(FDNWheelVisualSpec, "Detonauto.Carro.RodaVisual",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 	static bool SameRotation(const FQuat& A, const FQuat& B) { return A.Equals(B, 1.0e-4f) || A.Equals(-B, 1.0e-4f); }
+	TArray<FRotator> Bones() const
+	{
+		return { FRotator(0, 90, 0), FRotator(0, -90, 0), FRotator(0, 0, 0), FRotator(0, 180, 0), FRotator(15, 40, 10), FRotator(90, 0, 0), FRotator(0, 0, 90) };
+	}
 END_DEFINE_SPEC(FDNWheelVisualSpec)
 
 void FDNWheelVisualSpec::Define()
 {
 	Describe("RelativeRotation", [this]()
 	{
-		It("osso alinhado com o componente: a relativa e o proprio giro e esterco", [this]()
+		It("R1: osso x relativa = giro x base, qualquer que seja o osso", [this]()
 		{
-			const FQuat Off(FRotator(30.f, 20.f, 0.f));
-			TestTrue("igual ao giro", SameRotation(FDNWheelVisual::RelativeRotation(FQuat::Identity, 30.f, 20.f), Off));
-		});
-
-		It("osso girado (qualquer orientacao): osso x relativa = giro x osso, ou seja, o giro vale no espaco do componente", [this]()
-		{
-			for (const FRotator& BoneRotator : { FRotator(0, 90, 0), FRotator(0, -90, 0), FRotator(0, 180, 0), FRotator(15, 40, 10), FRotator(90, 0, 0), FRotator(0, 0, 90) })
+			for (const FRotator& BoneRotator : Bones())
 			{
 				const FQuat Bone(BoneRotator);
-				const FQuat Off(FRotator(37.f, -12.f, 0.f));
-				const FQuat World = Bone * FDNWheelVisual::RelativeRotation(Bone, 37.f, -12.f);
-				TestTrue(FString::Printf(TEXT("osso %s"), *BoneRotator.ToString()), SameRotation(World, Off * Bone));
+				for (const float BaseYaw : { 0.f, 180.f })
+				{
+					const FQuat World = Bone * FDNWheelVisual::RelativeRotation(Bone, 37.f, -12.f, BaseYaw);
+					const FQuat Expected = FQuat(FRotator(37.f, -12.f, 0.f)) * FQuat(FRotator(0.f, BaseYaw, 0.f));
+					TestTrue(FString::Printf(TEXT("osso %s, base %.0f"), *BoneRotator.ToString(), BaseYaw), SameRotation(World, Expected));
+				}
 			}
 		});
 
-		It("o giro puro (pitch) e uma rotacao em torno do eixo Y do COMPONENTE, qualquer que seja o osso", [this]()
+		It("R2: sem giro nem esterco, o eixo do cubo (Y local da malha) fica no Y do componente; base 180 vira para -Y", [this]()
 		{
-			const FQuat Bone(FRotator(0, 90, 0));
-			const FQuat World = Bone * FDNWheelVisual::RelativeRotation(Bone, 45.f, 0.f);
-			// World x Osso^-1 = rotacao nova aplicada por cima do osso, no espaco do componente: eixo Y, 45 graus
-			const FQuat Delta = World * Bone.Inverse();
-			FVector Axis; float Angle;
-			Delta.ToAxisAndAngle(Axis, Angle);
-			TestEqual("angulo", FMath::RadiansToDegrees(Angle), 45.f, 0.01f);
-			TestTrue(FString::Printf(TEXT("eixo %s e o Y do componente"), *Axis.ToString()), FMath::Abs(FMath::Abs(Axis.Y) - 1.0) < 1.0e-4);
+			for (const FRotator& BoneRotator : Bones())
+			{
+				const FQuat Bone(BoneRotator);
+				const FVector Axle0 = (Bone * FDNWheelVisual::RelativeRotation(Bone, 0.f, 0.f, 0.f)).RotateVector(FVector::YAxisVector);
+				const FVector Axle180 = (Bone * FDNWheelVisual::RelativeRotation(Bone, 0.f, 0.f, 180.f)).RotateVector(FVector::YAxisVector);
+				TestTrue(FString::Printf(TEXT("osso %s, base 0: eixo %s"), *BoneRotator.ToString(), *Axle0.ToString()), Axle0.Equals(FVector::YAxisVector, 1.0e-4));
+				TestTrue(FString::Printf(TEXT("osso %s, base 180: eixo %s"), *BoneRotator.ToString(), *Axle180.ToString()), Axle180.Equals(-FVector::YAxisVector, 1.0e-4));
+			}
 		});
 
-		It("o esterco puro (yaw) e uma rotacao em torno do eixo Z do COMPONENTE", [this]()
+		It("R2: o giro (pitch) nao tira o eixo do cubo do Y do componente", [this]()
 		{
 			const FQuat Bone(FRotator(0, 90, 0));
-			const FQuat Delta = (Bone * FDNWheelVisual::RelativeRotation(Bone, 0.f, 25.f)) * Bone.Inverse();
+			const FVector Axle = (Bone * FDNWheelVisual::RelativeRotation(Bone, 63.f, 0.f, 0.f)).RotateVector(FVector::YAxisVector);
+			TestTrue(FString::Printf(TEXT("eixo %s"), *Axle.ToString()), Axle.Equals(FVector::YAxisVector, 1.0e-4));
+		});
+
+		It("R3: o giro puro e uma rotacao em torno do Y do COMPONENTE, qualquer que seja o osso", [this]()
+		{
+			for (const FRotator& BoneRotator : Bones())
+			{
+				const FQuat Bone(BoneRotator);
+				const FQuat Delta = (Bone * FDNWheelVisual::RelativeRotation(Bone, 45.f, 0.f, 0.f)); // base 0: a orientação é só o giro
+				FVector Axis; float Angle;
+				Delta.ToAxisAndAngle(Axis, Angle);
+				TestEqual(FString::Printf(TEXT("angulo, osso %s"), *BoneRotator.ToString()), FMath::RadiansToDegrees(Angle), 45.f, 0.01f);
+				TestTrue(FString::Printf(TEXT("eixo %s e o Y do componente"), *Axis.ToString()), FMath::Abs(FMath::Abs(Axis.Y) - 1.0) < 1.0e-4);
+			}
+		});
+
+		It("R3: o esterco puro e uma rotacao em torno do Z do COMPONENTE", [this]()
+		{
+			const FQuat Bone(FRotator(0, -90, 0));
+			const FQuat Delta = Bone * FDNWheelVisual::RelativeRotation(Bone, 0.f, 25.f, 0.f);
 			FVector Axis; float Angle;
 			Delta.ToAxisAndAngle(Axis, Angle);
 			TestEqual("angulo", FMath::RadiansToDegrees(Angle), 25.f, 0.01f);
 			TestTrue("eixo Z", FMath::Abs(FMath::Abs(Axis.Z) - 1.0) < 1.0e-4);
-		});
-
-		It("giro e esterco zero: a relativa e a identidade, com qualquer osso (a roda fica como no pose de referencia)", [this]()
-		{
-			TestTrue("identidade", SameRotation(FDNWheelVisual::RelativeRotation(FQuat(FRotator(10, 60, 20)), 0.f, 0.f), FQuat::Identity));
-		});
-
-		It("o que NAO e a conta certa (Giro no espaco do osso) da outra rotacao com osso girado", [this]()
-		{
-			const FQuat Bone(FRotator(0, 90, 0));
-			const FQuat Off(FRotator(37.f, 0.f, 0.f));
-			TestFalse("conta errada difere", SameRotation(Bone * Off, Off * Bone));
 		});
 	});
 
