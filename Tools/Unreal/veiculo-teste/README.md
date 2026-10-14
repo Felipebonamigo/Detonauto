@@ -1,5 +1,8 @@
 # Carro de teste com presets (lote 8)
 
+> **Referência histórica.** Desde o lote 12 o carro vive no projeto principal (`Source/Detonauto/Vehicle/DNVehicle.*`, presets em
+> `Data/Cars.csv`, veja `docs/carro.md`). Esta cópia continua aqui só para consulta e para o Sandbox; não é mais atualizada junto.
+
 Cópia de referência dos arquivos do carro de teste que vivem no projeto descartável
 `Sandbox/VeiculoTeste` (fora do Git). Estão aqui para ficarem versionados e para quem não enxerga o Sandbox poder ler.
 **Se você mudar uma cópia, mude a outra.** A cópia que roda é a do Sandbox.

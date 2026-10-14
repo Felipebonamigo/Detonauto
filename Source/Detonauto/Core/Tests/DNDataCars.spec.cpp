@@ -142,6 +142,22 @@ void FDNDataCarsSpec::Define()
 			Bad(TEXT("HandbrakeRearGrip abaixo do minimo"), TEXT("HandbrakeRearGrip"), [](FDNCarConfigRow& R) { R.HandbrakeRearGrip = 0.049f; });
 		});
 
+		It("campo fora da propria faixa da exatamente um erro, o da faixa (o produto nao repete o aviso)", [this]()
+		{
+			for (const float V : { 0.199f, 2.001f })
+			{
+				const TArray<FString> E = ValidateWith([V](FDNCarConfigRow& R) { R.RearGripFactor = V; });
+				TestEqual(FString::Printf(TEXT("RearGripFactor %f: um erro"), V), E.Num(), 1);
+				TestTrue(FString::Printf(TEXT("RearGripFactor %f: e o da faixa; veio: %s"), V, *JoinErrors(E)), Cites(E, TEXT("número finito em")));
+			}
+			for (const float V : { 0.049f, 1.501f })
+			{
+				const TArray<FString> E = ValidateWith([V](FDNCarConfigRow& R) { R.HandbrakeRearGrip = V; });
+				TestEqual(FString::Printf(TEXT("HandbrakeRearGrip %f: um erro"), V), E.Num(), 1);
+				TestTrue(FString::Printf(TEXT("HandbrakeRearGrip %f: e o da faixa; veio: %s"), V, *JoinErrors(E)), Cites(E, TEXT("número finito em")));
+			}
+		});
+
 		It("PRECIPICIO: RearGripFactor x HandbrakeRearGrip abaixo de 0,295 faz o carro rodar e e recusado", [this]()
 		{
 			// medidos (docs/presets-carro.md): 0,28 = 90 graus, 0,294 = 77 graus (rodopio); 0,2975 = 37 a 41 graus (derrapa e volta)

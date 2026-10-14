@@ -1,5 +1,10 @@
 # Presets do carro de teste (lote 8, afinação arcade)
 
+> **Desde o lote 12 o carro vive no projeto principal** (`Source/Detonauto/Vehicle`) e os presets em `Data/Cars.csv`; veja
+> [`carro.md`](carro.md) para jogar e medir lá (`Tools/Unreal/vehicle-probe.ps1`). Este documento continua valendo para o
+> **significado de cada coluna**, o que cada preset muda e o roteiro de teste; os comandos abaixo (`TestCars.csv`, `car-probe.ps1`,
+> `DNTestCarGameMode`) são os do projeto descartável, mantido como referência. No projeto principal o nitro de teste virou o turbo do Core.
+
 Resposta ao que o Felipe sentiu no carro do template ([notas da Sprint 2](notas-sprint-2.md)): duro, pesado, parece
 simulador, não derrapa (freio de mão "trava"), câmera perto demais, sem nitro. Este lote **não mexe no Core nem no
 projeto principal**: tudo vive no projeto descartável `Sandbox/VeiculoTeste` (fora do Git), com cópia de referência em
