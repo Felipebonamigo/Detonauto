@@ -34,5 +34,5 @@ else { $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCrashScenario=Crash', 
 $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
 if ($Play) { Write-Host 'Jogo aberto. Feche a janela para terminar.'; $p.WaitForExit(); exit 0 }
 if (-not $p.WaitForExit($TimeoutSeconds * 1000)) { Stop-Process -Id $p.Id; Write-Error "Passou de $TimeoutSeconds s."; exit 1 }
-Select-String -Path $log -Pattern 'DNCrash:|DNTraffic:|Error:|Fatal' | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[[^\]]*\]', '' -replace '^LogDetonauto: Display: ', '' }
+Remove-KnownToolsetTracebacks (Get-Content -LiteralPath $log -Encoding UTF8) | Select-String -Pattern 'DNCrash:|DNTraffic:|Error:|Fatal' | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[[^\]]*\]', '' -replace '^LogDetonauto: Display: ', '' }
 exit 0

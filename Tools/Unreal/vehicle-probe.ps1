@@ -103,7 +103,7 @@ if ($Play) { Write-Host 'Jogo aberto. Feche a janela para terminar.'; $p.WaitFor
 if (-not $p.WaitForExit($TimeoutSeconds * 1000)) { Stop-Process -Id $p.Id; Write-Error "Passou de $TimeoutSeconds s e o jogo foi fechado."; exit 1 }
 if (-not (Test-Path $log)) { Write-Error 'O jogo não deixou log.'; exit 1 }
 
-Select-String -Path $log -Pattern 'ADNVehicle|DNCarProbe|DNCarShot|DNDent|LogDetonauto|Error:|Fatal' |
+Remove-KnownToolsetTracebacks (Get-Content -LiteralPath $log -Encoding UTF8) | Select-String -Pattern 'ADNVehicle|DNCarProbe|DNCarShot|DNDent|LogDetonauto|Error:|Fatal' |
     ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[[^\]]*\]', '' -replace '^LogDetonauto: Display: ', '' }
 if ($Keys -or $Shot -or $ShotDent -or $Scenario -eq 'Wall') { Get-ChildItem (Join-Path $projDir 'Saved\Screenshots') -Recurse -Filter 'dn-*.png' -ErrorAction SilentlyContinue | ForEach-Object { "Captura: $($_.FullName)" } }
 exit 0
