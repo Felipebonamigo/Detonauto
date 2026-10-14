@@ -17,6 +17,9 @@ variáveis) ficam em inglês, como é o padrão do Unreal.
 
 - Cronograma geral: https://claude.ai/artifact/UxU6zFtkNGTvHEwYH3ZB98
 - Sprints com progresso salvo: https://claude.ai/artifact/NkqnCgL7CW5YDtbE5hbSA7
+- Estúdio, com os 4 jogos do Felipe, ferramentas, pré-configurações e pendências
+  em comum: https://claude.ai/artifact/72KXW2Tve5gB65BHD1CDp6 (documento do
+  Claude Docs, lido pelo conector)
 
 No início de uma sessão, descubra em que sprint o Felipe está. Quando houver
 acesso às páginas acima, leia o progresso de lá. A cada revisão de escopo
