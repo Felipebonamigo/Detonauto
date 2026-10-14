@@ -55,12 +55,13 @@ if (-not (Test-Path -LiteralPath $index)) {
 }
 $r = Get-Content -LiteralPath $index -Raw -Encoding UTF8 | ConvertFrom-Json
 $passed = [int]$r.succeeded
+$warned = [int]$r.succeededWithWarnings  # aprovado com aviso no log (ex.: LogHttp sem rede durante o teste); conta como aprovado
 $failed = [int]$r.failed
 $notRun = [int]$r.notRun
 $total = @($r.tests).Count
 
 Write-Host ""
-Write-Host "RESUMO: $passed aprovados, $failed reprovados, $notRun não rodaram, $total no total"
+Write-Host "RESUMO: $($passed + $warned) aprovados ($warned com aviso), $failed reprovados, $notRun não rodaram, $total no total"
 foreach ($t in $r.tests) {
     $estado = if ($t.state -eq 'Success') { 'OK    ' } elseif ($t.state -eq 'Fail') { 'FALHOU' } else { $t.state }
     Write-Host "  [$estado] $($t.fullTestPath)"

@@ -37,6 +37,9 @@
 #include "DNVehicle.generated.h"
 
 class UMeshComponent;
+class USkeletalMesh;
+class USkeletalMeshComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -89,10 +92,39 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;
 
-	/** A carroceria (a que recebe o material de amassado): SK_DNSportsCarBody, com os faróis e os 5 alvos de deformação do dano
-	 *  por zona (lote 17, Tools/Unreal/damage-body.ps1); sem ela, a malha estática SM_SportsCar do template. */
+	/** A carroceria (a que recebe o material de amassado): BodySkin com SK_DNSportsCarBody, os faróis e os 5 alvos de deformação do
+	 *  dano por zona (lote 17, Tools/Unreal/damage-body.ps1); sem ela, BodyStatic com a malha estática SM_SportsCar do template. */
 	UPROPERTY(Transient)
 	TObjectPtr<UMeshComponent> BodyComp;
+
+	UPROPERTY(VisibleAnywhere, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> BodySkin;
+
+	UPROPERTY(VisibleAnywhere, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> BodyStatic;
+
+	UPROPERTY(VisibleAnywhere, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> GlassStatic;
+
+	/** Malhas por caminho: carregadas em LoadCarMeshes (antes do registro), nunca no construtor (ver o .cpp). A pasta do carro está
+	 *  na lista de cozimento (Config/DefaultGame.ini), porque o cozimento não segue caminho guardado no padrão de classe nativa. */
+	UPROPERTY(EditDefaultsOnly, Category="DN Carro|Malhas")
+	TSoftObjectPtr<USkeletalMesh> ChassisMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="DN Carro|Malhas")
+	TSoftObjectPtr<USkeletalMesh> DamageBodyMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="DN Carro|Malhas")
+	TSoftObjectPtr<UStaticMesh> BodyMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="DN Carro|Malhas")
+	TSoftObjectPtr<UStaticMesh> GlassMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="DN Carro|Malhas")
+	TSoftObjectPtr<UStaticMesh> WheelMesh;
+
+	/** Carrega as malhas e escolhe a carroceria (com alvos ou a estática). */
+	void LoadCarMeshes();
 
 	/** As quatro rodas visuais, na ordem FL, FR, BL, BR. */
 	UPROPERTY(Transient)

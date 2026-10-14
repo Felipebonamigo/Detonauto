@@ -147,10 +147,14 @@ melhor e ele quer cinco modos.
   `GameFeatureData` no `DefaultGame.ini` (senão todo commandlet sai com 1), e no
   `-game` deixam tracebacks de Python inofensivos, filtrados por lista explícita
   em `Tools/Unreal/Find-Unreal.ps1`.
-- `create_dent_material.ps1` completo quebra (`Assertion failed: !IsRooted()` em
-  `delete_all_material_expressions`) desde que a carroceria com alvos é carregada
-  no construtor do carro. Use `-InstancesOnly` para mudar valores; a causa está nas
-  pendências.
+- Nada de `ConstructorHelpers` para assets no construtor do carro: o que ele carrega
+  na partida de todo commandlet fica preso como raiz, e refazer esses assets por
+  script quebra (`Assertion failed: !IsRooted()`). O `ADNVehicle` guarda caminhos
+  (`TSoftObjectPtr`, caminho completo `Pacote.Objeto`) e carrega em
+  `PreRegisterAllComponents`; a pasta do carro está em `DirectoriesToAlwaysCook`.
+- `delete_all_material_expressions` (5.8) apaga só metade dos nós por chamada:
+  chamar até zerar (`create_dent_material.py`). Os restos se acumulavam e criaram
+  duas saídas do verniz, e o material deixou de compilar (pintura cinza).
 - Scripts de conteúdo regravam assets iguais com binário novo: antes do commit,
   desfaça (`git checkout --`) os que não mudaram de propósito, para não gastar LFS.
 
@@ -180,13 +184,6 @@ melhor e ele quer cinco modos.
 5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
-
-Pendências técnicas:
-
-- Achar por que refazer o `M_DNDentParent` dá `!IsRooted()` (hipótese não
-  provada: o material carregado no início pelo construtor do carro, via
-  `SK_DNSportsCarBody`). Saídas possíveis: carregar a carroceria fora do
-  construtor, ou refazer o material num pacote novo e trocar as referências.
 
 Pendências de design (decidir com playtest, não fazer agora):
 

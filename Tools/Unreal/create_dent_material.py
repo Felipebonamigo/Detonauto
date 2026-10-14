@@ -196,7 +196,17 @@ def build(dest, report):
     if eal.does_asset_exist(path):
         # refaz no mesmo pacote: apagar no commandlet deixa o arquivo no disco e a criação seguinte falha
         material = unreal.load_asset(path)
-        mel.delete_all_material_expressions(material)
+        # o delete_all do 5.8 apaga só metade dos nós por chamada (medido no lote 17b: 85 -> 42). Os restos se acumulavam a cada
+        # execução até haver duas saídas da normal de baixo do verniz, e aí o material não compila e o jogo mostra o padrão cinza
+        # ("The material can contain only one ClearCoatBottomNormal node"). Chama até zerar.
+        left = mel.get_num_material_expressions(material)
+        for _ in range(16):
+            if left == 0:
+                break
+            mel.delete_all_material_expressions(material)
+            left = mel.get_num_material_expressions(material)
+        if left:
+            raise DentError("Sobraram %d nós no material depois de apagar tudo: %s" % (left, path))
         report.append("material existente refeito: " + path)
     else:
         material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(ASSET_NAME, dest, unreal.Material, unreal.MaterialFactoryNew())

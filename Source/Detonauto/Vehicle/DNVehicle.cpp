@@ -10,7 +10,6 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "AnimationRuntime.h"
-#include "UObject/ConstructorHelpers.h"
 #include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
@@ -29,12 +28,13 @@
 
 namespace
 {
-	// Assets do carro esportivo do template, migrados para Content/Detonauto (Tools/Unreal/migrate_sports_car.ps1).
-	const TCHAR* SkeletalMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SK_SportsCar");
-	const TCHAR* DamageBodyPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SK_DNSportsCarBody");
-	const TCHAR* BodyMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar");
-	const TCHAR* GlassMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Glass");
-	const TCHAR* WheelMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Wheel");
+	// Assets do carro esportivo do template, migrados para Content/Detonauto (Tools/Unreal/migrate_sports_car.ps1). Caminho completo
+	// (Pacote.Objeto): o FSoftObjectPath não completa o nome do objeto como o ConstructorHelpers fazia (sem ele, a carga volta nula)
+	const TCHAR* SkeletalMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SK_SportsCar.SK_SportsCar");
+	const TCHAR* DamageBodyPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SK_DNSportsCarBody.SK_DNSportsCarBody");
+	const TCHAR* BodyMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar.SM_SportsCar");
+	const TCHAR* GlassMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Glass.SM_SportsCar_Glass");
+	const TCHAR* WheelMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Wheel.SM_SportsCar_Wheel");
 	const TCHAR* DentParentPath = TEXT("/Game/Detonauto/Vehicle/M_DNDentParent.M_DNDentParent");
 
 	const FName WheelBones[4] = { FName("Phys_Wheel_FL"), FName("Phys_Wheel_FR"), FName("Phys_Wheel_BL"), FName("Phys_Wheel_BR") };
@@ -61,56 +61,37 @@ ADNVehicle::ADNVehicle()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// --- malha e Physics Asset (vem junto com a malha). Sem Anim Blueprint: as rodas visuais são movidas em UpdateWheelVisuals ---
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkelMesh(SkeletalMeshPath);
-	if (SkelMesh.Succeeded())
-	{
-		GetMesh()->SetSkeletalMesh(SkelMesh.Object);
-	}
+	// --- malhas: o construtor só guarda os caminhos; quem carrega é LoadCarMeshes, antes do registro dos componentes. Carregar aqui
+	// (ConstructorHelpers) fazia a partida de todo commandlet carregar as malhas, as instâncias dos slots e o M_DNDentParent, que
+	// ficavam presos como raiz: refazer o material quebrava com "Assertion failed: !IsRooted()" (lote 17b, provado tirando as malhas)
+	ChassisMesh = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(SkeletalMeshPath));
+	DamageBodyMesh = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(DamageBodyPath));
+	BodyMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(BodyMeshPath));
+	GlassMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(GlassMeshPath));
+	WheelMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(WheelMeshPath));
+
+	// Physics Asset vem junto com a malha do chassi. Sem Anim Blueprint: as rodas visuais são movidas em UpdateWheelVisuals
 	GetMesh()->SetSimulatePhysics(true);
 	GetMesh()->SetCollisionProfileName(FName("Vehicle"));
 
-	// --- partes visuais, presas ao esqueleto ---
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> DamageBody(DamageBodyPath);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyMesh(BodyMeshPath);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> GlassMesh(GlassMeshPath);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> WheelMesh(WheelMeshPath);
-
-	auto MakeVisual = [this](const TCHAR* Name, UStaticMesh* Asset, FName Bone) -> UStaticMeshComponent*
+	// --- partes visuais, presas ao esqueleto, ainda sem malha ---
+	auto MakeVisual = [this](const TCHAR* Name, FName Bone) -> UStaticMeshComponent*
 	{
 		UStaticMeshComponent* Comp = CreateDefaultSubobject<UStaticMeshComponent>(Name);
 		Comp->SetupAttachment(GetMesh(), Bone);
 		Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Comp->SetStaticMesh(Asset);
 		return Comp;
 	};
-	if (DamageBody.Succeeded())
+	// lote 17: a carroceria com os 5 alvos de deformação e os faróis (SM_SportsCar_Glass) unidos; sem ela, a malha estática e o vidro
+	BodySkin = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("BodySkin"));
+	BodySkin->SetupAttachment(GetMesh());
+	BodySkin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	BodyStatic = MakeVisual(TEXT("Body"), NAME_None);
+	GlassStatic = MakeVisual(TEXT("Glass"), NAME_None);
+	const TCHAR* Names[4] = { TEXT("WheelFL"), TEXT("WheelFR"), TEXT("WheelBL"), TEXT("WheelBR") };
+	for (int32 i = 0; i < 4; ++i)
 	{
-		// lote 17: a carroceria com os faróis (SM_SportsCar_Glass) unidos, para andarem juntos com a lataria amassada
-		USkeletalMeshComponent* Skin = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("BodySkin"));
-		Skin->SetupAttachment(GetMesh());
-		Skin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Skin->SetSkeletalMesh(DamageBody.Object);
-		BodyComp = Skin;
-	}
-	else
-	{
-		if (BodyMesh.Succeeded())
-		{
-			BodyComp = MakeVisual(TEXT("Body"), BodyMesh.Object, NAME_None);
-		}
-		if (GlassMesh.Succeeded())
-		{
-			MakeVisual(TEXT("Glass"), GlassMesh.Object, NAME_None);
-		}
-	}
-	if (WheelMesh.Succeeded())
-	{
-		const TCHAR* Names[4] = { TEXT("WheelFL"), TEXT("WheelFR"), TEXT("WheelBL"), TEXT("WheelBR") };
-		for (int32 i = 0; i < 4; ++i)
-		{
-			WheelVisuals.Add(MakeVisual(Names[i], WheelMesh.Object, WheelBones[i]));
-		}
+		WheelVisuals.Add(MakeVisual(Names[i], WheelBones[i]));
 	}
 
 	// --- câmera de perseguição ---
@@ -314,8 +295,28 @@ bool ADNVehicle::SwitchPreset(FName Id)
 	return true;
 }
 
+void ADNVehicle::LoadCarMeshes()
+{
+	if (USkeletalMesh* Chassis = ChassisMesh.LoadSynchronous())
+	{
+		GetMesh()->SetSkeletalMesh(Chassis);
+	}
+	USkeletalMesh* Damage = DamageBodyMesh.LoadSynchronous();
+	BodySkin->SetSkeletalMesh(Damage);
+	BodyStatic->SetStaticMesh(Damage ? nullptr : BodyMesh.LoadSynchronous());
+	GlassStatic->SetStaticMesh(Damage ? nullptr : GlassMesh.LoadSynchronous());
+	BodyComp = Damage ? static_cast<UMeshComponent*>(BodySkin) : (BodyStatic->GetStaticMesh() ? static_cast<UMeshComponent*>(BodyStatic) : nullptr);
+	UStaticMesh* Wheel = WheelMesh.LoadSynchronous();
+	for (UStaticMeshComponent* Visual : WheelVisuals)
+	{
+		Visual->SetStaticMesh(Wheel);
+	}
+}
+
 void ADNVehicle::PreRegisterAllComponents()
 {
+	// as malhas entram antes do registro: o Chaos cria o veículo com o Physics Asset do chassi
+	LoadCarMeshes();
 	Super::PreRegisterAllComponents();
 
 	// -DNCarRow=arcade-2 na linha de comando escolhe o preset sem abrir o editor

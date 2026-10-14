@@ -115,6 +115,6 @@ As notas da revisão do lote 16, uma a uma. Capturas no perfil `DN_AlvoPS5`, 192
   0,65 ms em relação ao lote 16: dentro do ruído de ~1 ms, e a copa mais cheia é a explicação provável. Fica de olho na próxima medição.
 - Com o sol baixo (15 graus) e a rua entre prédios altos, o carro fica na sombra dos prédios em boa parte dos ângulos parados, mesmo com o
   sol por trás. A escolha da hora do dia por cruzamento está no lote 20 (`docs/fatia-vertical.md`).
-- Para refazer: `create_lookdev.ps1` (cena) e `create_dent_material.ps1 -Dest /Game/Detonauto/Vehicle -InstancesOnly` (pintura). O modo
-  completo do `create_dent_material` quebra hoje ao refazer o material-pai (`docs/estado-atual.md`, pendências).
+- Para refazer: `create_lookdev.ps1` (cena) e `create_dent_material.ps1 -Dest /Game/Detonauto/Vehicle` (pintura; `-InstancesOnly` só
+  refaz as instâncias). A quebra do modo completo no 16b foi corrigida no começo do 17b (`docs/estado-atual.md`, armadilhas).
 - Os scripts regravam assets iguais (texturas e materiais refeitos com o mesmo conteúdo). Só entram no commit os que mudaram de propósito.
