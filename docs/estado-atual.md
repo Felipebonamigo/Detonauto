@@ -44,7 +44,8 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 14 | Bugs do 1º playtest (rodas, amassado, curva) e ajustes (derrapagem, turbo, câmeras) | Aprovado (`docs/lote-14.md`). B3: não mexer no esterço; o preset padrão virou o arcade-3. Revisão: assistência só com 3 rodas no chão |
 | 15 | Plano visual, passos 1 e 2: base de renderização e cena de aparência | Na main, aguardando revisão (`docs/lookdev.md`, `docs/desempenho.md`): capturas antes e depois nos 4 ângulos; Frame 5,1 ms parado e 5,3 ms andando no perfil alvo PS5 (RTX 4070 Ti) |
 | 13b | Correções do tráfego achadas na revisão independente | Aprovado (`docs/regras-trafego.md`, seção do 13b) |
-| 16 | Visual do carro e da rua: rodas, pintura, vidros, pneus, prédios, mobiliário | Na main, aguardando revisão (`docs/lookdev.md`, seção do lote 16): rodas de lado corrigidas (bug do lote 14), pintura com verniz e flocos, um material por slot, interior mapping, 282 objetos CC0; Frame 4,55 ms parado no perfil alvo PS5 |
+| 16 | Visual do carro e da rua: rodas, pintura, vidros, pneus, prédios, mobiliário | Aprovado (`docs/lookdev.md`); polimento no 16b |
+| 13c | Pontuação por dano no Crash | Aprovado (`docs/regras-de-jogo.md`, revisão de 14 out): livro por veículo, P1 a P6, mutação 7 de 7 |
 
 ## Primeiro playtest (14 out)
 
@@ -145,12 +146,28 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 13c: pontuação por fração de dano (`docs/regras-de-jogo.md`, "Revisão de
-   14 out"), com nova medição a 100 e 130 km/h com 40 carros; não recalibrar as
-   medalhas sem o par.
-2. Unreal MCP: o Felipe autorizou no chat local (14 out). Ligar só se os plugins
-   existirem no 5.8 e com ele fora do PC; os scripts Python seguem oficiais.
+1. Lote 17: dano visual por zona (`docs/regras-dano-visual.md`).
+2. Lote 16b (polimento, notas do par): flocos menores e verniz mais nítido;
+   poste moderno no lugar do lampião; jacarandá com pouca folha; vitrines menos
+   brancas; capturas também com o sol por trás do carro (contra o sol ele vira
+   silhueta).
 3. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
-4. Lote 17: dano visual por zona (`docs/regras-dano-visual.md`).
-5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
+4. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`).
+
+Pendências de design (decidir com playtest, não fazer agora):
+
+- A 130 km/h a rodada rende MENOS que a 100 (o carro é desviado no primeiro
+  impacto): o contrário do que um arcade quer. Alavanca provável: proporção de
+  massa jogador × tráfego nas batidas e/ou controle do carro em câmera lenta
+  depois da batida.
+- Variação grande entre rodadas iguais (física em passo livre): avaliar subpasso
+  fixo do Chaos (passo fixo/assíncrono), medindo efeito na direção e no custo;
+  ranking exige repetibilidade.
+- Medalhas do cruzamento de exemplo ficam em 1000/5000/12000 até existir o
+  primeiro cruzamento de verdade (a estrada reta não é cruzamento).
+
+Unreal MCP: ligado em 14 out (plugins ModelContextProtocol e AllToolsets, só no
+editor; porta 8010 em `Config/DefaultEditorPerProjectUserSettings.ini`; servidor
+`unreal-mcp-detonauto` no escopo local do Claude Code do PC). Responde quando o
+editor está aberto. Os scripts Python seguem sendo a forma oficial.
