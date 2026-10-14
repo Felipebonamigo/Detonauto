@@ -25,7 +25,7 @@ void ADNVehicleTestGameMode::InitGame(const FString& MapName, const FString& Opt
 	// piso, parede e luz: o mapa é vazio
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	GetWorld()->SpawnActor<ADNTestArena>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	Arena = GetWorld()->SpawnActor<ADNTestArena>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 }
 
 AActor* ADNVehicleTestGameMode::ChoosePlayerStart_Implementation(AController* Player)

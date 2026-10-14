@@ -85,6 +85,43 @@ TArray<FDNTrafficSlot> FDNTrafficRoad::PlanSlots(const FDNTrafficRoadConfig& Con
 	return Slots;
 }
 
+FDNTrafficPool::FAcquired FDNTrafficPool::Acquire()
+{
+	FAcquired Result;
+	for (int32 i = 0; i < InUse.Num(); ++i)
+	{
+		if (!InUse[i])
+		{
+			InUse[i] = true;
+			Result.Index = i;
+			return Result;
+		}
+	}
+	if (InUse.Num() < MaxSize)
+	{
+		Result.Index = InUse.Add(true);
+		Result.bCreated = true;
+	}
+	return Result;
+}
+
+bool FDNTrafficPool::Release(int32 Index)
+{
+	if (!InUse.IsValidIndex(Index) || !InUse[Index])
+	{
+		return false;
+	}
+	InUse[Index] = false;
+	return true;
+}
+
+int32 FDNTrafficPool::Active() const
+{
+	int32 Count = 0;
+	for (const bool bUsed : InUse) { Count += bUsed ? 1 : 0; }
+	return Count;
+}
+
 FDNTrafficVehicleInput FDNTrafficGeometry::BuildInput(const FDNTrafficGeometryInput& In)
 {
 	FDNTrafficVehicleInput Out;

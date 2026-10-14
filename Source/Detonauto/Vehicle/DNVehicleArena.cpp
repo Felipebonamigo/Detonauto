@@ -5,6 +5,7 @@
 #include "Components/SkyLightComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -16,6 +17,17 @@ void ADNTestArena::PostInitializeComponents()
 	FloorMaterial->Friction = FloorFriction;
 	FloorMaterial->Restitution = 0.0f;
 	Floor->SetPhysMaterialOverride(FloorMaterial);
+
+	if (UMaterialInstanceDynamic* RoadColor = Road->CreateAndSetMaterialInstanceDynamic(0))
+	{
+		RoadColor->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.02f, 0.02f, 0.025f));
+	}
+}
+
+void ADNTestArena::SetWallEnabled(bool bEnabled)
+{
+	Wall->SetCollisionEnabled(bEnabled ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	Wall->SetVisibility(bEnabled);
 }
 
 ADNTestArena::ADNTestArena()
@@ -29,6 +41,7 @@ ADNTestArena::ADNTestArena()
 
 	// O cubo básico da engine mede 100 cm de lado, com o pivô no centro.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Flat(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Grid(TEXT("/Engine/EngineMaterials/WorldGridMaterial.WorldGridMaterial"));
 
 	auto MakeBlock = [this, Root](const TCHAR* Name, const FVector& Center, const FVector& SizeCm) -> UStaticMeshComponent*
@@ -50,8 +63,14 @@ ADNTestArena::ADNTestArena()
 		return Block;
 	};
 
-	Floor = MakeBlock(TEXT("Floor"), FVector(0.0f, 0.0f, -50.0f), FVector(40000.0f, 40000.0f, 100.0f));
+	// piso: de X = -200 m a X = +800 m, 400 m de largura (cobre a estrada de 600 m e a parede a 60 m)
+	Floor = MakeBlock(TEXT("Floor"), FVector(30000.0f, 0.0f, -50.0f), FVector(100000.0f, 40000.0f, 100.0f));
 	Wall = MakeBlock(TEXT("Wall"), FVector(WallX + 50.0f, 0.0f, 200.0f), FVector(100.0f, 2000.0f, 400.0f));
+
+	// estrada: faixa escura sobre o piso (só visual; o piso é quem colide), de X = 0 a RoadLengthCm, com a largura das faixas
+	Road = MakeBlock(TEXT("Road"), FVector(RoadLengthCm * 0.5f, 0.0f, 0.5f), FVector(RoadLengthCm, RoadWidthCm, 1.0f));
+	Road->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Road->SetMaterial(0, Flat.Succeeded() ? Flat.Object : nullptr);
 
 	// Luz: o mapa vazio não traz nenhuma.
 	UDirectionalLightComponent* Sun = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Sun"));

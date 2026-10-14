@@ -33,6 +33,13 @@ public:
 	 */
 	static constexpr float FloorFriction = 1.0f;
 
+	/** Estrada de teste (lote 13a): começa em X = 0, corre em +X; 3 faixas de 3,5 m (FDNTrafficRoadConfig). Só visual. */
+	static constexpr float RoadLengthCm = 60000.0f;
+	static constexpr float RoadWidthCm = 1050.0f;
+
+	/** Liga ou desliga a parede (colisão e visual): a rodada de Crash corre pela estrada sem parede a 60 m. */
+	void SetWallEnabled(bool bEnabled);
+
 protected:
 	virtual void PostInitializeComponents() override;
 
@@ -45,4 +52,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="Arena")
 	TObjectPtr<UStaticMeshComponent> Wall;
+
+	UPROPERTY(VisibleAnywhere, Category="Arena")
+	TObjectPtr<UStaticMeshComponent> Road;
 };

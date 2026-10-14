@@ -8,6 +8,8 @@
 //  W2 PlanSlots devolve no máximo Count carros, ordenados do mais perto para o mais longe; faixas lotadas (menos que MinGapM
 //     entre carros) cortam o excesso em vez de sobrepor;
 //  W3 a mesma semente dá a mesma estrada;
+//  W5 o pool tem tamanho máximo; Acquire reaproveita o livre de menor índice antes de criar um novo e recusa (INDEX_NONE) quando
+//     está cheio; Release de índice inválido ou já livre devolve falso e não muda nada;
 //  W4 BuildInput: velocidade de aproximação positiva = a distância entre os centros está diminuindo; vetor de avanço de
 //     tamanho zero ou NaN dá projeção 0 (nem na frente nem atrás).
 
@@ -192,6 +194,87 @@ void FDNTrafficRoadSpec::Define()
 				TestTrue("espaco", Slot.PositionM - Last[Slot.Lane] >= C.MinGapM - 1.0e-3f);
 				Last[Slot.Lane] = Slot.PositionM;
 			}
+		});
+	});
+}
+
+BEGIN_DEFINE_SPEC(FDNTrafficPoolSpec, "Detonauto.Trafego.Pool",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+END_DEFINE_SPEC(FDNTrafficPoolSpec)
+
+void FDNTrafficPoolSpec::Define()
+{
+	Describe("FDNTrafficPool", [this]()
+	{
+		It("W5: cria ate o tamanho maximo; depois recusa", [this]()
+		{
+			FDNTrafficPool Pool(3);
+			for (int32 i = 0; i < 3; ++i)
+			{
+				const FDNTrafficPool::FAcquired A = Pool.Acquire();
+				TestEqual(FString::Printf(TEXT("indice %d"), i), A.Index, i);
+				TestTrue("criado", A.bCreated);
+			}
+			TestEqual("cheio", Pool.Acquire().Index, static_cast<int32>(INDEX_NONE));
+			TestEqual("tamanho", Pool.Size(), 3);
+			TestEqual("ativos", Pool.Active(), 3);
+		});
+
+		It("reaproveita o liberado antes de criar um novo, sempre o de menor indice", [this]()
+		{
+			FDNTrafficPool Pool(5);
+			Pool.Acquire(); Pool.Acquire(); Pool.Acquire(); // 0, 1, 2
+			TestTrue("libera o 1", Pool.Release(1));
+			TestTrue("libera o 0", Pool.Release(0));
+			const FDNTrafficPool::FAcquired A = Pool.Acquire();
+			TestEqual("pega o 0", A.Index, 0);
+			TestFalse("nao e novo", A.bCreated);
+			const FDNTrafficPool::FAcquired B = Pool.Acquire();
+			TestEqual("pega o 1", B.Index, 1);
+			TestFalse("nao e novo", B.bCreated);
+			TestEqual("so agora cria o 3", Pool.Acquire().Index, 3);
+			TestEqual("tamanho cresceu so uma vez", Pool.Size(), 4);
+		});
+
+		It("liberar duas vezes, indice invalido ou nunca usado: falso e nada muda", [this]()
+		{
+			FDNTrafficPool Pool(3);
+			Pool.Acquire();
+			TestTrue("libera", Pool.Release(0));
+			TestFalse("de novo", Pool.Release(0));
+			TestFalse("negativo", Pool.Release(-1));
+			TestFalse("fora do tamanho", Pool.Release(1));
+			TestFalse("muito fora", Pool.Release(99));
+			TestEqual("ativos", Pool.Active(), 0);
+			TestEqual("tamanho", Pool.Size(), 1);
+		});
+
+		It("nunca entrega o mesmo indice a dois usuarios", [this]()
+		{
+			FDNTrafficPool Pool(4);
+			TSet<int32> Taken;
+			for (int32 i = 0; i < 4; ++i) { TestTrue("indice novo", !Taken.Contains(Pool.Acquire().Index)); }
+			Taken.Reset();
+			Pool.Release(2);
+			const int32 First = Pool.Acquire().Index;
+			TestEqual("o 2 volta", First, 2);
+			TestEqual("e agora esta cheio", Pool.Acquire().Index, static_cast<int32>(INDEX_NONE));
+		});
+
+		It("tamanho maximo zero ou negativo: nunca entrega", [this]()
+		{
+			TestEqual("zero", FDNTrafficPool(0).Acquire().Index, static_cast<int32>(INDEX_NONE));
+			TestEqual("negativo", FDNTrafficPool(-5).Acquire().Index, static_cast<int32>(INDEX_NONE));
+		});
+
+		It("os contadores acompanham: ativos sobem ao pegar e descem ao liberar", [this]()
+		{
+			FDNTrafficPool Pool(10);
+			Pool.Acquire(); Pool.Acquire();
+			TestEqual("2 ativos", Pool.Active(), 2);
+			Pool.Release(0);
+			TestEqual("1 ativo", Pool.Active(), 1);
+			TestEqual("tamanho segue 2", Pool.Size(), 2);
 		});
 	});
 }

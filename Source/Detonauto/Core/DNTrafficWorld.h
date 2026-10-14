@@ -54,6 +54,31 @@ struct FDNTrafficRoad
 	static TArray<FDNTrafficSlot> PlanSlots(const FDNTrafficRoadConfig& Config, int32 Count, int32 Seed);
 };
 
+/**
+ *  Política do pool de carros de tráfego (W5): só índices, sem atores. Acquire reaproveita o livre de menor índice antes de criar um
+ *  novo e recusa (INDEX_NONE) quando o pool está cheio; Release de índice inválido ou já livre devolve falso e não muda nada.
+ */
+struct FDNTrafficPool
+{
+	struct FAcquired
+	{
+		int32 Index = INDEX_NONE;
+		/** O índice é novo: quem chama precisa criar o ator. */
+		bool bCreated = false;
+	};
+
+	explicit FDNTrafficPool(int32 InMaxSize) : MaxSize(FMath::Max(InMaxSize, 0)) {}
+
+	FAcquired Acquire();
+	bool Release(int32 Index);
+	int32 Size() const { return InUse.Num(); }
+	int32 Active() const;
+
+private:
+	int32 MaxSize = 0;
+	TArray<bool> InUse;
+};
+
 /** O que o mundo sabe de um veículo de tráfego e do jogador neste quadro. Posições em cm, velocidades em cm/s. */
 struct FDNTrafficGeometryInput
 {

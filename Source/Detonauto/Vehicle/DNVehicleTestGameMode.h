@@ -20,6 +20,7 @@
 #include "DNVehicleTestGameMode.generated.h"
 
 class ADNVehicle;
+class ADNTestArena;
 class APlayerStart;
 
 UCLASS()
@@ -37,8 +38,13 @@ public:
 protected:
 	virtual void StartPlay() override;
 
-private:
+protected:
 	ADNVehicle* FindVehicle() const;
+
+	/** A arena criada em InitGame (a rodada de Crash desliga a parede). */
+	UPROPERTY(Transient)
+	TObjectPtr<ADNTestArena> Arena;
+
 	void ScenarioTick(ADNVehicle& Vehicle, float DeltaSeconds);
 	void ShotTick(ADNVehicle& Vehicle, float DeltaSeconds);
 	void ProbeFinish(ADNVehicle& Vehicle);
