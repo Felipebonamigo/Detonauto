@@ -21,7 +21,9 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado) | `Source/Detonauto/Core/` | Testadas; mais de 500 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado) | `Source/Detonauto/Core/` | Testadas; 599 testes de Automation |
+| Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
+| Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros |
 | Subsistemas de dados e de save | `Core/DNGameDataSubsystem`, `Core/DNRecordsSubsystem` | Testados sem mundo |
 | Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, amassado por material, HUD de depuração |
@@ -39,7 +41,9 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 10–11 | Protótipo do amassado e calibração da batida | Aprovados; técnica revista em `docs/plano-visual.md` |
 | 12 | Carro no projeto principal | Aprovado |
 | 13 | Tráfego real e rodada de Crash | Parcial; falta a medição |
-| 14 | Bugs do 1º playtest (rodas, amassado, curva) e ajustes (derrapagem, turbo, câmeras) | Fechado na main (`docs/lote-14.md`): B1, B2, J1–J4 feitos e capturados no `-Play`; B3 medido, causa não achada, proposta aguardando o Felipe; mutação 41 de 43 no código (2 equivalentes), 14 de 14 nos CSV |
+| 14 | Bugs do 1º playtest (rodas, amassado, curva) e ajustes (derrapagem, turbo, câmeras) | Aprovado (`docs/lote-14.md`). B3: não mexer no esterço; o preset padrão virou o arcade-3. Revisão: assistência só com 3 rodas no chão |
+| 15 | Plano visual, passos 1 e 2: base de renderização e cena de aparência | Na main, aguardando revisão (`docs/lookdev.md`, `docs/desempenho.md`): capturas antes e depois nos 4 ângulos; Frame 5,1 ms parado e 5,3 ms andando no perfil alvo PS5 (RTX 4070 Ti) |
+| 13b | Correções do tráfego achadas na revisão independente | Próximo; decisões do par em "Próximo passo" |
 
 ## Primeiro playtest (14 out)
 
@@ -92,6 +96,22 @@ melhor e ele quer cinco modos.
   (instalado por winget em 14 out). `Tools/Blender/export_fbx_batch.py` testado:
   escala 1:1, e o +X do Blender chega como +X do Unreal (modelar o carro com a
   frente para +X).
+- O `/Engine/Maps/Entry` tem PlayerStart: "o mapa tem PlayerStart" não distingue
+  mapa de verdade. A cena de aparência marca o dela com a tag `DNMapStart`.
+- `EditorAssetLibrary.delete_asset` no commandlet diz que apagou, mas o arquivo
+  continua no disco e o `new_level` seguinte falha. Scripts de conteúdo refazem no
+  mesmo pacote (esvaziar o mapa, apagar os nós do material) em vez de apagar.
+- Nomes dos pinos do nó `If` no Python: `"A > B"`, `"A == B"`, `"A < B"`
+  (`get_material_expression_input_names` lista os de qualquer nó).
+- O `Saved/Config/WindowsEditor/GameUserSettings.ini` da máquina reaplica os `sg.*`
+  por cima do perfil de dispositivo. O `-AlvoPS5` repete os valores do perfil por
+  console. Não editar o arquivo do usuário.
+- Janela do jogo sem foco fica travada em 60 fps mesmo com `t.MaxFPS 0`, e o tempo
+  de GPU parece 3 vezes maior. Medir sem mexer no PC; o `lookdev-measure.ps1`
+  descarta medição travada.
+- Exposição física de dia (EV 13 a 15) pede `r.EyeAdaptation.CachedLightingPreExposure=8`;
+  com o padrão 4 o Lumen corta a luz acima de EV 12.
+- Roteiro `-DNKeys` vai entre aspas (pode ter espaço, como `EXEC:csvprofile start`).
 
 ## Pendências do Felipe
 
@@ -100,11 +120,26 @@ melhor e ele quer cinco modos.
 - Backup em HD externo.
 - Playtest do lote 14: roteiro em `docs/pendente-playtest.md`, seção 8. Responder
   o que é a curva "dura" (B3).
-- Fechar o outro Unreal aberto (`AgeOfEarthUE`) quando a sessão local for medir
-  desempenho (lote 13 e stat unit da cena de aparência).
+- Fechar o outro Unreal aberto (`AgeOfEarthUE`) e não usar o PC enquanto a sessão
+  local mede desempenho (lote 13).
+- Olhar as capturas da cena de aparência (`docs/lookdev.md`) e dizer se a luz de
+  fim de tarde é a direção certa.
 
 ## Próximo passo
 
-1. Lote 13: medição (`crash-measure.ps1`), com nenhum outro Unreal aberto.
-2. Lote 15: plano visual, passos 1 e 2 (base de renderização em texto e cena de
-   aparência `L_Lookdev` por script, com capturas antes e depois).
+1. Lote 13b, decisões do par (14 out), regra no Core quando for lógica, com teste:
+   1. Rail não atravessa Rail: seguir o carro da frente na mesma faixa com folga
+      mínima de 8 m entre para-choques (reduz até parar se preciso) e espaçamento
+      mínimo ao nascer.
+   2. Ao acordar: o corpo herda a velocidade da trilha e usa atrito baixo de
+      "rolando" até sofrer batida acima do limiar de dano; então volta ao atrito
+      normal. O carro não pode parar sozinho em 12 m.
+   3. Distância de acordar medida entre as caixas (folga), não entre centros
+      (ônibus e caminhão).
+   4. Sem jogador: nenhuma decisão de despawn, e a vaga não se perde.
+   5. Rodada que nunca silencia (modo Physics): achar a causa e corrigir na origem,
+      sem aumentar o limiar.
+2. Lote 13: medição (`crash-measure.ps1`) depois do 13b, com nenhum outro Unreal
+   aberto.
+3. Plano visual, passo 3: escolher o carro do City Sample (precisa migrar os
+   veículos do Fab para o PC) e inspecionar a malha.
