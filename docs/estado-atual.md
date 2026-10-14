@@ -43,7 +43,8 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 13 | Tráfego real e rodada de Crash | Parcial; falta a medição |
 | 14 | Bugs do 1º playtest (rodas, amassado, curva) e ajustes (derrapagem, turbo, câmeras) | Aprovado (`docs/lote-14.md`). B3: não mexer no esterço; o preset padrão virou o arcade-3. Revisão: assistência só com 3 rodas no chão |
 | 15 | Plano visual, passos 1 e 2: base de renderização e cena de aparência | Na main, aguardando revisão (`docs/lookdev.md`, `docs/desempenho.md`): capturas antes e depois nos 4 ângulos; Frame 5,1 ms parado e 5,3 ms andando no perfil alvo PS5 (RTX 4070 Ti) |
-| 13b | Correções do tráfego achadas na revisão independente | Na main, aguardando revisão (`docs/regras-trafego.md`, seção do 13b): seguir o da frente, rolar ao acordar, folga entre caixas, sem jogador, silêncio pelos destroços; mutação 18 de 19 (1 equivalente) e 3 de 3 nos CSV |
+| 13b | Correções do tráfego achadas na revisão independente | Aprovado (`docs/regras-trafego.md`, seção do 13b) |
+| 16 | Visual do carro e da rua: rodas, pintura, vidros, pneus, prédios, mobiliário | Na main, aguardando revisão (`docs/lookdev.md`, seção do lote 16): rodas de lado corrigidas (bug do lote 14), pintura com verniz e flocos, um material por slot, interior mapping, 282 objetos CC0; Frame 4,55 ms parado no perfil alvo PS5 |
 
 ## Primeiro playtest (14 out)
 
@@ -119,6 +120,14 @@ melhor e ele quer cinco modos.
   frente porque segue a regra `FollowSpeed`.
 - Material físico de atrito baixo precisa de `FrictionCombineMode = Min` (com
   override); na média com o piso de atrito 1,0 o carro frearia do mesmo jeito.
+- Os ossos das rodas do SportsCar estão girados ±90 graus no pose de referência:
+  malha presa a osso não pode herdar a rotação dele. Prova de roda é captura de
+  LADO (de trás o erro se disfarça).
+- O SportsCar do template não tem vidro de janela nem interior: janelas são o slot
+  do chassi. Emissivo em cena de dia com exposição física precisa de milhares de
+  nits para aparecer.
+- Substituição de texto em PowerShell com "`n" dentro de script passado ao
+  Claude Code estraga linhas: editar código só com a ferramenta de edição.
 
 ## Pendências do Felipe
 
@@ -136,14 +145,12 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 16 (visual do carro e da rua, pedido do par): pintura automotiva, vidros
-   (o carro do template não tem malha de vidro de janela: as janelas são o slot 0
-   da carroceria, o do chassi; o amassado pintava os dois slots de laranja),
-   pneus e rodas, prédios com interior mapping e variações, mobiliário de rua
-   (precisa de modelos novos: nem o acervo nem o doc do estúdio têm; baixar pede
-   autorização do Felipe).
-2. Lote 13: medição (`crash-measure.ps1`), com nenhum outro Unreal aberto.
-3. Unreal MCP (aprovado pelo par em `docs/proposta-recursos-unreal.md`): o registro
-   do servidor no Claude Code (`claude mcp add`) muda a configuração do Claude e
-   precisa do sim do Felipe no chat da sessão local.
+1. Lote 13c: pontuação por fração de dano (`docs/regras-de-jogo.md`, "Revisão de
+   14 out"), com nova medição a 100 e 130 km/h com 40 carros; não recalibrar as
+   medalhas sem o par.
+2. Unreal MCP: o Felipe autorizou no chat local (14 out). Ligar só se os plugins
+   existirem no 5.8 e com ele fora do PC; os scripts Python seguem oficiais.
+3. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
 4. Lote 17: dano visual por zona (`docs/regras-dano-visual.md`).
+5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
+   é o caminho para a cidade e o carro finais (`docs/lookdev.md`).

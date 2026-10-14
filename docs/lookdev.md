@@ -66,3 +66,35 @@ depois disso.
 3. **Pintura do carro.** O carro ainda usa o material simples do template (laranja chapado). É o passo 4 do plano visual (pintura com
    verniz; `r.ClearCoatNormal` já está ligado).
 4. **Prédios do City Sample, postes, árvores, sinalização.** Não há assets disso no PC; a cena é de blocos.
+
+## Lote 16: carro e rua
+
+Os mesmos 4 ângulos, perfil `DN_AlvoPS5`. "Antes" é o "depois" do lote 15.
+
+| Ângulo | Antes (lote 15) | Depois (lote 16) |
+|---|---|---|
+| Três-quartos | ![antes](img/lookdev/depois-tres-quartos.jpg) | ![depois](img/lote16/depois-tres-quartos.jpg) |
+| Lateral | ![antes](img/lookdev/depois-lateral.jpg) | ![depois](img/lote16/depois-lateral.jpg) |
+| Frente | ![antes](img/lookdev/depois-frente.jpg) | ![depois](img/lote16/depois-frente.jpg) |
+| 80 km/h | ![antes](img/lookdev/depois-80kmh.jpg) | ![depois](img/lote16/depois-80kmh.jpg) |
+
+Rodas: antes ![antes](img/lote16/rodas-antes.jpg) e depois ![esquerda](img/lote16/rodas-depois-esquerda.jpg) ![direita](img/lote16/rodas-depois-direita.jpg).
+
+- **Rodas de lado (bug do lote 14):** os ossos das rodas do SportsCar estão girados ±90 graus e a conta antiga fazia a malha herdar o
+  osso. Agora a malha fica com o eixo do cubo no eixo lateral do carro (`Core/DNWheelVisual.h`, teste R2 visto falhar com a conta antiga).
+- **Pintura:** `M_DNDentParent` virou a pintura automotiva: verniz (clear coat) liso por cima, base metálica com flocos por baixo (normal
+  gerada pelo script), cor vermelho escuro metálico, e o amassado de antes. Feito por `Tools/Unreal/create_dent_material.ps1`.
+- **Vidros:** o carro do template **não tem malha de vidro de janela** (o `SM_SportsCar_Glass` são os faróis); as janelas são o slot do
+  chassi. O amassado pintava os dois slots com o laranja do protótipo; agora cada slot tem o seu material (pintura; chassi e janelas
+  escuros e lisos, com reflexo) e os dois deformam juntos. Vidro translúcido de verdade pede um carro com vidro e interior (City Sample).
+- **Pneus e rodas:** borracha escura e fosca, aro metálico com reflexo, nas malhas da roda.
+- **Prédios:** janelas com salas falsas (interior mapping procedural, metade acesas), caixilhos, vitrine no térreo, fachada de concreto,
+  pé-direito de 3 ou 3,5 m e 12 prédios baixos e recuados em 4 trechos.
+- **Rua:** 282 objetos CC0 do Poly Haven: postes, lanternas presas nas fachadas, bancos, lixeiras, hidrantes e jacarandás nos recuos.
+  O acervo do estúdio e o doc "Modelos 3D" não tinham mobiliário de rua; os modelos foram baixados com autorização do Felipe.
+- **Custo** (`lookdev-measure.ps1`, sem outro Unreal aberto): parado 4,55 / 5,07 ms, andando 4,72 / 5,30 ms (Frame média / p95; GPU 4,3 e
+  4,4 ms). Igual ao lote 15, dentro do ruído.
+
+Anotado: os jacarandás aparecem com pouca folha (folhas mascaradas em 1K; pode ser o limiar da máscara ou o modelo); a placa sem marca
+não foi feita; para a cidade final, os prédios e o mobiliário do City Sample (precisa ser baixado pelo Felipe no Fab) combinam entre si
+e com o carro final, o que nenhuma mistura de fontes garante.
