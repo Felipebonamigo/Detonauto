@@ -21,7 +21,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado) | `Source/Detonauto/Core/` | Testadas; 599 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado) | `Source/Detonauto/Core/` | Testadas; 622 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros |
@@ -43,7 +43,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 13 | Tráfego real e rodada de Crash | Parcial; falta a medição |
 | 14 | Bugs do 1º playtest (rodas, amassado, curva) e ajustes (derrapagem, turbo, câmeras) | Aprovado (`docs/lote-14.md`). B3: não mexer no esterço; o preset padrão virou o arcade-3. Revisão: assistência só com 3 rodas no chão |
 | 15 | Plano visual, passos 1 e 2: base de renderização e cena de aparência | Na main, aguardando revisão (`docs/lookdev.md`, `docs/desempenho.md`): capturas antes e depois nos 4 ângulos; Frame 5,1 ms parado e 5,3 ms andando no perfil alvo PS5 (RTX 4070 Ti) |
-| 13b | Correções do tráfego achadas na revisão independente | Próximo; decisões do par em "Próximo passo" |
+| 13b | Correções do tráfego achadas na revisão independente | Na main, aguardando revisão (`docs/regras-trafego.md`, seção do 13b): seguir o da frente, rolar ao acordar, folga entre caixas, sem jogador, silêncio pelos destroços; mutação 18 de 19 (1 equivalente) e 3 de 3 nos CSV |
 
 ## Primeiro playtest (14 out)
 
@@ -112,6 +112,13 @@ melhor e ele quer cinco modos.
 - Exposição física de dia (EV 13 a 15) pede `r.EyeAdaptation.CachedLightingPreExposure=8`;
   com o padrão 4 o Lumen corta a luz acima de EV 12.
 - Roteiro `-DNKeys` vai entre aspas (pode ter espaço, como `EXEC:csvprofile start`).
+- Python 5.8: o enum `MaterialProperty` não tem o pino de verniz (ClearCoat); o
+  caminho é `MakeMaterialAttributes` (tem `ClearCoat` e `ClearCoatRoughness`) ligado
+  em `MP_MATERIAL_ATTRIBUTES`. Substrate está desligado por padrão.
+- Corpos cinemáticos não colidem entre si: carro em trilho só não atravessa o da
+  frente porque segue a regra `FollowSpeed`.
+- Material físico de atrito baixo precisa de `FrictionCombineMode = Min` (com
+  override); na média com o piso de atrito 1,0 o carro frearia do mesmo jeito.
 
 ## Pendências do Felipe
 
@@ -129,19 +136,14 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 13b, decisões do par (14 out), regra no Core quando for lógica, com teste:
-   1. Rail não atravessa Rail: seguir o carro da frente na mesma faixa com folga
-      mínima de 8 m entre para-choques (reduz até parar se preciso) e espaçamento
-      mínimo ao nascer.
-   2. Ao acordar: o corpo herda a velocidade da trilha e usa atrito baixo de
-      "rolando" até sofrer batida acima do limiar de dano; então volta ao atrito
-      normal. O carro não pode parar sozinho em 12 m.
-   3. Distância de acordar medida entre as caixas (folga), não entre centros
-      (ônibus e caminhão).
-   4. Sem jogador: nenhuma decisão de despawn, e a vaga não se perde.
-   5. Rodada que nunca silencia (modo Physics): achar a causa e corrigir na origem,
-      sem aumentar o limiar.
-2. Lote 13: medição (`crash-measure.ps1`) depois do 13b, com nenhum outro Unreal
-   aberto.
-3. Plano visual, passo 3: escolher o carro do City Sample (precisa migrar os
-   veículos do Fab para o PC) e inspecionar a malha.
+1. Lote 16 (visual do carro e da rua, pedido do par): pintura automotiva, vidros
+   (o carro do template não tem malha de vidro de janela: as janelas são o slot 0
+   da carroceria, o do chassi; o amassado pintava os dois slots de laranja),
+   pneus e rodas, prédios com interior mapping e variações, mobiliário de rua
+   (precisa de modelos novos: nem o acervo nem o doc do estúdio têm; baixar pede
+   autorização do Felipe).
+2. Lote 13: medição (`crash-measure.ps1`), com nenhum outro Unreal aberto.
+3. Unreal MCP (aprovado pelo par em `docs/proposta-recursos-unreal.md`): o registro
+   do servidor no Claude Code (`claude mcp add`) muda a configuração do Claude e
+   precisa do sim do Felipe no chat da sessão local.
+4. Lote 17: dano visual por zona (`docs/regras-dano-visual.md`).
