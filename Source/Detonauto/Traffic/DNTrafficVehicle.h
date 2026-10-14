@@ -23,6 +23,7 @@
 #include "Core/DNTraffic.h"
 #include "Core/DNTrafficWorld.h"
 #include "Core/DNDamage.h"
+#include "Core/DNCrash.h"
 #include "Core/DNDentParams.h"
 #include "Core/Data/DNDataRows.h"
 #include "DNTrafficVehicle.generated.h"
@@ -32,6 +33,8 @@ class ADNTrafficVehicle;
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FDNOnTrafficVehicleImpact, ADNTrafficVehicle* /*Vehicle*/, AActor* /*Other*/);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FDNOnTrafficVehicleDestroyed, ADNTrafficVehicle* /*Vehicle*/, int32 /*ValueCash*/);
+/** Uma batida com dano (lote 13c): o aumento do dano total (FDNDamage::TotalDamage, 0 a 1) e se ela destruiu o carro. */
+DECLARE_MULTICAST_DELEGATE_FourParams(FDNOnTrafficVehicleDamaged, ADNTrafficVehicle* /*Vehicle*/, int32 /*ValueCash*/, float /*AddedTotalDamage*/, bool /*bDestroyed*/);
 
 UCLASS()
 class DETONAUTO_API ADNTrafficVehicle : public AActor
@@ -92,6 +95,10 @@ public:
 
 	FDNOnTrafficVehicleImpact OnImpact;
 	FDNOnTrafficVehicleDestroyed OnDestroyed;
+	FDNOnTrafficVehicleDamaged OnDamaged;
+
+	/** O livro deste carro na pontuação por dano (quanto do valor já rendeu); zera ao sair do pool. */
+	FDNCrashVehicleLedger& GetLedger() { return Ledger; }
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -131,6 +138,7 @@ private:
 
 	FDNDamageConfig DamageConfig;
 	FDNDamageState DamageState;
+	FDNCrashVehicleLedger Ledger;
 	FDNImpactGrouper ImpactGrouper;
 	FVector VelocityBeforeStepCmS = FVector::ZeroVector;
 };

@@ -67,6 +67,7 @@ void ADNCrashTestGameMode::StartPlay()
 	Traffic->Configure(FDNTrafficRoadConfig(), TrafficCount, Seed, 64, bAllPhysics);
 	Traffic->OnVehicleImpact.AddUObject(this, &ADNCrashTestGameMode::HandleImpact);
 	Traffic->OnVehicleDestroyed.AddUObject(this, &ADNCrashTestGameMode::HandleDestroyed);
+	Traffic->OnVehicleDamaged.AddUObject(this, &ADNCrashTestGameMode::HandleDamaged);
 	Traffic->SetCrashRoundActive(true);
 
 	// regras do Core
@@ -125,9 +126,26 @@ void ADNCrashTestGameMode::HandleImpact(ADNTrafficVehicle* Vehicle, AActor* Othe
 
 void ADNCrashTestGameMode::HandleDestroyed(ADNTrafficVehicle* Vehicle, int32 ValueCash)
 {
-	const int32 Points = CrashRound->RegisterDestruction(ValueCash);
-	UE_LOG(LogDetonauto, Display, TEXT("DNCrash: carro destruido (valor %d): +%d pontos, total %d, destruidos %d"),
-		ValueCash, Points, CrashRound->GetScore(), CrashRound->GetState().DestroyedCount);
+	// os pontos da destruição já entraram em HandleDamaged (a destruição completa o valor; lote 13c)
+	UE_LOG(LogDetonauto, Display, TEXT("DNCrash: carro destruido (valor %d): total %d, destruidos %d"), ValueCash, CrashRound->GetScore(), CrashRound->GetState().DestroyedCount);
+}
+
+void ADNCrashTestGameMode::HandleDamaged(ADNTrafficVehicle* Vehicle, int32 ValueCash, float AddedTotalDamage, bool bDestroyed)
+{
+	// pontos por dano (lote 13c). Antes da primeira batida no jogador não conta: um carro acordado que encosta em outro não pontua
+	// nem liga a rodada (HandleImpact)
+	if (!Vehicle || !CrashRound->GetState().bFirstImpactHappened)
+	{
+		return;
+	}
+	const int32 Points = CrashRound->RegisterDamage(Vehicle->GetLedger(), ValueCash, AddedTotalDamage, bDestroyed);
+	static int32 Logged = 0;
+	if (Logged < 60)
+	{
+		++Logged;
+		UE_LOG(LogDetonauto, Display, TEXT("DNCrash: dano em '%s' (valor %d): +%.1f%% do dano total%s: +%d pontos, total %d"), *Vehicle->GetName(), ValueCash,
+			AddedTotalDamage * 100.0f, bDestroyed ? TEXT(" | DESTRUIDO") : TEXT(""), Points, CrashRound->GetScore());
+	}
 }
 
 void ADNCrashTestGameMode::HandleRoundEnded(int32 FinalScore)

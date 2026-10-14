@@ -41,6 +41,16 @@ int32 UDNCrashRoundComponent::RegisterDestruction(int32 Value)
 	return Points;
 }
 
+int32 UDNCrashRoundComponent::RegisterDamage(FDNCrashVehicleLedger& Ledger, int32 Value, float AddedDamageFraction, bool bDestroyed)
+{
+	const int32 ScoreBefore = State.Score.Total;
+	const int32 MultiplierBefore = State.Multiplier;
+	const bool bEndedBefore = State.bEnded;
+	const int32 Points = FDNCrash::RegisterDamage(Config, State, Ledger, Value, AddedDamageFraction, bDestroyed);
+	Broadcast(ScoreBefore, MultiplierBefore, bEndedBefore);
+	return Points;
+}
+
 void UDNCrashRoundComponent::CollectMultiplier()
 {
 	const int32 ScoreBefore = State.Score.Total;

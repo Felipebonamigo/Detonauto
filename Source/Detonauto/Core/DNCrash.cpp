@@ -72,6 +72,50 @@ int32 FDNCrash::RegisterDestruction(const FDNCrashConfig& Config, FDNCrashState&
 	return State.Score.Total - Before;
 }
 
+int32 FDNCrash::RegisterDamage(const FDNCrashConfig& Config, FDNCrashState& State, FDNCrashVehicleLedger& Ledger, int32 Value,
+	float AddedDamageFraction, bool bDestroyed)
+{
+	if (State.bEnded || Value <= 0 || Ledger.bDestroyed)
+	{
+		return 0;
+	}
+	const float Added = (FMath::IsFinite(AddedDamageFraction) && AddedDamageFraction > 0.0f) ? AddedDamageFraction : 0.0f;
+	if (Added <= 0.0f && !bDestroyed)
+	{
+		return 0; // P4: sem dano não pontua nem vira elo
+	}
+
+	RegisterImpact(Config, State);
+
+	// P3: impacto com dano é elo da cadeia (a mesma janela das destruições)
+	if (State.ChainEvents > 0 && State.SecondsSinceLastDestruction <= Config.ChainWindowSeconds)
+	{
+		++State.ChainLinks;
+	}
+	else
+	{
+		State.ChainLinks = 0;
+	}
+	++State.ChainEvents;
+	State.SecondsSinceLastDestruction = 0.0f;
+
+	// P1, P2: paga a fração nova, ou tudo o que falta se destruiu; nunca passa de 100%
+	const float Remaining = FMath::Max(0.0f, 1.0f - Ledger.PaidFraction);
+	const float Fraction = bDestroyed ? Remaining : FMath::Min(Added, Remaining);
+	Ledger.PaidFraction += Fraction;
+	if (bDestroyed)
+	{
+		Ledger.bDestroyed = true;
+		++State.DestroyedCount;
+	}
+	// P6: truncado para baixo, com tolerância de 0,001 ponto contra o erro do float (1 - 0,3f = 0,69999998 faria 700 virar 699)
+	const int64 Base = static_cast<int64>(FMath::FloorToDouble(static_cast<double>(Value) * static_cast<double>(Fraction) + 1.0e-3));
+	const int32 Points = ComputePoints(Config, static_cast<int32>(FMath::Min<int64>(Base, MAX_int32)), State.Multiplier, State.ChainLinks);
+	const int32 Before = State.Score.Total;
+	State.Score.Add(Points);
+	return State.Score.Total - Before;
+}
+
 void FDNCrash::CollectMultiplier(const FDNCrashConfig& Config, FDNCrashState& State)
 {
 	if (State.bEnded)

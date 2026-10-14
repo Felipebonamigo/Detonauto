@@ -95,6 +95,7 @@ ADNTrafficVehicle* ADNTrafficManager::Acquire()
 		{
 			Created->OnImpact.AddUObject(this, &ADNTrafficManager::HandleImpact);
 			Created->OnDestroyed.AddUObject(this, &ADNTrafficManager::HandleDestroyed);
+			Created->OnDamaged.AddUObject(this, &ADNTrafficManager::HandleDamaged);
 		}
 		Pool.Add(Created);
 		if (!Created)
@@ -287,6 +288,11 @@ float ADNTrafficManager::MaxWreckSpeedMs() const
 void ADNTrafficManager::HandleImpact(ADNTrafficVehicle* Vehicle, AActor* Other)
 {
 	OnVehicleImpact.Broadcast(Vehicle, Other);
+}
+
+void ADNTrafficManager::HandleDamaged(ADNTrafficVehicle* Vehicle, int32 ValueCash, float AddedTotalDamage, bool bDestroyed)
+{
+	OnVehicleDamaged.Broadcast(Vehicle, ValueCash, AddedTotalDamage, bDestroyed);
 }
 
 void ADNTrafficManager::HandleDestroyed(ADNTrafficVehicle* Vehicle, int32 ValueCash)

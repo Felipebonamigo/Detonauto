@@ -2,8 +2,9 @@
 // regras do Core numa estrada reta de 600 m, sem .umap e sem Blueprint. Só cola; nenhuma regra nova aqui.
 //
 //   tráfego  ADNTrafficManager (Rail -> Physics -> pool), números de Data/TrafficSettings.csv e TrafficVehicles.csv
-//   pontos   UDNCrashRoundComponent (FDNCrash): RegisterImpact no 1º contato com um carro de tráfego, RegisterDestruction com o
-//            ValueCash do CSV quando o dano (FDNDamage) destrói o carro; fim da rodada pelas regras do Core (silêncio ou tempo)
+//   pontos   UDNCrashRoundComponent (FDNCrash): RegisterImpact na 1ª batida no jogador; depois dela, RegisterDamage a cada batida
+//            com dano (valor do CSV x fração do dano total adicionada; a destruição completa o valor; lote 13c); fim da rodada pelas
+//            regras do Core (silêncio ou tempo)
 //   medalha  FDNMedals sobre os limites do cruzamento CrossingId (padrão exemplo-rio-01, de Crossings.csv)
 //   recorde  UDNRecordsSubsystem::RegisterResult, UMA vez por rodada
 //   HUD      pontos, multiplicador, destruídos, tempo, medalha provisória e o turbo do carro
@@ -61,6 +62,7 @@ private:
 
 	void HandleImpact(ADNTrafficVehicle* Vehicle, AActor* Other);
 	void HandleDestroyed(ADNTrafficVehicle* Vehicle, int32 ValueCash);
+	void HandleDamaged(ADNTrafficVehicle* Vehicle, int32 ValueCash, float AddedTotalDamage, bool bDestroyed);
 	void HandleRoundEnded(int32 FinalScore);
 	void UpdateHud(const ADNVehicle& Vehicle) const;
 	void DriveCrashScenario(ADNVehicle& Vehicle, float DeltaSeconds);

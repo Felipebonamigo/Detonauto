@@ -79,6 +79,8 @@ public:
 	FDNOnTrafficVehicleImpact OnVehicleImpact;
 	/** Um carro de tráfego destruído pelas regras do dano, com o valor do CSV. */
 	FDNOnTrafficVehicleDestroyed OnVehicleDestroyed;
+	/** Uma batida com dano num carro de tráfego (pontos por dano, lote 13c). */
+	FDNOnTrafficVehicleDamaged OnVehicleDamaged;
 
 protected:
 	virtual void BeginPlay() override;
@@ -94,6 +96,7 @@ private:
 	FDNTrafficGeometryInput MakeGeometry(const ADNTrafficVehicle* Vehicle) const;
 	void HandleImpact(ADNTrafficVehicle* Vehicle, AActor* Other);
 	void HandleDestroyed(ADNTrafficVehicle* Vehicle, int32 ValueCash);
+	void HandleDamaged(ADNTrafficVehicle* Vehicle, int32 ValueCash, float AddedTotalDamage, bool bDestroyed);
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ADNTrafficVehicle>> Pool;

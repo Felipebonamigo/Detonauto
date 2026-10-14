@@ -39,12 +39,22 @@ struct FDNCrashState
 	int32 ChainLinks = 0;
 	float SecondsSinceLastDestruction = 1.0e9f;
 
+	/** Eventos da cadeia já registrados (impactos com dano e destruições, pela regra de pontos por dano). */
+	int32 ChainEvents = 0;
+
 	bool bFirstImpactHappened = false;
 	float SecondsSinceFirstImpact = 0.0f;
 	float QuietSeconds = 0.0f;
 	bool bEnded = false;
 
 	void Reset() { *this = FDNCrashState(); }
+};
+
+/** O livro de um veículo na pontuação por dano: quanto do valor já foi pago e se ele já foi destruído. Quem chama guarda (P5). */
+struct FDNCrashVehicleLedger
+{
+	float PaidFraction = 0.0f;
+	bool bDestroyed = false;
 };
 
 struct FDNCrash
@@ -63,6 +73,18 @@ struct FDNCrash
 	 *  Valor <= 0 é ignorado por inteiro (C5); depois do fim da rodada também (C4).
 	 */
 	static int32 RegisterDestruction(const FDNCrashConfig& Config, FDNCrashState& State, int32 Value);
+
+	/**
+	 *  Pontos por dano (revisão de 14 out 2026, lote 13c; decisões P1 a P5 em Core/Tests/DNCrash.spec.cpp). AddedDamageFraction é o
+	 *  aumento do dano total do veículo (FDNDamage::TotalDamage, de 0 a 1) neste impacto; bDestroyed, se o impacto o destruiu.
+	 *   - paga valor x fração (truncado), com a cadeia e o multiplicador do instante; destruir paga o que falta até 100%;
+	 *   - a soma nunca passa de 100% e um veículo destruído não paga mais;
+	 *   - impacto com dano (ou destruição) é elo da cadeia; sem dano, NaN ou negativo não faz nada;
+	 *   - valor <= 0 e rodada encerrada são ignorados (C4, C5).
+	 *  Devolve os pontos somados.
+	 */
+	static int32 RegisterDamage(const FDNCrashConfig& Config, FDNCrashState& State, FDNCrashVehicleLedger& Ledger, int32 Value,
+		float AddedDamageFraction, bool bDestroyed);
 
 	/** Multiplicador coletado no chão (+1, até o máximo). Ignorado depois do fim da rodada (C4). */
 	static void CollectMultiplier(const FDNCrashConfig& Config, FDNCrashState& State);

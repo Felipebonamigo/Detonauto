@@ -66,6 +66,7 @@ void ADNTrafficVehicle::Activate(const FDNTrafficVehicleEntry& Spec, const FVect
 	Body->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 	Body->SetPhysMaterialOverride(nullptr);
 	DamageState.Reset();
+	Ledger = FDNCrashVehicleLedger();
 	ImpactGrouper = FDNImpactGrouper();
 	PendingImpact = 0.0f;
 	RailHitsBeforeWake = 0;
@@ -250,7 +251,13 @@ void ADNTrafficVehicle::FlushImpacts(double Now)
 	Impact.DeltaVMs = Group.DeltaVMs;
 	Impact.Zone = FDNDentParams::ZoneOfLocalPoint(Group.LocalPoint, FVector::ZeroVector, FVector(CubeHalfCm, CubeHalfCm, CubeHalfCm));
 	Impact.LocalPositionCm = Group.LocalPoint;
+	const float TotalBefore = FDNDamage::TotalDamage(DamageState);
 	const FDNDamageResult Result = FDNDamage::ApplyImpact(DamageConfig, DamageState, Impact);
+	const float AddedTotal = FDNDamage::TotalDamage(DamageState) - TotalBefore;
+	if (AddedTotal > 0.0f || Result.bJustDestroyed)
+	{
+		OnDamaged.Broadcast(this, ValueCash, AddedTotal, Result.bJustDestroyed); // pontos por dano (lote 13c)
+	}
 	if (bDriving && (Result.AddedZoneDamage > 0.0f || Result.bJustDestroyed))
 	{
 		// batida acima do limiar de dano: o motorista parou de dirigir; volta o atrito normal e acaba o "manter velocidade"

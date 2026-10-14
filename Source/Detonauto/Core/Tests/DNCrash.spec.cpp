@@ -348,4 +348,115 @@ void FDNCrashRoundSpec::Define()
 	});
 }
 
+// Lote 13c, revisão de 14 out 2026 (docs/regras-de-jogo.md): cada batida pontua pelo dano que causa, e destruir completa o valor.
+// Decisões:
+//  P1 pontos de um impacto = valor x fração do dano total adicionada (truncado para baixo), com a cadeia e o multiplicador do
+//     instante (C1, C2);
+//  P2 destruir paga o que falta para 100% do valor; depois de destruído, o veículo não paga mais nada; a soma nunca passa de 100%;
+//  P3 a cadeia conta impactos COM dano (e destruições): um impacto com dano dentro da janela soma um elo;
+//  P4 impacto sem dano (fração <= 0 ou NaN) não pontua e não vira elo; valor <= 0 e rodada encerrada são ignorados (C4, C5);
+//  P5 o livro (o quanto do valor já foi pago) é por veículo e quem chama o guarda;
+//  P6 o truncamento tem tolerância de 0,001 ponto contra o erro do float (1 - 0,3f = 0,69999998: sem ela, 700 viraria 699).
+BEGIN_DEFINE_SPEC(FDNCrashDamagePointsSpec, "Detonauto.Crash.PontosPorDano",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+	FDNCrashConfig Config;
+END_DEFINE_SPEC(FDNCrashDamagePointsSpec)
+
+void FDNCrashDamagePointsSpec::Define()
+{
+	It("P1: 25% de dano num veiculo de 1000 rende 250 (sem cadeia, x1)", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger L;
+		TestEqual("pontos", FDNCrash::RegisterDamage(Config, S, L, 1000, 0.25f, false), 250);
+		TestEqual("total", S.Score.Total, 250);
+		TestEqual("livro", L.PaidFraction, 0.25f, 1e-6f);
+		TestTrue("primeiro impacto ligado", S.bFirstImpactHappened);
+		TestEqual("nao destruiu", S.DestroyedCount, 0);
+	});
+
+	It("P1: trunca para baixo e usa o multiplicador do instante", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger L;
+		TestEqual("999 x 0,333 = 332,667 -> 332", FDNCrash::RegisterDamage(Config, S, L, 999, 0.333f, false), 332);
+		FDNCrash::CollectMultiplier(Config, S); // x2
+		S.SecondsSinceLastDestruction = 99.f; // fora da janela: só o multiplicador
+		FDNCrashVehicleLedger L2;
+		TestEqual("x2", FDNCrash::RegisterDamage(Config, S, L2, 1000, 0.1f, false), 200);
+	});
+
+	It("P2: destruir completa ate 100% do valor (com o multiplicador do instante)", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger L;
+		FDNCrash::RegisterDamage(Config, S, L, 1000, 0.3f, false);
+		S.SecondsSinceLastDestruction = 99.f; // fora da janela: sem bonus de cadeia no proximo
+		FDNCrash::CollectMultiplier(Config, S); // x2
+		TestEqual("o que falta (70%) x2", FDNCrash::RegisterDamage(Config, S, L, 1000, 0.1f, true), 1400);
+		TestEqual("total 300 + 1400", S.Score.Total, 1700);
+		TestEqual("destruidos", S.DestroyedCount, 1);
+		TestTrue("livro fechado", L.bDestroyed);
+	});
+
+	It("P2: depois de destruido nao paga mais; a soma de danos nunca passa de 100%", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger L;
+		FDNCrash::RegisterDamage(Config, S, L, 1000, 0.7f, false);
+		S.SecondsSinceLastDestruction = 99.f;
+		TestEqual("mais 70% so paga os 30% que faltam", FDNCrash::RegisterDamage(Config, S, L, 1000, 0.7f, false), 300);
+		S.SecondsSinceLastDestruction = 99.f;
+		TestEqual("ja pagou tudo: destruir nao paga mais", FDNCrash::RegisterDamage(Config, S, L, 1000, 0.f, true), 0);
+		TestEqual("destruido conta", S.DestroyedCount, 1);
+		TestEqual("depois de destruido: nada", FDNCrash::RegisterDamage(Config, S, L, 1000, 0.5f, false), 0);
+		TestEqual("total = valor", S.Score.Total, 1000);
+	});
+
+	It("P2: bater de novo num destruido nao vira elo nem conta outra destruicao", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger L;
+		FDNCrash::RegisterDamage(Config, S, L, 1000, 0.2f, true);
+		const int32 EventsBefore = S.ChainEvents;
+		FDNCrash::RegisterDamage(Config, S, L, 1000, 0.3f, true);
+		FDNCrash::RegisterDamage(Config, S, L, 1000, 0.3f, false);
+		TestEqual("uma destruicao so", S.DestroyedCount, 1);
+		TestEqual("nenhum elo novo", S.ChainEvents, EventsBefore);
+	});
+
+	It("P3: impacto com dano dentro da janela soma um elo da cadeia", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger A, B;
+		TestEqual("primeiro sem bonus", FDNCrash::RegisterDamage(Config, S, A, 1000, 0.2f, false), 200);
+		FDNCrash::Tick(Config, S, 1.0f, 30.f);
+		TestEqual("segundo, 1 s depois: +10%", FDNCrash::RegisterDamage(Config, S, B, 1000, 0.2f, false), 220);
+		FDNCrash::Tick(Config, S, 2.0f, 30.f);
+		TestEqual("terceiro, 2 s depois: a cadeia reinicia", FDNCrash::RegisterDamage(Config, S, A, 1000, 0.1f, false), 100);
+	});
+
+	It("P4: impacto sem dano nao pontua e nao vira elo", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger A, B;
+		TestEqual("sem dano", FDNCrash::RegisterDamage(Config, S, A, 1000, 0.f, false), 0);
+		TestEqual("NaN", FDNCrash::RegisterDamage(Config, S, A, 1000, std::numeric_limits<float>::quiet_NaN(), false), 0);
+		TestEqual("negativo", FDNCrash::RegisterDamage(Config, S, A, 1000, -0.2f, false), 0);
+		TestEqual("o proximo com dano e o primeiro da cadeia (sem bonus)", FDNCrash::RegisterDamage(Config, S, B, 1000, 0.2f, false), 200);
+	});
+
+	It("P4: valor <= 0 e rodada encerrada sao ignorados; o livro nao muda", [this]()
+	{
+		FDNCrashState S;
+		FDNCrashVehicleLedger L;
+		TestEqual("valor 0", FDNCrash::RegisterDamage(Config, S, L, 0, 0.5f, true), 0);
+		TestEqual("livro intacto", L.PaidFraction, 0.f);
+		TestFalse("nao destruiu", L.bDestroyed);
+		S.bEnded = true;
+		TestEqual("rodada encerrada", FDNCrash::RegisterDamage(Config, S, L, 1000, 0.5f, false), 0);
+		TestEqual("livro intacto depois do fim", L.PaidFraction, 0.f);
+	});
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

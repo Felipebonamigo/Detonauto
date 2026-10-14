@@ -35,6 +35,9 @@ public:
 	/** Registra um veículo destruído; devolve os pontos somados. */
 	int32 RegisterDestruction(int32 Value);
 
+	/** Pontos por dano (lote 13c): o livro é do veículo; devolve os pontos somados. */
+	int32 RegisterDamage(FDNCrashVehicleLedger& Ledger, int32 Value, float AddedDamageFraction, bool bDestroyed);
+
 	/** Multiplicador coletado no chão. */
 	void CollectMultiplier();
 
