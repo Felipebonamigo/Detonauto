@@ -68,6 +68,24 @@ ligado no mesmo uso. Soltar o botão em qualquer momento cancela o prêmio. Um
 - A pontuação satura em `MAX_int32`, sem dar a volta (regra do `FDNScore`).
 - Valores zero ou negativos são ignorados.
 
+### Revisão de 14 out 2026: pontos por dano (lote 13c)
+
+A medição do lote 13b mostrou **0 veículos destruídos** a 130 km/h com 40 carros:
+uma batida de tráfego dá variação de velocidade de 20 a 26 m/s, e a zona só
+satura a 32 m/s. Com pontos só na destruição, a rodada valia zero. Decisão:
+
+- **Cada batida pontua pelo dano que causa.** Pontos de um impacto =
+  `valor do veículo × fração do dano total adicionada pelo impacto`, com o
+  bônus da cadeia e o multiplicador do instante, como hoje.
+- **Destruir completa o valor:** ao ser destruído, o veículo soma o que falta
+  para chegar a 100% do valor (com cadeia e multiplicador do instante). Assim um
+  veículo nunca rende mais que o próprio valor vezes os bônus, e destruir
+  continua sendo o objetivo.
+- **A cadeia** passa a contar impactos com dano, não só destruições.
+- O fim da rodada, as medalhas e a saturação não mudam.
+- Os limites de medalha do cruzamento de exemplo (`Crossings.csv`) serão
+  recalibrados com a medição do lote 13c, não antes.
+
 ## 3. Medalhas
 
 Cada cruzamento define três limites crescentes: bronze, prata e ouro. A medalha
