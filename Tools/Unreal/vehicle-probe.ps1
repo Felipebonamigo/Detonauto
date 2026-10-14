@@ -30,7 +30,10 @@
 param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Row = 'Padrao',
-    [ValidateSet('Sin', 'Accel', 'Turbo', 'Handbrake', 'Turn', 'Switch', 'Wall', 'Steer')][string]$Scenario = 'Sin',
+    [ValidateSet('Sin', 'Accel', 'Turbo', 'Handbrake', 'Turn', 'Switch', 'Wall', 'Steer', 'Boost')][string]$Scenario = 'Sin',
+    [double]$HbKmh = 0,                 # cenários Handbrake e Turn: velocidade de entrada (0 = 55)
+    [switch]$TurboOn,                   # cenário Boost: aperta o turbo
+    [double]$Throttle = 0.3,            # cenários Handbrake e Turn: acelerador durante a curva (1 = pé no fundo)
     [double]$Steer = 1.0,                # cenário Steer: entrada de esterço mantida (0 a 1); a velocidade vem de -WallKmh
     [switch]$Play,
     [string]$Keys,                      # roteiro de teclas REAIS (ver DNVehicleTestGameMode.h): ex. 'W@0.5-9;T@3;SHOT@4;QUIT@8'
@@ -63,7 +66,10 @@ elseif ($Shot) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNCarShot') }
 else {
     $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario")
     if ($WallKmh -gt 0) { $a += "-DNWallKmh=$WallKmh" }
-    if ($Scenario -eq 'Steer') { $a += ("-DNSteer=" + $Steer.ToString([Globalization.CultureInfo]::InvariantCulture)) }
+    if ($PSBoundParameters.ContainsKey('Throttle')) { $a += ("-DNThrottle=" + $Throttle.ToString([Globalization.CultureInfo]::InvariantCulture)) }
+    if ($TurboOn) { $a += '-DNTurboOn' }
+    if ($HbKmh -gt 0) { $a += "-DNHbKmh=$HbKmh" }
+    if ($PSBoundParameters.ContainsKey('Steer') -or $Scenario -eq 'Steer') { $a += ("-DNSteer=" + $Steer.ToString([Globalization.CultureInfo]::InvariantCulture)) }
 }
 
 $a += $ExtraArgs

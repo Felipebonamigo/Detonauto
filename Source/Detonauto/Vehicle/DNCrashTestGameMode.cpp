@@ -177,9 +177,7 @@ void ADNCrashTestGameMode::UpdateHud(const ADNVehicle& Vehicle) const
 	const FDNCrashState& S = CrashRound->GetState();
 	const FVector2D Scale(1.6f, 1.6f);
 	const EDNMedal Current = bHasThresholds ? FDNMedals::Evaluate(Thresholds, S.Score.Total) : EDNMedal::None;
-	const TArray<FString> Hud = Vehicle.HudLines();
-	// a última mensagem adicionada fica em cima: ordem inversa da tela
-	GEngine->AddOnScreenDebugMessage(9206, 0.0f, Vehicle.GetTurbo()->IsActive() ? FColor::Cyan : FColor::White, Hud.IsValidIndex(2) ? Hud[2] : FString(), false, Scale);
+	// a última mensagem adicionada fica em cima: ordem inversa da tela (o turbo já está nas linhas do próprio carro)
 	GEngine->AddOnScreenDebugMessage(9205, 0.0f, FColor::White, FString::Printf(TEXT("Tempo: %.1f s     Rodada: %s"), Elapsed, bEnded ? TEXT("ENCERRADA") : (S.bFirstImpactHappened ? TEXT("em andamento") : TEXT("esperando a primeira batida"))), false, Scale);
 	GEngine->AddOnScreenDebugMessage(9204, 0.0f, FColor::Silver, FString::Printf(TEXT("Medalha: %s     (cruzamento %s)"), FDNMedals::ToString(Current), *CrossingId), false, Scale);
 	GEngine->AddOnScreenDebugMessage(9203, 0.0f, FColor::Orange, FString::Printf(TEXT("Destruidos: %d     Multiplicador: x%d"), S.DestroyedCount, S.Multiplier), false, Scale);

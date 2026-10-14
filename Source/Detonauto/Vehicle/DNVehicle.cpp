@@ -513,6 +513,17 @@ void ADNVehicle::Tick(float DeltaSeconds)
 		TurboEmptySeconds = 0.0f;
 	}
 
+	// o turbo abre o campo de visão (sensação de velocidade): o empurrão é grande (medido: +59 a +70% de velocidade em 3 s), mas só
+	// aparece na tela se a câmera ajudar; no playtest 1 o Felipe disse que "quase não dá diferença"
+	{
+		const float KickTarget = Turbo->IsActive() ? 1.0f : 0.0f;
+		TurboFovBlend = FMath::FInterpTo(TurboFovBlend, KickTarget, DeltaSeconds, TurboFovBlendSpeed);
+		if (CameraModes.IsValidIndex(CameraIndex))
+		{
+			Camera->SetFieldOfView(CameraModes[CameraIndex].Config.Fov + TurboFovKickDegrees * TurboFovBlend);
+		}
+	}
+
 	if (DentViewSecondsLeft > 0.0f)
 	{
 		DentViewSecondsLeft -= DeltaSeconds;

@@ -253,6 +253,11 @@ protected:
 	TArray<FDNCameraMode> CameraModes;
 	int32 CameraIndex = 0;
 
+	/** Abertura do campo de visão com o turbo ativo [graus], e a velocidade com que sobe e desce. */
+	static constexpr float TurboFovKickDegrees = 12.0f;
+	static constexpr float TurboFovBlendSpeed = 5.0f;
+	float TurboFovBlend = 0.0f;
+
 	/** Rotação do osso de cada roda no pose de referência (espaço do componente): converte o curso da suspensão para o espaço do osso. */
 	TArray<FQuat> WheelBoneRotations;
 };

@@ -83,8 +83,12 @@ void ADNVehicleTestGameMode::StartPlay()
 		FParse::Value(Cmd, TEXT("DNCarScenario="), Scenario);
 		FParse::Value(Cmd, TEXT("DNWallKmh="), WallTargetKmh);
 		FParse::Value(Cmd, TEXT("DNSteer="), SteerInput);
+		bBoostTurbo = FParse::Param(Cmd, TEXT("DNTurboOn"));
+		HandbrakeSteer = FParse::Value(Cmd, TEXT("DNSteer="), HandbrakeSteer) ? HandbrakeSteer : 0.5f;
+		FParse::Value(Cmd, TEXT("DNHbKmh="), HandbrakeEntryKmh);
+		FParse::Value(Cmd, TEXT("DNThrottle="), HandbrakeThrottle);
 		ScenarioSeconds = (Scenario == TEXT("Handbrake") || Scenario == TEXT("Turn") || Scenario == TEXT("Switch")) ? 9.0f
-			: (Scenario == TEXT("Turbo") || Scenario == TEXT("Accel")) ? 3.6f : (Scenario == TEXT("Wall") ? 7.0f : (Scenario == TEXT("Steer") ? 16.0f : 10.0f));
+			: (Scenario == TEXT("Turbo") || Scenario == TEXT("Accel")) ? 3.6f : (Scenario == TEXT("Wall") ? 7.0f : (Scenario == TEXT("Steer") ? 16.0f : (Scenario == TEXT("Boost") ? 16.0f : 10.0f)));
 		UE_LOG(LogDetonauto, Display, TEXT("DNCarProbe: cenário '%s' de %.0f s iniciado"), *Scenario, ScenarioSeconds);
 	}
 }
@@ -249,7 +253,7 @@ void ADNVehicleTestGameMode::ScenarioTick(ADNVehicle& Vehicle, float DeltaSecond
 		// Acelera reto até 55 km/h (ou 3,5 s). Aí começa a manobra (T0): volante a 0,5 e acelerador a 0,3 por 1 s, com o
 		// freio de mão apertado de T0+0,1 s a T0+0,9 s. Depois solta tudo. Mede o deslizamento e a guinada em T0..T0+3 s.
 		// A parede fica a 60 m da partida; por isso a manobra começa cedo e a janela é curta.
-		if (ManeuverT0 < 0.0f && (SpeedKmh >= 55.0f || ScenarioTime >= 3.5f))
+		if (ManeuverT0 < 0.0f && (SpeedKmh >= HandbrakeEntryKmh || ScenarioTime >= 8.0f))
 		{
 			ManeuverT0 = ScenarioTime;
 			SpeedAtManeuver = SpeedKmh;
@@ -262,8 +266,8 @@ void ADNVehicleTestGameMode::ScenarioTick(ADNVehicle& Vehicle, float DeltaSecond
 		}
 		else if (Since < 1.0f)
 		{
-			Move->SetThrottleInput(0.3f);
-			Move->SetSteeringInput(FMath::Clamp(0.5f * Vehicle.AppliedSteeringGain, -1.0f, 1.0f));
+			Move->SetThrottleInput(HandbrakeThrottle);
+			Move->SetSteeringInput(FMath::Clamp(HandbrakeSteer * Vehicle.AppliedSteeringGain, -1.0f, 1.0f));
 		}
 		else
 		{
@@ -283,6 +287,41 @@ void ADNVehicleTestGameMode::ScenarioTick(ADNVehicle& Vehicle, float DeltaSecond
 			}
 			MaxYawRateDegS = FMath::Max(MaxYawRateDegS, FMath::Abs(Vehicle.GetMesh()->GetPhysicsAngularVelocityInDegrees().Z));
 			MinSpeedKmh = FMath::Min(MinSpeedKmh, SpeedKmh);
+			// recuperou = depois de soltar o freio de mão (0,9 s), deslize abaixo de 10 graus e guinada abaixo de 40 graus/s
+			if (RecoverySeconds < 0.0f && Since >= 0.9f && FMath::Abs(Vehicle.SlipAngleDegNow()) < 10.0f
+				&& FMath::Abs(Vehicle.GetMesh()->GetPhysicsAngularVelocityInDegrees().Z) < 40.0f && SpeedKmh > 15.0f)
+			{
+				RecoverySeconds = Since - 0.9f;
+			}
+			MaxSlipFullDeg = FMath::Max(MaxSlipFullDeg, FMath::Abs(Vehicle.SlipAngleDegNow()));
+		}
+	}
+	else if (Scenario == TEXT("Boost"))
+	{
+		// Turbo (J3): segura 60 km/h (controle proporcional), espera 1 s estável e acelera a fundo por 3 s, com o turbo (-DNTurboOn) ou sem.
+		// Mede a velocidade final aos 3 s.
+		if (BoostT0 < 0.0f)
+		{
+			Move->SetThrottleInput(FMath::Clamp(0.4f + (60.0f - SpeedKmh) * 0.08f, 0.0f, 1.0f));
+			Move->SetSteeringInput(0.0f);
+			BoostAtSpeedSince = FMath::Abs(SpeedKmh - 60.0f) < 3.0f ? (BoostAtSpeedSince < 0.0f ? ScenarioTime : BoostAtSpeedSince) : -1.0f;
+			if (BoostAtSpeedSince >= 0.0f && ScenarioTime - BoostAtSpeedSince >= 1.0f)
+			{
+				BoostT0 = ScenarioTime;
+				SpeedAtManeuver = SpeedKmh;
+				Vehicle.SetTurboButton(bBoostTurbo);
+			}
+		}
+		else
+		{
+			Move->SetThrottleInput(1.0f);
+			Move->SetSteeringInput(0.0f);
+			if (ScenarioTime - BoostT0 >= 3.0f)
+			{
+				UE_LOG(LogDetonauto, Display, TEXT("DNCarProbe: TURBO preset=%s turbo=%s | entrou a %.1f km/h | velocidade aos 3 s: %.1f km/h | barra do turbo: %.0f"),
+					*Vehicle.CarId.ToString(), bBoostTurbo ? TEXT("ligado") : TEXT("desligado"), SpeedAtManeuver, SpeedKmh, Vehicle.GetTurbo()->GetBar());
+				ScenarioSeconds = ScenarioTime;
+			}
 		}
 	}
 	else if (Scenario == TEXT("Steer"))
@@ -392,6 +431,8 @@ void ADNVehicleTestGameMode::ProbeFinish(ADNVehicle& Vehicle)
 		UE_LOG(LogDetonauto, Display,
 			TEXT("DNCarProbe: MANOBRA preset=%s | velocidade ao entrar=%.0f km/h | ângulo de deslizamento máximo=%.1f graus | guinada máxima=%.0f graus/s | velocidade mínima=%.0f km/h"),
 			*Vehicle.CarId.ToString(), SpeedAtManeuver, MaxSlipDeg, MaxYawRateDegS, MinSpeedKmh);
+		UE_LOG(LogDetonauto, Display, TEXT("DNCarProbe: RECUPERACAO preset=%s assistencia=%s | deslize maximo (-180..180)=%.1f graus | recuperou em %.2f s depois de soltar o freio de mao (-1 = nao recuperou)"),
+			*Vehicle.CarId.ToString(), Vehicle.bDriftAssist ? TEXT("ligada") : TEXT("desligada"), MaxSlipFullDeg, RecoverySeconds);
 	}
 	FPlatformMisc::RequestExit(false);
 }

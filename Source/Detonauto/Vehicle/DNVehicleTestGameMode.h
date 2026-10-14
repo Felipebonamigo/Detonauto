@@ -90,5 +90,16 @@ protected:
 	float MaxYawRateDegS = 0.0f;
 	float MinSpeedKmh = 1.0e9f;
 	float SpeedAtManeuver = 0.0f;
+	/** Cenários Handbrake/Turn: velocidade de entrada (-DNHbKmh, padrão 55) e esterço (-DNSteer, padrão 0,5). */
+	float HandbrakeEntryKmh = 55.0f;
+	float HandbrakeSteer = 0.5f;
+	/** Acelerador durante a curva (-DNThrottle, padrão 0,3): 1,0 mede a saída de traseira com o pé no fundo. */
+	float HandbrakeThrottle = 0.3f;
+	/** Cenário Boost: instante em que o turbo (ou a aceleração sem turbo) começou e se o turbo liga (-DNTurboOn). */
+	float BoostT0 = -1.0f;
+	float BoostAtSpeedSince = -1.0f;
+	bool bBoostTurbo = false;
+	float RecoverySeconds = -1.0f; // segundos depois de soltar o freio de mão até o carro voltar a ser controlável (-1 = não voltou)
+	float MaxSlipFullDeg = 0.0f;   // maior ângulo de deslize em toda a janela, de -180 a 180 (o de MaxSlipDeg ignora a ré)
 	float ManeuverT0 = -1.0f; // instante em que a manobra começou (-1 = ainda acelerando)
 };
