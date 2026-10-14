@@ -124,6 +124,8 @@ melhor e ele quer cinco modos.
   local mede desempenho (lote 13).
 - Olhar as capturas da cena de aparência (`docs/lookdev.md`) e dizer se a luz de
   fim de tarde é a direção certa.
+- Ler a proposta de recursos do Unreal (`docs/proposta-recursos-unreal.md`:
+  upscalers, Chaos Destruction, Mass, MetaSounds, PCG e Unreal MCP) e dizer o que entra.
 
 ## Próximo passo
 
