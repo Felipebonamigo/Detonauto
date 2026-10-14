@@ -98,3 +98,23 @@ Rodas: antes ![antes](img/lote16/rodas-antes.jpg) e depois ![esquerda](img/lote1
 Anotado: os jacarandás aparecem com pouca folha (folhas mascaradas em 1K; pode ser o limiar da máscara ou o modelo); a placa sem marca
 não foi feita; para a cidade final, os prédios e o mobiliário do City Sample (precisa ser baixado pelo Felipe no Fab) combinam entre si
 e com o carro final, o que nenhuma mistura de fontes garante.
+
+## Lote 16b: polimento (14 out 2026)
+
+As notas da revisão do lote 16, uma a uma. Capturas no perfil `DN_AlvoPS5`, 1920x1080, roteiro de teclas reais, em `img/lote16b/`.
+
+| Nota | O que mudou | Prova |
+|---|---|---|
+| Flocos fortes demais; verniz 0,03 a 0,05 | `MI_DNPintura`: `FlakeTiling` 30 → 60 (flocos menores), `FlakeStrength` 0,6 → 0,25, verniz 0,03 → 0,04; chassi 0,02 → 0,03. Valores explícitos na instância | ![três-quartos](img/lote16b/tres-quartos.jpg) |
+| Poste moderno no lugar do lampião | Poste de avenida feito do zero no Blender (`Tools/Blender/make_street_light.py`): coluna cônica de 8 m, braço curvo de 1,7 m sobre a pista, luminária de LED. As lanternas de parede antigas saíram (destoavam) | ![poste](img/lote16b/modelo-poste.jpg) ![80 km/h](img/lote16b/80kmh.jpg) |
+| Jacarandá com pouca folha | Causa: a máscara das folhas (1k) perdia cobertura nos mips de longe, e o Nanite encolhia os cartões ao simplificar a copa. A máscara preserva a cobertura por mip (`do_scale_mips_for_alpha_coverage`, limiar 0,333 no R) e a malha usa Nanite com preservação de área | ![antes e depois](img/lote16b/folhagem-antes-depois.jpg) |
+| Vitrines brancas | `MI_Vitrine`: brilho da sala 2000 → 900 nits | ![lateral](img/lote16b/lateral.jpg) |
+| Capturas com o sol por trás | Frente e quartos da frente, com o sol atrás da câmera | ![frente](img/lote16b/frente.jpg) ![esquerda](img/lote16b/frente-esquerda-sol-por-tras.jpg) ![direita](img/lote16b/frente-direita-sol-por-tras.jpg) |
+
+- **Custo** (`lookdev-measure.ps1`): parado 4,83 / 5,45 ms, andando 5,37 / 5,91 ms (Frame média / p95; GPU 4,5 e 4,6 ms). Andando subiu
+  0,65 ms em relação ao lote 16: dentro do ruído de ~1 ms, e a copa mais cheia é a explicação provável. Fica de olho na próxima medição.
+- Com o sol baixo (15 graus) e a rua entre prédios altos, o carro fica na sombra dos prédios em boa parte dos ângulos parados, mesmo com o
+  sol por trás. A escolha da hora do dia por cruzamento está no lote 20 (`docs/fatia-vertical.md`).
+- Para refazer: `create_lookdev.ps1` (cena) e `create_dent_material.ps1 -Dest /Game/Detonauto/Vehicle -InstancesOnly` (pintura). O modo
+  completo do `create_dent_material` quebra hoje ao refazer o material-pai (`docs/estado-atual.md`, pendências).
+- Os scripts regravam assets iguais (texturas e materiais refeitos com o mesmo conteúdo). Só entram no commit os que mudaram de propósito.

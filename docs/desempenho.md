@@ -306,6 +306,19 @@ Blender, 5 alvos de deformação, cache de skin ligado).
 - **Não medido:** carro amassado em movimento rápido perto da câmera, Lumen com muitas carrocerias deformadas na tela, e o tráfego
   (que ainda usa cubos, `Traffic/DNTrafficVehicle`). Quando o tráfego usar o carro de verdade, medir de novo com o `crash-measure.ps1`.
 
+## Lote 16b: polimento da cena (14 out 2026)
+
+Mesmo protocolo. Cena com o poste novo (226 objetos de rua), copa dos jacarandás mais cheia (Nanite preservando área) e vitrines mais
+escuras; só o carro do jogador.
+
+| Cenário | Frame média / p95 | Game | Draw | GPU média / p95 | Quadros |
+|---|---|---|---|---|---|
+| parado | 4,83 / 5,45 ms | 1,33 / 1,77 ms | 4,82 / 5,43 ms | 4,48 / 5,04 ms | 2072 em 10 s |
+| andando | 5,37 / 5,91 ms | 1,79 / 2,67 ms | 5,35 / 5,92 ms | 4,64 / 5,26 ms | 1490 em 8 s |
+
+Contra o lote 16 (4,55 e 4,72 ms): +0,3 parado e +0,65 andando, dentro do ruído de ~1 ms. Se a próxima medição confirmar a subida
+andando, a suspeita é a copa mais densa (mais cartões de folha mascarados na tela).
+
 ## Para o Felipe testar na Sprint 6
 
 1. Abra o carro do template, jogue com Alt+P e digite `stat unit`.

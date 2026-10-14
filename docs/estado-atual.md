@@ -46,7 +46,8 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 13b | Correções do tráfego achadas na revisão independente | Aprovado (`docs/regras-trafego.md`, seção do 13b) |
 | 16 | Visual do carro e da rua: rodas, pintura, vidros, pneus, prédios, mobiliário | Aprovado (`docs/lookdev.md`); polimento no 16b |
 | 13c | Pontuação por dano no Crash | Aprovado (`docs/regras-de-jogo.md`, revisão de 14 out): livro por veículo, P1 a P6, mutação 7 de 7 |
-| 17 | Dano visual, camada 1: deformação grande por zona | Na main, aguardando revisão (`docs/lote-17.md`): regra com mutação 18 de 19 (1 equivalente), carroceria com 5 alvos gerada no Blender, capturas a 0,3/0,6/1,0 e na parede, custo de 6 carros amassados dentro do ruído. Frente e traseira mudaram do contrato (a lataria passava das rodas) |
+| 17 | Dano visual, camada 1: deformação grande por zona | Aprovado (`docs/lote-17.md`): regra com mutação 18 de 19 (1 equivalente), carroceria com 5 alvos gerada no Blender. Leitura da revisão: ainda "macio", não chapa amassada; segue no 17b |
+| 16b | Polimento visual: pintura, poste moderno, folhagem, vitrines | Na main, aguardando revisão (`docs/lookdev.md`, seção 16b) |
 
 ## Primeiro playtest (14 out)
 
@@ -139,6 +140,19 @@ melhor e ele quer cinco modos.
   (`0,3`) e o console lê 0. Formatar com `CultureInfo.InvariantCulture`.
 - Saída de `*>` no PowerShell 5.1 é UTF-16: `grep` do Bash não acha texto nela
   (use `iconv -f utf-16` ou `Get-Content -Encoding unicode`).
+- `Set-Content -Encoding utf8` no PowerShell 5.1 grava BOM: mensagem de commit
+  feita assim sai com um caractere invisível no título (aconteceu no 9f66cab).
+  Mensagem de commit só pela ferramenta de escrita de arquivo.
+- Unreal MCP: os plugins `Experimental/Toolsets/*` precisam da regra de
+  `GameFeatureData` no `DefaultGame.ini` (senão todo commandlet sai com 1), e no
+  `-game` deixam tracebacks de Python inofensivos, filtrados por lista explícita
+  em `Tools/Unreal/Find-Unreal.ps1`.
+- `create_dent_material.ps1` completo quebra (`Assertion failed: !IsRooted()` em
+  `delete_all_material_expressions`) desde que a carroceria com alvos é carregada
+  no construtor do carro. Use `-InstancesOnly` para mudar valores; a causa está nas
+  pendências.
+- Scripts de conteúdo regravam assets iguais com binário novo: antes do commit,
+  desfaça (`git checkout --`) os que não mudaram de propósito, para não gastar LFS.
 
 ## Pendências do Felipe
 
@@ -156,17 +170,23 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Revisão do lote 17 (`docs/lote-17.md`) e o Felipe dizer se parece batida.
-2. Lote 16b (polimento, notas do par): flocos menores e verniz mais nítido;
-   poste moderno no lugar do lampião; jacarandá com pouca folha; vitrines menos
-   brancas; capturas também com o sol por trás do carro (contra o sol ele vira
-   silhueta).
-3. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
-4. Lotes 18 a 21 (`docs/fatia-vertical.md`): câmera de batida, efeitos Niagara,
+1. Lote 17b (pedido na revisão do 17): riscos, tinta arrancada, primer e metal
+   nu e fuligem no material da pintura por zona (parâmetros em `Damage.csv`);
+   vincos mais duros no Blender, comparados lado a lado com os de hoje; batida
+   real a 100 km/h capturada na `L_Lookdev`, de perto.
+2. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
+3. Lotes 18 a 21 (`docs/fatia-vertical.md`): câmera de batida, efeitos Niagara,
    primeiro cruzamento e som base.
 5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
+
+Pendências técnicas:
+
+- Achar por que refazer o `M_DNDentParent` dá `!IsRooted()` (hipótese não
+  provada: o material carregado no início pelo construtor do carro, via
+  `SK_DNSportsCarBody`). Saídas possíveis: carregar a carroceria fora do
+  construtor, ou refazer o material num pacote novo e trocar as referências.
 
 Pendências de design (decidir com playtest, não fazer agora):
 
