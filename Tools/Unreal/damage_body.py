@@ -168,6 +168,8 @@ def import_body(fbx, report):
         opts.set_editor_property("skeleton", skeleton)
     data = opts.get_editor_property("skeletal_mesh_import_data")
     data.set_editor_property("import_morph_targets", True)
+    # a cor de vértice traz onde cada zona amassa mais (o desgaste da pintura usa, lote 17b)
+    data.set_editor_property("vertex_color_import_option", unreal.VertexColorImportOption.REPLACE)
     data.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
     data.set_editor_property("convert_scene", True)
     task.options = opts

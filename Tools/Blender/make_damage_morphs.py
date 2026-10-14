@@ -26,6 +26,7 @@ Argumentos
     --wheels        wheels.json com os eixos e o raio da roda em cm (Tools/Unreal/damage_body.py --mode export grava)
     --renders       pasta das imagens de conferência (dentro de docs/img/); sem ela, não renderiza
     --seed          semente da ondulação (padrão 17)
+    --subdivide     níveis de subdivisão simples antes dos alvos (padrão 1; 0 desliga)
     --allowed-root  pasta onde é permitido gravar o .fbx. Padrão: Sandbox/ deste repositório.
 """
 
@@ -47,15 +48,20 @@ ZONES = ("DN_Front", "DN_Rear", "DN_Left", "DN_Right", "DN_Roof")
 # Valores em fração do tamanho do carro. Frente e traseira mudaram do contrato (recuo de 18% e 14% do comprimento caindo a
 # zero a 35%): com eles a lataria recuava para trás das rodas, que ficavam soltas na frente (captura do lote 17). Agora o
 # amassado forte fica no balanço, da ponta até o para-lama, e só uma cauda leve passa da roda.
-FRONT_CRUSH = 0.45      # a ponta da frente recua esta fração da distância da ponta até o começo do para-lama
-REAR_CRUSH = 0.40
+FRONT_CRUSH = 0.55      # a ponta da frente recua esta fração da distância da ponta até o começo do para-lama (17b: era 0,45)
+REAR_CRUSH = 0.50       # (17b: era 0,40; a revisão pediu mais amplitude em 1,0, até onde a conferência de dobra deixa)
 ARCH_MARGIN = 0.02      # o amassado forte acaba um pouco depois do começo do para-lama (fração do comprimento)
 TAIL_DEPTH = 0.025      # cauda leve: recuo extra na ponta, fração do comprimento...
 TAIL_REACH = 0.35       # ...que cai a zero a esta fração do comprimento, a partir da ponta (o alcance do contrato)
 SIDE_DEPTH = 0.12       # afundamento da porta, fração da largura
 ROOF_DEPTH = 0.20       # afundamento do teto, fração da altura da cabine
 BELT_LINE = 0.55        # altura da linha da cintura (base da cabine), fração da altura
-RIPPLE = 0.25           # ondulação: tira até 25% da forma principal (as profundidades acima são o máximo)
+RIPPLE = 0.10           # ondulação larga: tira até 10% da forma principal (17b: era 25%; os vincos abaixo fazem o relevo)
+# Vincos (17b): dobras com crista viva, perfil 1 - |sen| (ponta aguda, vale redondo), como chapa que dobra em vez de afundar macio
+CREASES = 3.0           # quantas cristas cabem na região amassada de cada zona
+CREASE_HOOD = 0.05      # frente e traseira: altura das cristas no capô e no porta-malas, fração da altura do carro...
+CREASE_FENDER = 0.035   # ...e nos para-lamas, fração da largura (0,035 e 0,025 quase não apareciam no capô)
+CREASE_SIDE = 0.30      # portas e teto: amplitude das cristas, fração do afundamento principal da zona
 HOOD_RISE = 0.08        # o capô sobe em "V" até esta fração da altura (o porta-malas, 60% disso)
 CORNER_BIAS = 0.25      # frente e traseira: a quina menos atingida recua até 25% menos que a outra
 PILLAR_LEAN = 0.04      # as colunas inclinam: o topo da cabine anda de lado esta fração da largura
@@ -123,9 +129,27 @@ def ripples(seed):
     return [Ripple(rng) for _ in ZONES]
 
 
+def crest(u):
+    """Perfil de vinco de -0,5 a 0,5: ponta aguda nos inteiros (onde |sen| tem a quina), vale redondo no meio."""
+    return 0.5 - abs(math.sin(math.pi * u))
+
+
+def crease_phase(zone, box, ripple, fx, sy, hz):
+    """Onde o ponto cai no padrão de vincos da zona (as cristas ficam nos inteiros). Usado pela forma e pela cor de vértice."""
+    if zone in (0, 1):
+        front = zone == 0
+        reach = (box.front_arch if front else box.rear_arch) + ARCH_MARGIN
+        d = (1.0 - fx) if front else fx
+        return CREASES * d / reach + 0.35 * sy + ripple.pu   # sanfona na região amassada, um pouco torta
+    if zone in (2, 3):
+        return CREASES * 1.6 * hz + 0.6 * fx + ripple.pv      # linhas quase horizontais na porta, inclinadas para a frente
+    return CREASES * (fx - 0.09) / 0.66 + 0.3 * sy + ripple.pu  # de lado a lado no teto, um pouco em diagonal
+
+
 def displacement(zone, box, ripple, x, y, z, lean_sign=1.0):
     """Deslocamento (dx, dy, dz) em metros do ponto (x, y, z) com a zona totalmente amassada (peso 1)."""
     fx, sy, hz = box.normalized(x, y, z)
+    phase = crease_phase(zone, box, ripple, fx, sy, hz)
     top = smoothstep((hz - 0.40) / 0.25)  # só a parte de cima (capô, porta-malas) dobra para cima
     if zone in (0, 1):
         front = zone == 0
@@ -139,10 +163,15 @@ def displacement(zone, box, ripple, x, y, z, lean_sign=1.0):
         corner = 1.0 - CORNER_BIAS * (0.5 - 0.5 * sy * (1.0 if front else -1.0))
         dx = (-1.0 if front else 1.0) * depth * box.length * wave * corner
         # dobra em "V" no capô (ou no porta-malas), no meio do balanço: a crista fica mais perto da ponta no meio do carro
-        crest = arch * (0.45 + 0.30 * abs(sy))
+        ridge = arch * (0.45 + 0.30 * abs(sy))
         rise = (HOOD_RISE if front else 0.6 * HOOD_RISE) * box.height
-        dz = rise * bump((d - crest) / (0.35 * arch)) * (1.0 - min(sy * sy, 1.0)) * top * corner
+        dz = rise * bump((d - ridge) / (0.35 * arch)) * (1.0 - min(sy * sy, 1.0)) * top * corner
         dy = 0.02 * box.width * sy * g      # a lataria esmagada abre um pouco para os lados
+        # vincos em sanfona na região amassada, um pouco tortos (a crista anda com o lado do carro)
+        fold = crest(phase) * g * corner
+        dz += CREASE_HOOD * box.height * fold * top
+        flank = smoothstep((abs(sy) - 0.5) / 0.4) * (1.0 - top)
+        dy += CREASE_FENDER * box.width * fold * flank * (1.0 if sy >= 0.0 else -1.0)
         return dx, dy, dz
     if zone in (2, 3):
         side = 1.0 if zone == 2 else -1.0     # esquerda é +Y
@@ -150,14 +179,18 @@ def displacement(zone, box, ripple, x, y, z, lean_sign=1.0):
         gx = bump((fx - 0.48) / 0.42)         # cai a zero nas pontas do carro
         gz = bump((hz - 0.42) / 0.38)         # e perto do assoalho e do teto
         wave = wave_factor(ripple(fx, hz))
-        return 0.0, -side * SIDE_DEPTH * box.width * gs * gx * gz * wave, 0.0
+        main = SIDE_DEPTH * box.width * gs * gx * gz
+        fold = crest(phase)  # vincos na porta (a chapa dobra em linhas)
+        return 0.0, -side * main * (wave + CREASE_SIDE * 2.0 * fold), 0.0
     if zone == 4:
         cabin = box.height * (1.0 - BELT_LINE)
         gh = smoothstep((hz - BELT_LINE) / (1.0 - BELT_LINE))
         gx = bump((fx - 0.42) / 0.33)
         gy = 1.0 - 0.5 * min(sy * sy, 1.0)
         wave = wave_factor(ripple(fx, 0.5 + 0.5 * sy))
-        dz = -ROOF_DEPTH * cabin * gh * gx * gy * wave
+        main = ROOF_DEPTH * cabin * gh * gx * gy
+        fold = crest(phase)  # vincos atravessando o teto
+        dz = -main * (wave + CREASE_SIDE * 2.0 * fold)
         dy = lean_sign * PILLAR_LEAN * box.width * gh * gx
         return 0.0, dy, dz
     raise MorphError("zona inválida: %r" % (zone,))
@@ -222,6 +255,7 @@ def parse_args(args):
     parser.add_argument("--wheels", required=True)
     parser.add_argument("--renders", default=None)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--subdivide", type=int, default=1)
     parser.add_argument("--allowed-root", default=DEFAULT_ALLOWED_ROOT)
     try:
         parsed = parser.parse_args(args)
@@ -265,6 +299,24 @@ def load_and_join(paths, report):
     return body
 
 
+def subdivide(body, levels):
+    """
+    Subdivisão SIMPLES (a forma não muda): mais vértices onde os vincos dobram. O carro do template tem 6,5 mil vértices na lataria e
+    os vincos do 17b saíam serrilhados. As normais do arquivo (customizadas) e os UVs são interpolados, então o carro intacto fica igual.
+    """
+    import bpy
+    if levels <= 0:
+        return
+    bpy.context.view_layer.objects.active = body
+    modifier = body.modifiers.new("Subdivisao", "SUBSURF")
+    modifier.subdivision_type = "SIMPLE"
+    modifier.levels = levels
+    modifier.render_levels = levels
+    if hasattr(modifier, "use_custom_normals"):
+        modifier.use_custom_normals = True
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+
+
 def mark_sharp_edges(body, degrees=40.0):
     """Arestas vivas acima de ~40 graus ficam marcadas: o Unreal recalcula as normais dos alvos respeitando-as."""
     import bmesh
@@ -304,6 +356,35 @@ def add_shape_keys(body, box, waves, report):
             raise MorphError("%s dobra a malha sobre si mesma (determinante %.2f)" % (name, worst))
 
 
+def wear_colors(body, box, waves, report):
+    """
+    Cor de vértice para o desgaste da pintura (lote 17b): quanto cada zona amassa naquele ponto, puxado para as cristas dos vincos,
+    onde a tinta solta primeiro. R = frente, G = traseira, B = laterais (o material escolhe o lado pelo sinal de Y), A = teto. O
+    material multiplica pelo peso da zona: as lascas e os riscos aparecem onde a chapa dobrou, e não espalhados pela zona inteira.
+    """
+    verts = body.data.vertices
+    mags = []
+    for zone in range(len(ZONES)):
+        row = []
+        for v in verts:
+            d = displacement(zone, box, waves[zone], v.co.x, v.co.y, v.co.z)
+            row.append(math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]))
+        mags.append(row)
+    attr = body.data.color_attributes.new("DN_Desgaste", "FLOAT_COLOR", "POINT")
+    peaks = [max(max(row), 1e-6) for row in mags]
+    covered = 0
+    for i, v in enumerate(verts):
+        fx, sy, hz = box.normalized(v.co.x, v.co.y, v.co.z)
+        w = []
+        for zone in range(len(ZONES)):
+            ridge = crest(crease_phase(zone, box, waves[zone], fx, sy, hz)) + 0.5   # 1 na crista, 0 no vale
+            w.append((mags[zone][i] / peaks[zone]) ** 0.7 * (0.3 + 0.7 * ridge ** 3))
+        attr.data[i].color = (w[0], w[1], max(w[2], w[3]), w[4])
+        covered += 1 if max(w) > 0.5 else 0
+    body.data.color_attributes.active_color = attr
+    report.append("cor de vértice do desgaste: %d de %d vértices com peso acima de 0,5" % (covered, len(verts)))
+
+
 def add_root_bone(body):
     """Esqueleto de 1 osso: o Unreal só aceita alvos de deformação em malha com esqueleto."""
     import bpy
@@ -340,6 +421,7 @@ def export(body, arm, path):
         bake_space_transform=False,              # com esqueleto, o Unreal converte os eixos na importação
         use_mesh_modifiers=False,                # aplicar modificadores apagaria os alvos (shape keys)
         mesh_smooth_type="FACE",
+        colors_type="LINEAR",                    # a cor de vértice é dado (pesos do desgaste), não cor: sem conversão sRGB
         add_leaf_bones=False,
         bake_anim=False,
         use_armature_deform_only=True,
@@ -410,8 +492,12 @@ def main(argv):
         box.set_wheels(wheels["front_axle_cm"] / 100.0, wheels["rear_axle_cm"] / 100.0, wheels["wheel_radius_cm"] / 100.0)
         report.append("para-lamas a %.1f%% (frente) e %.1f%% (traseira) do comprimento, contados da ponta"
                       % (box.front_arch * 100.0, box.rear_arch * 100.0))
+        subdivide(body, args.subdivide)
+        report.append("subdivisão simples %d: %d vértices" % (args.subdivide, len(body.data.vertices)))
         report.append("arestas vivas marcadas (> 40 graus): %d" % mark_sharp_edges(body))
-        add_shape_keys(body, box, ripples(args.seed), report)
+        waves = ripples(args.seed)
+        add_shape_keys(body, box, waves, report)
+        wear_colors(body, box, waves, report)
         arm = add_root_bone(body)
         export(body, arm, args.out)
         report.append("saída: %s" % os.path.abspath(args.out))

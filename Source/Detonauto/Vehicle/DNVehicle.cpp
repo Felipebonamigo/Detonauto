@@ -796,6 +796,17 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 	{
 		FVector Center, Extent;
 		GetBodyBox(Center, Extent);
+		// desgaste da pintura (lote 17b): a caixa da carroceria e os valores de Damage.csv; os pesos das zonas vão em PushWearToMaterial
+		for (UMaterialInstanceDynamic* Dynamic : DentMaterials)
+		{
+			Dynamic->SetVectorParameterValue(TEXT("BodyCenter"), FLinearColor(Center.X, Center.Y, Center.Z));
+			Dynamic->SetVectorParameterValue(TEXT("BodyExtent"), FLinearColor(Extent.X, Extent.Y, Extent.Z));
+			Dynamic->SetScalarParameterValue(TEXT("WearChipCoverage"), DamageConfig.WearChipCoverage);
+			Dynamic->SetScalarParameterValue(TEXT("WearChipSizeCm"), DamageConfig.WearChipSizeCm);
+			Dynamic->SetScalarParameterValue(TEXT("WearScratch"), DamageConfig.WearScratch);
+			Dynamic->SetScalarParameterValue(TEXT("WearSoot"), DamageConfig.WearSoot);
+		}
+		PushWearToMaterial();
 		UE_LOG(LogDetonauto, Display, TEXT("DNDent: carroceria '%s': %d de %d slot(s) de material com amassado, caixa local centro=%s extensao=%s"),
 			*BodyComp->GetName(), DentMaterials.Num(), BodyComp->GetNumMaterials(), *Center.ToCompactString(), *Extent.ToCompactString());
 	}
@@ -872,24 +883,40 @@ void ADNVehicle::ClearDents()
 	{
 		Skin->ClearMorphTargets();
 	}
+	PushWearToMaterial();
 }
 
 void ADNVehicle::UpdateDamageMorphs(float DeltaSeconds)
 {
-	USkeletalMeshComponent* Skin = Cast<USkeletalMeshComponent>(BodyComp);
-	if (!Skin)
-	{
-		return;
-	}
 	float Before[FDNDamageMorph::ZoneCount];
 	FMemory::Memcpy(Before, MorphWeights, sizeof(Before));
 	FDNDamageMorph::Weights(DamageConfig, DamageState, MorphWeights, DeltaSeconds);
-	for (int32 Zone = 0; Zone < FDNDamageMorph::ZoneCount; ++Zone)
+	if (FMemory::Memcmp(Before, MorphWeights, sizeof(Before)) == 0)
 	{
-		if (MorphWeights[Zone] != Before[Zone])
+		return;
+	}
+	if (USkeletalMeshComponent* Skin = Cast<USkeletalMeshComponent>(BodyComp))
+	{
+		for (int32 Zone = 0; Zone < FDNDamageMorph::ZoneCount; ++Zone)
 		{
-			Skin->SetMorphTarget(FName(FDNDamageMorph::TargetName(Zone)), MorphWeights[Zone], false);
+			if (MorphWeights[Zone] != Before[Zone])
+			{
+				Skin->SetMorphTarget(FName(FDNDamageMorph::TargetName(Zone)), MorphWeights[Zone], false);
+			}
 		}
+	}
+	PushWearToMaterial(); // o desgaste da pintura segue o mesmo peso da deformação (também na carroceria estática)
+}
+
+void ADNVehicle::PushWearToMaterial()
+{
+	// os 5 pesos em dois vetores (o nó Custom só recebe RGB de um parâmetro vetorial): frente, traseira, esquerda | direita, teto
+	const FLinearColor A(MorphWeights[0], MorphWeights[1], MorphWeights[2]);
+	const FLinearColor B(MorphWeights[3], MorphWeights[4], 0.0f);
+	for (UMaterialInstanceDynamic* Dynamic : DentMaterials)
+	{
+		Dynamic->SetVectorParameterValue(TEXT("ZoneWearA"), A);
+		Dynamic->SetVectorParameterValue(TEXT("ZoneWearB"), B);
 	}
 }
 

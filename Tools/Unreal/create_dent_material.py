@@ -76,6 +76,91 @@ return float4(offset, mask);
 """
 
 
+# Desgaste da pintura (lote 17b, camada 3 do dano visual): máscaras por pixel a partir da posição local P (cm), da caixa da carroceria
+# (C centro, E extensão), do peso de cada zona (ZA = frente, traseira, esquerda; ZB = direita, teto; o C++ manda os mesmos pesos dos
+# alvos de deformação), da cor de vértice VC (onde cada zona amassa, com as cristas dos vincos; gravada pelo
+# Tools/Blender/make_damage_morphs.py: R frente, G traseira, B laterais, A teto) e de ruído 3D procedural (nenhuma textura).
+# Eixos do Unreal: +X frente, +Y direita, +Z cima. Saída: float4 (primer, metal nu, risco, fuligem), cada um de 0 a 1.
+WEAR_HLSL = """
+struct DNWearNoise
+{
+    float h(float3 p) { return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453); }
+    float v(float3 x)
+    {
+        float3 i = floor(x);
+        float3 f = frac(x);
+        f = f * f * (3.0 - 2.0 * f);
+        return lerp(lerp(lerp(h(i), h(i + float3(1, 0, 0)), f.x), lerp(h(i + float3(0, 1, 0)), h(i + float3(1, 1, 0)), f.x), f.y),
+                    lerp(lerp(h(i + float3(0, 0, 1)), h(i + float3(1, 0, 1)), f.x), lerp(h(i + float3(0, 1, 1)), h(i + float3(1, 1, 1)), f.x), f.y), f.z);
+    }
+    float fbm(float3 x) { return 0.5 * v(x) + 0.3 * v(x * 2.03 + 11.1) + 0.2 * v(x * 4.01 + 23.7); }
+};
+DNWearNoise n;
+float3 q = (P - C) / max(E, float3(1.0, 1.0, 1.0));
+float fx = q.x * 0.5 + 0.5;
+float hz = q.z * 0.5 + 0.5;
+// onde amassou: o peso de cada zona vezes a cor de vértice (cristas dos vincos), dentro da região larga da zona (a caixa limita a
+// carroceria estática de reserva, que não tem a cor de vértice e chega toda branca)
+float wf = 1.0 - smoothstep(0.0, 0.35, 1.0 - fx);
+float wr = 1.0 - smoothstep(0.0, 0.35, fx);
+float wt = smoothstep(0.6, 0.9, hz);
+float sideW = q.y < 0.0 ? ZA.z * smoothstep(0.3, 0.8, -q.y) : ZB.x * smoothstep(0.3, 0.8, q.y);
+float d = saturate(ZA.x * wf * VC.r + ZA.y * wr * VC.g + sideW * VC.b + ZB.y * wt * VA);
+float on = step(0.001, d);
+// lascas: manchas largas (o ruído grande manda) com borda recortada (o fino), só onde o campo passa do limiar; o limiar desce com o
+// dano, então elas nascem nas cristas e crescem. No miolo da lasca, metal nu
+float field = n.fbm(P / 35.0) * 0.65 + n.fbm(P / max(Size, 1.0)) * 0.35;
+float th = 0.74 - 0.6 * Cov * pow(d, 1.5);
+float chip = smoothstep(th, th + 0.012, field) * on * Paint;
+float metal = smoothstep(th + 0.05, th + 0.062, field) * on * Paint;
+float primer = saturate(chip - metal);
+// riscos compridos ao longo do carro (raspão), finos na altura e na largura
+float s = n.v(float3(P.x / 120.0, P.y / 2.0, P.z / 2.0));
+float scratch = smoothstep(0.74, 0.80, s) * Scr * saturate(d * 2.0) * Paint;
+// fuligem e sujeira: manchas largas, mais fortes onde amassou mais
+float soot = Soot * d * (0.6 + 0.4 * n.v(P / 40.0));
+return float4(primer, metal, scratch, soot);
+"""
+
+WEAR_COLOR_HLSL = """
+float3 c = lerp(Col, float3(0.16, 0.16, 0.15), M.x);
+c = lerp(c, float3(0.42, 0.42, 0.43), M.y);
+c = lerp(c, c * 0.4 + 0.33, M.z);
+return c * (1.0 - 0.8 * M.w);
+"""
+
+# (metálico, aspereza, verniz): primer fosco e sem verniz, metal nu sem verniz, risco tira metade do verniz, fuligem deixa fosco
+WEAR_SURFACE_HLSL = """
+float metal = lerp(lerp(Met, 0.0, M.x), 1.0, M.y);
+float rough = lerp(lerp(lerp(Rgh, 0.65, M.x), 0.35, M.y), 0.5, M.z);
+rough = lerp(rough, 0.85, M.w);
+float coat = Coat * (1.0 - M.x - M.y) * (1.0 - 0.5 * M.z) * (1.0 - 0.7 * M.w);
+return float3(metal, saturate(rough), saturate(coat));
+"""
+
+
+def custom_node(mel, material, code, description, names, output_type, x, y):
+    n = node(mel, material, unreal.MaterialExpressionCustom, x, y)
+    n.set_editor_property("code", code)
+    n.set_editor_property("description", description)
+    n.set_editor_property("output_type", output_type)
+    inputs = []
+    for name in names:
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    n.set_editor_property("inputs", inputs)
+    return n
+
+
+def channel(mel, material, src, which, x, y):
+    m = node(mel, material, unreal.MaterialExpressionComponentMask, x, y)
+    for c in "rgba":
+        m.set_editor_property(c, c == which)
+    mel.connect_material_expressions(src, "", m, "")
+    return m
+
+
 class DentError(RuntimeError):
     """Erro esperado, com mensagem para o usuário."""
 
@@ -345,10 +430,43 @@ def build(dest, report):
     mel.connect_material_expressions(color, "", painted, "A")
     mel.connect_material_expressions(keep, "", painted, "B")
 
+    # --- desgaste da pintura por zona (lote 17b): o C++ manda a caixa da carroceria, os pesos das zonas e os valores de Damage.csv ---
+    wear = custom_node(mel, material, WEAR_HLSL, "Desgaste por zona (lascas, metal, riscos, fuligem)",
+                       ("P", "C", "E", "ZA", "ZB", "Cov", "Size", "Scr", "Soot", "Paint", "VC", "VA"), unreal.CustomMaterialOutputType.CMOT_FLOAT4, 0, 800)
+    mel.connect_material_expressions(local, "", wear, "P")
+    # a saída principal do nó de cor de vértice tem 3 canais (RGB): o alfa (teto) vai por um pino próprio
+    vertex_color = node(mel, material, unreal.MaterialExpressionVertexColor, -400, 1680)
+    mel.connect_material_expressions(vertex_color, "", wear, "VC")
+    mel.connect_material_expressions(vertex_color, "A", wear, "VA")
+    wear_params = (
+        (vector_param(mel, material, "BodyCenter", (0.0, 0.0, 60.0, 0.0), -400, 800), "C"),
+        (vector_param(mel, material, "BodyExtent", (235.0, 114.0, 62.0, 0.0), -400, 930), "E"),
+        (vector_param(mel, material, "ZoneWearA", (0.0, 0.0, 0.0, 0.0), -400, 1060), "ZA"),
+        (vector_param(mel, material, "ZoneWearB", (0.0, 0.0, 0.0, 0.0), -400, 1190), "ZB"),
+        (scalar_param(mel, material, "WearChipCoverage", 0.2, -400, 1320), "Cov"),
+        (scalar_param(mel, material, "WearChipSizeCm", 6.0, -400, 1390), "Size"),
+        (scalar_param(mel, material, "WearScratch", 0.6, -400, 1460), "Scr"),
+        (scalar_param(mel, material, "WearSoot", 0.5, -400, 1530), "Soot"),
+        # 1 na pintura; o chassi (janelas, grade e plástico preto) fica sem lascas nem riscos, só com fuligem (MI_DNChassi põe 0)
+        (scalar_param(mel, material, "WearPaint", 1.0, -400, 1600), "Paint"),
+    )
+    for src, pin in wear_params:
+        mel.connect_material_expressions(src, "", wear, pin)
+    worn_color = custom_node(mel, material, WEAR_COLOR_HLSL, "Cor com desgaste", ("Col", "M"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 450, 300)
+    mel.connect_material_expressions(painted, "", worn_color, "Col")
+    mel.connect_material_expressions(wear, "", worn_color, "M")
+    surface = custom_node(mel, material, WEAR_SURFACE_HLSL, "Superfície com desgaste", ("Met", "Rgh", "Coat", "M"),
+                          unreal.CustomMaterialOutputType.CMOT_FLOAT3, 450, 600)
+    for src, pin in ((metallic, "Met"), (roughness, "Rgh"), (coat, "Coat"), (wear, "M")):
+        mel.connect_material_expressions(src, "", surface, pin)
+    worn_metal = channel(mel, material, surface, "r", 650, 550)
+    worn_rough = channel(mel, material, surface, "g", 650, 650)
+    worn_coat = channel(mel, material, surface, "b", 650, 750)
+
     # --- tudo pelos atributos de material (é o único caminho do Python para o verniz) ---
-    attrs = node(mel, material, unreal.MaterialExpressionMakeMaterialAttributes, 550, 0)
-    for src, out, pin in ((painted, "", "BaseColor"), (metallic, "", "Metallic"), (roughness, "", "Roughness"), (body_n, "RGB", "Normal"),
-                          (offset, "", "WorldPositionOffset"), (coat, "", "ClearCoat"), (coat_rough, "", "ClearCoatRoughness"),
+    attrs = node(mel, material, unreal.MaterialExpressionMakeMaterialAttributes, 900, 0)
+    for src, out, pin in ((worn_color, "", "BaseColor"), (worn_metal, "", "Metallic"), (worn_rough, "", "Roughness"), (body_n, "RGB", "Normal"),
+                          (offset, "", "WorldPositionOffset"), (worn_coat, "", "ClearCoat"), (coat_rough, "", "ClearCoatRoughness"),
                           (mra_tex, "B", "AmbientOcclusion")):
         if not mel.connect_material_expressions(src, out, attrs, pin):
             raise DentError("Ligação de material falhou: %s -> %s" % (src.get_name(), pin))
@@ -359,7 +477,8 @@ def build(dest, report):
         raise DentError("Não consegui salvar " + path)
     report.append("material criado: " + path)
     report.append("parâmetros: Paint Tint, Base Texture, MRA, Normal, MetalPaintMetallic, Roughness, ClearCoat, ClearCoatRoughness, FlakeTiling, "
-                  "FlakeStrength, DentDarkening, D0P..D7P, D0R..D7R, D0D..D7D")
+                  "FlakeStrength, DentDarkening, D0P..D7P, D0R..D7R, D0D..D7D, BodyCenter, BodyExtent, ZoneWearA, ZoneWearB, "
+                  "WearChipCoverage, WearChipSizeCm, WearScratch, WearSoot, WearPaint")
     dress_car(dest, material, report)
 
 
@@ -402,7 +521,8 @@ def dress_car(dest, paint, report):
         # mais fracos, verniz na faixa 0,03 a 0,05 pedida na revisão
         pintura = make_instance(dest, "MI_DNPintura", paint, {"FlakeStrength": 0.25, "FlakeTiling": 60.0, "ClearCoatRoughness": 0.04})
         # chassi, grade e janelas: as texturas do chassi do template, verniz bem liso e sem flocos (vidro fumê opaco: o carro não tem interior)
-        chassi = make_instance(dest, "MI_DNChassi", paint, {"MetalPaintMetallic": 1.0, "FlakeStrength": 0.0, "ClearCoatRoughness": 0.03, "Roughness": 0.3},
+        chassi = make_instance(dest, "MI_DNChassi", paint, {"MetalPaintMetallic": 1.0, "FlakeStrength": 0.0, "ClearCoatRoughness": 0.03, "Roughness": 0.3,
+                                                                      "WearPaint": 0.0},
                                {"Paint Tint": (1.0, 0.992, 0.99)},
                                {"Base Texture": find_texture("T_SportsCar_Chasis_D", "/Engine/EngineResources/WhiteSquareTexture"),
                                 "MRA": find_texture("T_SportsCar_Chasis_MRA", "/Engine/EngineResources/WhiteSquareTexture"),

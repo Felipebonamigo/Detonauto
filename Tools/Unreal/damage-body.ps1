@@ -18,6 +18,7 @@ param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe',
     [int]$Seed = 17,
+    [string]$Renders = 'docs\img\dano-zonas-17b',  # pasta das imagens de conferência (as do lote 17 ficam em docs\img\dano-zonas)
     [string]$EngineVersion,
     [int]$TimeoutSeconds = 900
 )
@@ -31,7 +32,7 @@ $exe = Join-Path $ctx.Root 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $projDir = Split-Path $ctx.Uproject
 $repo = Split-Path (Split-Path $PSScriptRoot)
 $work = Join-Path $projDir 'Sandbox\dano'
-$renders = Join-Path $repo 'docs\img\dano-zonas'
+$renders = Join-Path $repo $Renders
 $report = Join-Path $projDir 'Saved\DamageBodyReport.txt'
 $env:PYTHONDONTWRITEBYTECODE = '1'
 

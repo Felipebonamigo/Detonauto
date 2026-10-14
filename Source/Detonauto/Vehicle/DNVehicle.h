@@ -255,6 +255,9 @@ protected:
 	/** Leva os pesos dos alvos de deformação na direção do dano de cada zona (FDNDamageMorph) e aplica na carroceria. */
 	void UpdateDamageMorphs(float DeltaSeconds);
 
+	/** Manda os pesos das zonas ao desgaste da pintura (lascas, metal nu, riscos e fuligem; lote 17b). */
+	void PushWearToMaterial();
+
 	/** Fecha a janela de contatos vencida e aplica a batida (o maior valor da janela). */
 	void FlushImpacts(double Now);
 	void GetBodyBox(FVector& OutCenter, FVector& OutExtent) const;
