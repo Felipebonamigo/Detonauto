@@ -45,6 +45,11 @@ trimestral, quebre o próximo trimestre em sprints de duas semanas.
 5. **Desempenho é requisito.** Meta de 60 fps num PC com placa de vídeo no
    nível do PS5. Qualquer sistema novo de dano, tráfego ou efeitos precisa ser
    medido antes de ser aprovado.
+6. **Visual realista é requisito.** Todo efeito visual é aprovado por captura
+   de tela na cena de aparência e no modo em que o Felipe joga (`-Play`), não só
+   por teste automático. Plano em `docs/plano-visual.md`.
+7. **Passagem entre sessões.** O estado do projeto fica em `docs/estado-atual.md`,
+   atualizado a cada lote fechado. Uma sessão nova começa por ele.
 
 ## Licenças de assets
 
