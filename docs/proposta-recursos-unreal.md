@@ -1,6 +1,6 @@
 # Proposta: recursos do Unreal que ainda não usamos
 
-14 out 2026. Proposta da sessão na nuvem, **aguardando o Felipe**: nada aqui muda a
+14 out 2026. Proposta da sessão na nuvem. **Decidida em 14 out** (ver o fim), com a delegação do Felipe ("faça tudo você"); ele pode vetar qualquer item. nada aqui muda a
 ordem do `docs/plano-visual.md` nem os lotes sem aprovação. Todo item segue a regra 5
 (medir antes de aprovar, com o resultado em `docs/desempenho.md`) e a regra 6 (efeito
 visual aprovado por captura na cena de aparência e no `-Play`). A lógica continua em
@@ -28,3 +28,14 @@ C++ e os ajustes em CSV; nada disso pede Blueprint grosso.
 Os plugins de upscaler (NVIDIA DLSS, AMD FSR, Intel XeSS) são grátis, mas cada um tem
 termos próprios: conferir antes de empacotar e registrar na tela de créditos. O
 conteúdo do City Sample segue a licença "só Unreal" já anotada em `docs/licencas.csv`.
+
+## Decisão (14 out 2026)
+
+| # | Recurso | Decisão |
+|---|---|---|
+| 6 | Unreal MCP | **Aprovado**, depois do lote 13b. Só ligar se os dois plugins existirem no motor 5.8 instalado. Usar só quando o Felipe não estiver usando o PC; os scripts Python versionados continuam sendo a forma oficial de criar cena e material, para tudo ficar reproduzível em texto. |
+| 1 | Upscalers | **TSR já basta agora.** DLSS, FSR e XeSS entram na frente de opções gráficas, perto do Acesso Antecipado, com os termos de cada plugin conferidos. |
+| 2 | Chaos Destruction | **Aprovado para vidros e peças** (camada 2 do dano), depois da camada 1 (morph por zona) e medido no `crash-measure.ps1`. |
+| 3 | Mass | **Só se o `Rail` não aguentar** a densidade do Crash, depois da medição do lote 13. |
+| 4 | MetaSounds | **Aprovado** quando a frente de áudio abrir. |
+| 5 | PCG | **Aprovado** para o distrito, depois dos prédios do City Sample estarem no projeto. |
