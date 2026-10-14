@@ -13,6 +13,7 @@
 param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Textures,
+    [string]$Models,           # modelos CC0 do mobiliário de rua (padrão: Sandbox\modelos_cc0; sem a pasta, a cena sai sem eles)
     [string]$EngineVersion,
     [int]$TimeoutSeconds = 1200
 )
@@ -31,7 +32,9 @@ $report = Join-Path $projDir 'Saved\LookdevReport.txt'
 if (Test-Path -LiteralPath $report) { Remove-Item -LiteralPath $report -Force }
 
 # O commandlet trata a string de -Script= com escapes (\r viraria retorno de carro): use barras normais.
+if (-not $Models) { $Models = Join-Path $projDir 'Sandbox\modelos_cc0' }
 $pyArgs = "`"$($script.Replace('\', '/'))`" --textures `"$($Textures.Replace('\', '/'))`""
+if (Test-Path -LiteralPath $Models) { $pyArgs += " --models `"$($Models.Replace('\', '/'))`"" }
 
 # Python embutido não pode gravar .pyc na instalação da engine (também travado dentro do .py).
 $env:PYTHONDONTWRITEBYTECODE = '1'

@@ -37,6 +37,8 @@ import argparse
 import os
 import random
 import re
+import struct
+import zlib
 
 import unreal
 
@@ -94,6 +96,7 @@ def project_dir():
 def parse_args(argv):
     parser = argparse.ArgumentParser(prog="create_lookdev.py", add_help=False)
     parser.add_argument("--textures", required=True)
+    parser.add_argument("--models", default=None)
     parser.add_argument("--report", default=None)
     try:
         return parser.parse_args(argv)
@@ -293,8 +296,8 @@ d = sign(d) * max(abs(d), 1e-5);
 float3 t = (step(0.0, d) - l) / d;
 float tm = min(min(t.x, t.y), t.z);
 float r = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
-float lit = r > 0.4 ? 1.0 : 0.18;
-float3 wall = lerp(float3(0.62, 0.56, 0.46), float3(0.45, 0.5, 0.56), frac(r * 7.13));
+float lit = r > 0.5 ? 1.0 : 0.12;
+float3 wall = lerp(float3(0.42, 0.36, 0.28), float3(0.3, 0.33, 0.38), frac(r * 7.13));
 float3 col;
 if (tm == t.z)
 {
@@ -373,7 +376,8 @@ def build_window_master(report):
     connect(fresnel, "", see, "")
     no_frame = expr(m, unreal.MaterialExpressionOneMinus, -600, 150)
     connect(frame, "", no_frame, "")
-    bright = param(unreal.MaterialExpressionScalarParameter, "BrilhoInterior", 120.0, -600, 450)
+    # nits: com a exposição de dia (EV 13,5) uns 2500 nits viram cinza médio; a sala acesa fica bem abaixo da rua ensolarada
+    bright = param(unreal.MaterialExpressionScalarParameter, "BrilhoInterior", 1500.0, -600, 450)  # 4000 deixava as salas brancas
     e1 = expr(m, unreal.MaterialExpressionMultiply, -400, 100)
     connect(interior, "", e1, "A")
     connect(no_frame, "", e1, "B")
@@ -432,7 +436,7 @@ def build_materials(textures, report):
     for floor_cm in FLOOR_HEIGHTS:
         mats["Janela%d" % floor_cm] = instance(window, "MI_Janela%d" % floor_cm, {"PaneWidthCm": 150.0},
                                                {"RoomSizeCm": (450.0, 450.0, floor_cm), "RoomOffsetCm": (0.0, 0.0, SIDEWALK_TOP + GROUND_FLOOR_CM)})
-    mats["Vitrine"] = instance(window, "MI_Vitrine", {"PaneWidthCm": 250.0, "BrilhoInterior": 160.0},
+    mats["Vitrine"] = instance(window, "MI_Vitrine", {"PaneWidthCm": 250.0, "BrilhoInterior": 2000.0},
                                {"RoomSizeCm": (700.0, 700.0, GROUND_FLOOR_CM), "RoomOffsetCm": (0.0, 0.0, SIDEWALK_TOP)})
     report.append("instâncias de material: %d" % len(mats))
     return mats
@@ -487,7 +491,11 @@ def build_street(b):
         n += 1
 
 
+FACADES = []  # (x inicial, x final, lado, y da fachada) de cada prédio, para prender as lanternas
+
+
 def build_buildings(b, report):
+    FACADES.clear()
     rng = random.Random(15)  # semente fixa: a cena é igual em toda execução
     front = LANE_CM + CURB_W + SIDEWALK_W
     total = 0
@@ -512,6 +520,7 @@ def build_buildings(b, report):
             y_face = side * (front + setback)
             y0, y1 = sorted((y_face, y_face + side * depth))
             b.box("Predio_%+d_%02d" % (side, total), x, x + width, y0, y1, SIDEWALK_TOP - 5.0, SIDEWALK_TOP + height, mat)
+            FACADES.append((x, x + width, side, y_face))
             # vidro na fachada da rua: vitrine no térreo e uma faixa por andar, 2 cm para fora da parede
             gy0, gy1 = sorted((y_face, y_face - side * 2.0))
             b.box("Vitrine_%+d_%02d" % (side, total), x + 150.0, x + width - 150.0, gy0, gy1, SIDEWALK_TOP + 40.0, SIDEWALK_TOP + GROUND_FLOOR_CM - 90.0, "Vitrine")
@@ -590,12 +599,221 @@ def open_empty_map(report):
     return levels
 
 
-def build_map(mats, report):
+# --- mobiliário de rua (modelos CC0 do Poly Haven; uma linha por modelo em docs/licencas.csv) ---
+
+PROP_DIR = ROOT + "/Props"
+PROPS = ("street_lamp_01", "street_lamp_02", "metal_trash_can", "modular_street_seating", "fire_hydrant", "jacaranda_tree")
+SKIP_SETS = ("_aged", "_rust")  # variações gastas ficam de fora: as limpas bastam e pesam menos
+
+
+def prop_texture_sets(folder):
+    """{conjunto: {tipo: arquivo}} a partir de textures/<conjunto>_<tipo>_<res>.<ext>."""
+    sets = {}
+    tdir = os.path.join(folder, "textures")
+    for name in sorted(os.listdir(tdir)):
+        m = re.match(r"^(.*)_(diff|nor_gl|rough|metal|opacity|alpha)_\dk\.(jpg|png|exr)$", name)
+        if not m or any(m.group(1).endswith(s) for s in SKIP_SETS):
+            continue
+        sets.setdefault(m.group(1), {})[m.group(2)] = os.path.join(tdir, name)
+    return sets
+
+
+def import_prop_texture(path, name, kind):
+    task = unreal.AssetImportTask()
+    task.filename = path
+    task.destination_path = PROP_DIR + "/Textures"
+    task.destination_name = name
+    task.automated = True
+    task.replace_existing = True
+    task.save = False
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    asset_path = PROP_DIR + "/Textures/" + name
+    tex = unreal.load_asset(asset_path)
+    if not isinstance(tex, unreal.Texture2D):
+        raise LookdevError("A importação não gerou a textura " + asset_path)
+    if kind == "nor_gl":
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+        tex.set_editor_property("srgb", False)
+        tex.set_editor_property("flip_green_channel", True)  # normal no padrão OpenGL; o Unreal usa o DirectX
+    elif kind != "diff":
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+        tex.set_editor_property("srgb", False)
+    unreal.EditorAssetLibrary.save_asset(asset_path)
+    return tex
+
+
+def plain_texture(name, value, kind):
+    """Textura 4x4 de um valor só (conteúdo próprio, gerada aqui), com a compressão do tipo: o padrão dos parâmetros do material-pai
+    precisa casar com o tipo de amostragem, e o "sem metal" das instâncias precisa de uma máscara preta de verdade."""
+    png = os.path.join(project_dir(), "Saved", "Lookdev", name + ".png")
+    os.makedirs(os.path.dirname(png), exist_ok=True)
+    row = b"\x00" + bytes([value, value, value]) * 4
+
+    def chunk(kind_, data):
+        return struct.pack(">I", len(data)) + kind_ + data + struct.pack(">I", zlib.crc32(kind_ + data) & 0xFFFFFFFF)
+
+    with open(png, "wb") as handle:
+        handle.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 4, 4, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(row * 4)) + chunk(b"IEND", b""))
+    return import_prop_texture(png, name, kind)
+
+
+def build_prop_master(name, masked, defaults, report):
+    """Material-pai dos modelos: cor, normal, aspereza (R) e metal (R); o mascarado tem opacidade (R) e duas faces (folhas, vidro)."""
+    path = PROP_DIR + "/" + name
+    mel = unreal.MaterialEditingLibrary
+    m = recreate(path, unreal.Material, unreal.MaterialFactoryNew())
+
+    def sampler(param, texture, kind, y):
+        s = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, -600, y)
+        s.set_editor_property("parameter_name", param)
+        s.set_editor_property("texture", texture)
+        s.set_editor_property("sampler_type", kind)
+        return s
+
+    color = sampler("Cor", defaults["cor"], unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, -300)
+    normal = sampler("Normal", unreal.load_asset("/Engine/EngineMaterials/DefaultNormal"), unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, 0)
+    rough = sampler("Aspereza", defaults["branco"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, 300)
+    metal = sampler("Metal", defaults["preto"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, 600)
+    mel.connect_material_property(color, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(normal, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    mel.connect_material_property(rough, "R", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.connect_material_property(metal, "R", unreal.MaterialProperty.MP_METALLIC)
+    if masked:
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+        m.set_editor_property("two_sided", True)
+        opacity = sampler("Opacidade", defaults["branco"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, 900)
+        mel.connect_material_property(opacity, "R", unreal.MaterialProperty.MP_OPACITY_MASK)
+    m.set_editor_property("used_with_nanite", True)
+    mel.recompile_material(m)
+    unreal.EditorAssetLibrary.save_asset(path)
+    report.append("material criado: " + path)
+    return m
+
+
+def import_prop_mesh(fbx, name):
+    task = unreal.AssetImportTask()
+    task.filename = fbx
+    task.destination_path = PROP_DIR
+    task.destination_name = name
+    task.automated = True
+    task.replace_existing = True
+    task.save = False
+    opts = unreal.FbxImportUI()
+    opts.set_editor_property("import_mesh", True)
+    opts.set_editor_property("import_materials", False)
+    opts.set_editor_property("import_textures", False)
+    opts.set_editor_property("import_as_skeletal", False)
+    opts.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_STATIC_MESH)
+    data = opts.get_editor_property("static_mesh_import_data")
+    data.set_editor_property("combine_meshes", True)
+    data.set_editor_property("build_nanite", True)
+    data.set_editor_property("generate_lightmap_u_vs", False)
+    task.options = opts
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    mesh = unreal.load_asset(PROP_DIR + "/" + name)
+    if not isinstance(mesh, unreal.StaticMesh):
+        raise LookdevError("A importação não gerou a malha " + PROP_DIR + "/" + name)
+    return mesh
+
+
+def import_props(models_root, report):
+    """Importa os modelos que estiverem em models_root/<id>/ e devolve {id: StaticMesh}. Sem a pasta: nenhum (a cena sai sem eles)."""
+    if not models_root or not os.path.isdir(models_root):
+        report.append("mobiliário de rua: pasta de modelos ausente, cena sem ele")
+        return {}
+    check_game_path(PROP_DIR)
+    defaults = {"cor": plain_texture("T_DNBrancoCor", 255, "diff"), "branco": plain_texture("T_DNBranco", 255, "mask"),
+                "preto": plain_texture("T_DNPreto", 0, "mask")}
+    opaque = build_prop_master("M_DNPropOpaco", False, defaults, report)
+    masked = build_prop_master("M_DNPropMascarado", True, defaults, report)
+    meshes = {}
+    for ph_id in PROPS:
+        folder = os.path.join(models_root, ph_id)
+        fbx = [f for f in os.listdir(folder) if f.lower().endswith(".fbx")] if os.path.isdir(folder) else []
+        if not fbx:
+            report.append("mobiliário: %s não encontrado, ficou de fora" % ph_id)
+            continue
+        if unreal.EditorAssetLibrary.does_asset_exist(PROP_DIR + "/SM_" + ph_id):
+            # já importado: reaproveita (a importação do jacarandá leva minutos); para reimportar, apague a pasta Props
+            meshes[ph_id] = unreal.load_asset(PROP_DIR + "/SM_" + ph_id)
+            report.append("mobiliário %s: reaproveitado" % ph_id)
+            continue
+        mesh = import_prop_mesh(os.path.join(folder, fbx[0]), "SM_" + ph_id)
+        instances = {}
+        for key, files in prop_texture_sets(folder).items():
+            tex = {kind: import_prop_texture(path, "T_%s_%s" % (key, kind), kind) for kind, path in files.items()}
+            is_masked = "opacity" in tex or "alpha" in tex
+            params = {"Cor": tex.get("diff"), "Normal": tex.get("nor_gl"), "Aspereza": tex.get("rough"), "Metal": tex.get("metal") or defaults["preto"],
+                      "Opacidade": tex.get("opacity") or tex.get("alpha")}
+            instances[key] = instance(masked if is_masked else opaque, "MI_" + key, None, None, {k: v for k, v in params.items() if v is not None})
+        slots = [str(s.material_slot_name) for s in mesh.get_editor_property("static_materials")]
+        chosen = []
+        for i, slot in enumerate(slots):
+            # o conjunto cujo sufixo aparece no nome do slot; senão o conjunto com o nome do modelo
+            low = slot.lower()
+            best = next((k for k in instances if k != ph_id and k[len(ph_id) + 1:] and k[len(ph_id) + 1:] in low), None)
+            best = best or (ph_id if ph_id in instances else next(iter(instances), None))
+            if best:
+                mesh.set_material(i, instances[best])
+            chosen.append("%s->%s" % (slot, best))
+        unreal.EditorAssetLibrary.save_asset(PROP_DIR + "/SM_" + ph_id)
+        bounds = mesh.get_bounds()
+        report.append("mobiliário %s: extensão %s cm, slots %s" % (ph_id, bounds.box_extent, ", ".join(chosen)))
+        meshes[ph_id] = mesh
+    return meshes
+
+
+def build_props(b, props, report):
+    """Postes perto do meio-fio, bancos e lixeiras junto aos prédios, hidrantes, e jacarandás nos recuos dos trechos baixos."""
+    if not props:
+        return
+    front = LANE_CM + CURB_W + SIDEWALK_W
+    count = 0
+
+    def place(ph_id, x, y, yaw, z=SIDEWALK_TOP, scale=1.0):
+        nonlocal count
+        if ph_id not in props:
+            return
+        actor = b.spawn(unreal.StaticMeshActor, (x, y, z), unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw), "%s_%d" % (ph_id, count))
+        actor.static_mesh_component.set_static_mesh(props[ph_id])
+        actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+        count += 1
+
+    for side in (-1, 1):
+        x = ROAD_X0 + 1000.0
+        n = 0
+        while x < ROAD_X1 - 500.0:
+            place("street_lamp_01", x, side * (LANE_CM + CURB_W + 60.0), -90.0 * side)
+            n += 1
+            x += 2500.0
+        x = ROAD_X0 + 1500.0 + (700.0 if side > 0 else 0.0)
+        while x < ROAD_X1 - 500.0:
+            place("modular_street_seating", x, side * (front - 90.0), 90.0 * side)
+            place("metal_trash_can", x + 300.0, side * (front - 70.0), 0.0)
+            x += 6000.0
+        x = ROAD_X0 + 3200.0 + (1800.0 if side > 0 else 0.0)
+        while x < ROAD_X1 - 500.0:
+            place("fire_hydrant", x, side * (LANE_CM + CURB_W + 45.0), 0.0)
+            x += 7000.0
+    # lanterna de parede (street_lamp_02 é a cabeça sem poste): no meio da fachada, a 2,8 m da calçada, de prédio sim, prédio não
+    for i, (fx0, fx1, side, y_face) in enumerate(FACADES):
+        if i % 2 == 0:
+            place("street_lamp_02", (fx0 + fx1) * 0.5, y_face - side * 25.0, -90.0 * side, z=SIDEWALK_TOP + 280.0)
+    for z0, z1, side in LOW_ZONES:
+        x = z0 + 600.0
+        while x < z1 - 600.0:
+            place("jacaranda_tree", x, side * (front + 450.0), (x * 37.0) % 360.0, scale=0.6)  # o modelo tem 19 m de altura
+            x += 1200.0
+    report.append("mobiliário de rua colocado: %d atores" % count)
+
+
+def build_map(mats, report, props=None):
     levels = open_empty_map(report)
     b = Builder(mats)
     build_light(b)
     build_street(b)
     build_buildings(b, report)
+    build_props(b, props or {}, report)
     if not levels.save_current_level():
         raise LookdevError("Não consegui salvar o mapa " + MAP_PATH)
     report.append("mapa criado: %s (%d atores)" % (MAP_PATH, b.count))
@@ -611,7 +829,8 @@ def main():
         source = os.path.abspath(args.textures)
         textures = import_textures(source, report)
         mats = build_materials(textures, report)
-        build_map(mats, report)
+        props = import_props(os.path.abspath(args.models) if args.models else None, report)
+        build_map(mats, report, props)
     except LookdevError as exc:
         error = str(exc)
     except Exception as exc:  # qualquer outro erro também derruba o processo, com mensagem
