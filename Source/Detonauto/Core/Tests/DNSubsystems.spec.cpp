@@ -244,7 +244,7 @@ void FDNGameDataSubsystemSpec::Define()
 		{
 			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();
 			TestEqual("antes de carregar: so o padrao", Sub->GetCameraModes().Num(), 1);
-			TestEqual("e e o alta-longe", Sub->GetCameraModes()[0].Id, FString(TEXT("alta-longe")));
+			if (Sub->GetCameraModes().Num() == 1) { TestEqual("e e o alta-longe", Sub->GetCameraModes()[0].Id, FString(TEXT("alta-longe"))); }
 			Sub->Reload();
 			const TArray<FDNCameraMode> Modes = Sub->GetCameraModes();
 			TestEqual("cinco modos", Modes.Num(), 5);
@@ -261,7 +261,7 @@ void FDNGameDataSubsystemSpec::Define()
 			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(MoveTemp(Data), {});
 			TestEqual("dois modos", Sub->GetCameraModes().Num(), 2);
-			TestEqual("FOV do segundo", Sub->GetCameraModes()[1].Config.Fov, 77.f);
+			if (Sub->GetCameraModes().Num() == 2) { TestEqual("FOV do segundo", Sub->GetCameraModes()[1].Config.Fov, 77.f); }
 
 			FDNData Bad;
 			Bad.CameraModes = { DNTest::CameraEntry() };
@@ -269,7 +269,7 @@ void FDNGameDataSubsystemSpec::Define()
 			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
 			Sub->ApplyData(MoveTemp(Bad), {});
 			TestEqual("tabela invalida: so o padrao", Sub->GetCameraModes().Num(), 1);
-			TestEqual("FOV padrao", Sub->GetCameraModes()[0].Config.Fov, FDNCameraConfig().Fov);
+			if (Sub->GetCameraModes().Num() == 1) { TestEqual("FOV padrao", Sub->GetCameraModes()[0].Config.Fov, FDNCameraConfig().Fov); }
 		});
 
 		It("recarregar substitui o estado anterior (nao acumula erros)", [this]()
