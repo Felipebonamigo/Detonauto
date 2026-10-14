@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Joga o carro do projeto (ADNVehicle) em um mapa vazio da engine com piso e parede criados em C++: para jogar (-Play) ou para
     rodar um cenário sem intervenção e imprimir o que o código mediu, ou tirar uma foto com o HUD.
@@ -29,7 +29,7 @@
 #>
 param(
     [Parameter(Mandatory)][string]$Uproject,
-    [string]$Row = 'Padrao',
+    [string]$Row = 'arcade-3',            # preset padrão do jogo (o que o Felipe mais gostou no playtest 1)
     [ValidateSet('Sin', 'Accel', 'Turbo', 'Handbrake', 'Turn', 'Switch', 'Wall', 'Steer', 'Boost')][string]$Scenario = 'Sin',
     [double]$HbKmh = 0,                 # cenários Handbrake e Turn: velocidade de entrada (0 = 55)
     [switch]$TurboOn,                   # cenário Boost: aperta o turbo
@@ -40,14 +40,27 @@ param(
     [switch]$Shot,
     [switch]$ShotDent,
     [int]$WallKmh = 0,                   # cenário Wall: segura esta velocidade na aproximação (0 = acelerador a fundo)
-    [string]$Map = '/Engine/Maps/Entry',
+    [string]$Map = '/Engine/Maps/Entry',   # /Game/Detonauto/Maps/L_Lookdev: cena de aparência (o GameMode usa o PlayerStart do mapa)
+    [int]$ResX = 1280,                  # janela de -Play, -Keys, -Shot e -ShotDent
+    [int]$ResY = 720,
     [string[]]$ExtraArgs = @(),         # argumentos extras para o jogo (ex.: -DNTraffic=0)
+    [switch]$AlvoPS5,                   # perfil de qualidade "alvo PS5" (DN_AlvoPS5 em Config/DefaultDeviceProfiles.ini; docs/desempenho.md)
+    [string[]]$Exec = @(),              # comandos de console depois de carregar (ex.: 'r.ScreenPercentage', 'stat unit')
     [string]$GameMode = 'DNVehicleTestGameMode',   # DNCrashTestGameMode: estrada sem parede (use -Keys; -DNTraffic=0 sem tráfego)
     [int]$TimeoutSeconds = 240,
     [string]$EngineVersion
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Find-Unreal.ps1')
+
+function Get-DeviceProfileCVars([string]$Ini, [string]$ProfileName) {
+    # linhas +CVars=nome=valor da seção [<perfil> DeviceProfile], como comandos de console "nome valor"
+    $inSection = $false
+    foreach ($line in Get-Content -LiteralPath $Ini -Encoding UTF8) {
+        if ($line -match '^\s*\[(.+)\]\s*$') { $inSection = ($Matches[1] -eq "$ProfileName DeviceProfile"); continue }
+        if ($inSection -and $line -match '^\s*\+CVars=([^=]+)=(.+?)\s*$') { "$($Matches[1]) $($Matches[2])" }
+    }
+}
 
 try { $ctx = Resolve-UnrealContext $Uproject $EngineVersion } catch { Write-Error $_.Exception.Message; exit 1 }
 $exe = Join-Path $ctx.Root 'Engine\Binaries\Win64\UnrealEditor.exe'
@@ -59,10 +72,11 @@ if (Test-Path $log) { Remove-Item $log }
 
 $a = @("`"$($ctx.Uproject)`"", "$Map`?game=/Script/$($ctx.Name).$GameMode", '-game', '-windowed', '-novsync', '-nosplash', '-nosound',
     "-DNCarRow=$Row", "-abslog=`"$log`"")
-if ($Keys) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', "-DNKeys=$Keys") }
-elseif ($Play) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes') }
-elseif ($ShotDent) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNShotDent') }
-elseif ($Shot) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNCarShot') }
+# o roteiro vai entre aspas: pode ter espaço (EXEC:csvprofile start)
+if ($Keys) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes', "-DNKeys=`"$Keys`"") }
+elseif ($Play) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes') }
+elseif ($ShotDent) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes', '-DNShotDent') }
+elseif ($Shot) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes', '-DNCarShot') }
 else {
     $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario")
     if ($WallKmh -gt 0) { $a += "-DNWallKmh=$WallKmh" }
@@ -72,6 +86,14 @@ else {
     if ($PSBoundParameters.ContainsKey('Steer') -or $Scenario -eq 'Steer') { $a += ("-DNSteer=" + $Steer.ToString([Globalization.CultureInfo]::InvariantCulture)) }
 }
 
+$execList = @($Exec)
+if ($AlvoPS5) {
+    $a += '-DeviceProfile=DN_AlvoPS5'
+    # O GameUserSettings.ini da máquina (Saved/Config) reaplica os grupos sg.* por cima do perfil. Os mesmos valores do perfil, lidos
+    # do .ini, vão também como comandos de console, que têm prioridade maior. O arquivo do usuário não é tocado.
+    $execList = @(Get-DeviceProfileCVars (Join-Path $projDir 'Config\DefaultDeviceProfiles.ini') 'DN_AlvoPS5') + $execList
+}
+if ($execList.Count -gt 0) { $a += "-ExecCmds=`"$($execList -join ',')`"" }
 $a += $ExtraArgs
 $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
 if ($Play) { Write-Host 'Jogo aberto. Feche a janela para terminar.'; $p.WaitForExit(); exit 0 }

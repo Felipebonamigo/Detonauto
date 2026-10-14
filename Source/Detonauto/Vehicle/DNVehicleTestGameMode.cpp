@@ -6,6 +6,7 @@
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
@@ -24,6 +25,22 @@ void ADNVehicleTestGameMode::InitGame(const FString& MapName, const FString& Opt
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
+	// mapa de verdade (cena de aparência): o PlayerStart dele tem a tag DNMapStart. O /Engine/Maps/Entry também tem um PlayerStart
+	// (sem a tag), por isso a tag e não só "existe PlayerStart"
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(MapStartTag))
+		{
+			MapStart = *It;
+			break;
+		}
+	}
+	if (MapStart)
+	{
+		UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: o mapa '%s' tem PlayerStart com a tag %s; sem arena de teste"), *MapName, *MapStartTag.ToString());
+		return;
+	}
+
 	// piso, parede e luz: o mapa é vazio
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -32,6 +49,10 @@ void ADNVehicleTestGameMode::InitGame(const FString& MapName, const FString& Opt
 
 AActor* ADNVehicleTestGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
+	if (MapStart)
+	{
+		return MapStart;
+	}
 	if (!Start)
 	{
 		FActorSpawnParameters Params;
@@ -181,6 +202,13 @@ void ADNVehicleTestGameMode::KeyScriptTick(ADNVehicle& Vehicle, float DeltaSecon
 		{
 			E.bDone = true;
 			Vehicle.SetShotCamera(FCString::Atof(*E.What.Mid(3)));
+		}
+		else if (E.What.StartsWith(TEXT("EXEC:")))
+		{
+			// EXEC:<comando de console>, ex. EXEC:csvprofile start (o comando não pode ter ';' nem '@', os separadores do roteiro)
+			E.bDone = true;
+			PC->ConsoleCommand(E.What.Mid(5));
+			UE_LOG(LogDetonauto, Display, TEXT("DNKeys: t=%.2f s comando '%s'"), ScriptTime, *E.What.Mid(5));
 		}
 		else
 		{

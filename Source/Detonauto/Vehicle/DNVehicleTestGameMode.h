@@ -3,7 +3,8 @@
 //
 //     UnrealEditor.exe Detonauto.uproject /Engine/Maps/Entry?game=/Script/Detonauto.DNVehicleTestGameMode -game
 //
-// ou use Tools/Unreal/play-vehicle.ps1. Teclas (as mesmas do protótipo): W/S acelera e freia, A/D esterça, Espaço = freio de mão,
+// ou use Tools/Unreal/vehicle-probe.ps1. Num mapa com um PlayerStart marcado com a tag DNMapStart (a cena de aparência
+// /Game/Detonauto/Maps/L_Lookdev, criada por Tools/Unreal/create_lookdev.py) não cria a arena: o carro nasce nesse PlayerStart. Teclas (as mesmas do protótipo): W/S acelera e freia, A/D esterça, Espaço = freio de mão,
 // Shift = turbo, 1/2/3/0 = presets arcade-1/2/3/Padrao, T/Y/U = batida simulada na frente (pequena, média, máxima), G/H/J = no
 // lado esquerdo, V = limpa os amassados.
 //
@@ -41,16 +42,22 @@ protected:
 protected:
 	ADNVehicle* FindVehicle() const;
 
-	/** A arena criada em InitGame (a rodada de Crash desliga a parede). */
+	/** A arena criada em InitGame (a rodada de Crash desliga a parede). Nula num mapa de verdade (ver MapStartTag). */
 	UPROPERTY(Transient)
 	TObjectPtr<ADNTestArena> Arena;
+
+	/** Tag do PlayerStart de um mapa de verdade (L_Lookdev): com ele, sem arena e o carro nasce ali. */
+	inline static const FName MapStartTag = FName(TEXT("DNMapStart"));
+
+	UPROPERTY(Transient)
+	TObjectPtr<APlayerStart> MapStart;
 
 	/** Roteiro de teclas (-DNKeys): pressiona e solta teclas REAIS pelo PlayerController, o mesmo caminho do teclado do jogador. */
 	void KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds);
 
 	struct FScriptEvent
 	{
-		FString What;       // nome da tecla (W, T, SpaceBar...), ou SHOT, CAM<yaw>, QUIT
+		FString What;       // nome da tecla (W, T, SpaceBar...), ou SHOT, CAM<yaw>, QUIT, DENT..., DEMO<n>, EXEC:<comando de console>
 		float Start = 0.0f;
 		float End = -1.0f;  // soltar; teclas sem fim soltam 0,15 s depois
 		bool bPressed = false;
