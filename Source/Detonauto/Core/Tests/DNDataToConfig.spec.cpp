@@ -88,7 +88,8 @@ void FDNDataToConfigSpec::Define()
 			R.MassKg = 1201.f; R.MaxTorque = 851.f; R.LateralGrip = 1.1f; R.SuspensionStiffness = 171.f; R.SteeringGain = 1.2f;
 			R.CenterOfMassDropCm = 26.f; R.SuspensionDampingRatio = 0.56f; R.SuspensionTravelCm = 19.f; R.RollbarScaling = 0.06f;
 			R.RearGripFactor = 0.86f; R.HandbrakeRearGrip = 0.36f; R.HandbrakeRampInSeconds = 0.13f; R.HandbrakeRampOutSeconds = 0.71f;
-			R.HandbrakeTorque = 3001.f; R.CameraDistanceCm = 811.f; R.CameraHeightCm = 186.f; R.CameraFov = 96.f; R.NitroAccelMps2 = 13.f;
+			R.HandbrakeTorque = 3001.f; R.NitroAccelMps2 = 13.f;
+			R.DriftAssistStartDeg = 22.f; R.DriftAssistGain = 11.f; R.DriftAssistMax = 333.f;
 			const FDNCarConfig C = R.ToConfig();
 			TestEqual("MassKg", C.MassKg, 1201.f);
 			TestEqual("MaxTorque", C.MaxTorque, 851.f);
@@ -104,10 +105,31 @@ void FDNDataToConfigSpec::Define()
 			TestEqual("HandbrakeRampInSeconds", C.HandbrakeRampInSeconds, 0.13f);
 			TestEqual("HandbrakeRampOutSeconds", C.HandbrakeRampOutSeconds, 0.71f);
 			TestEqual("HandbrakeTorque", C.HandbrakeTorque, 3001.f);
-			TestEqual("CameraDistanceCm", C.CameraDistanceCm, 811.f);
-			TestEqual("CameraHeightCm", C.CameraHeightCm, 186.f);
-			TestEqual("CameraFov", C.CameraFov, 96.f);
+			TestEqual("DriftAssistStartDeg", C.DriftAssistStartDeg, 22.f);
+			TestEqual("DriftAssistGain", C.DriftAssistGain, 11.f);
+			TestEqual("DriftAssistMax", C.DriftAssistMax, 333.f);
 			TestEqual("NitroAccelMps2", C.NitroAccelMps2, 13.f);
+		});
+
+		It("Camera", [this]()
+		{
+			FDNCameraConfigRow R;
+			R.Anchor = TEXT("Car"); R.DistanceCm = 0.f; R.HeightCm = 101.f; R.ForwardCm = 143.f; R.SideCm = -31.f; R.PitchDeg = -4.f; R.Fov = 103.f; R.Smoothing = 7.f;
+			const FDNCameraConfig C = R.ToConfig();
+			TestEqual("Anchor", C.Anchor, EDNCameraAnchor::Car);
+			TestEqual("DistanceCm", C.DistanceCm, 0.f);
+			TestEqual("HeightCm", C.HeightCm, 101.f);
+			TestEqual("ForwardCm", C.ForwardCm, 143.f);
+			TestEqual("SideCm", C.SideCm, -31.f);
+			TestEqual("PitchDeg", C.PitchDeg, -4.f);
+			TestEqual("Fov", C.Fov, 103.f);
+			TestEqual("Smoothing", C.Smoothing, 7.f);
+			FDNCameraConfigRow Chase;
+			Chase.Anchor = TEXT("chase");
+			TestEqual("Chase (caixa diferente)", Chase.ToConfig().Anchor, EDNCameraAnchor::Chase);
+			FDNCameraConfigRow Invalido;
+			Invalido.Anchor = TEXT("Orbit");
+			TestEqual("texto invalido cai em Chase (a validacao ja recusou antes)", Invalido.ToConfig().Anchor, EDNCameraAnchor::Chase);
 		});
 
 		It("Damage", [this]()

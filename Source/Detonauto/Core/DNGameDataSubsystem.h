@@ -14,6 +14,13 @@
 #include "Core/DNMedals.h"
 #include "DNGameDataSubsystem.generated.h"
 
+/** Um modo de câmera: o id de Cameras.csv e os números. */
+struct FDNCameraMode
+{
+	FString Id;
+	FDNCameraConfig Config;
+};
+
 UCLASS()
 class DETONAUTO_API UDNGameDataSubsystem : public UGameInstanceSubsystem
 {
@@ -43,6 +50,8 @@ public:
 	FDNDamageConfig GetDamageConfig() const;
 	/** Os números do tráfego do CSV, ou o padrão se TrafficSettings.csv é inválido (S1). */
 	FDNTrafficSettings GetTrafficSettings() const;
+	/** Os modos de câmera do CSV, na ordem da tecla C. Tabela inválida ou não carregada: só o modo padrão (alta-longe). */
+	TArray<FDNCameraMode> GetCameraModes() const;
 	/** Os carros de tráfego do CSV; vazio se TrafficVehicles.csv é inválido ou não foi carregado. */
 	const TArray<FDNTrafficVehicleEntry>& GetTrafficVehicles() const;
 	/** Limites das medalhas do cruzamento (sem diferenciar a caixa). Falso, sem mexer em Out, se não existe ou os limites são inválidos. */
@@ -63,6 +72,7 @@ private:
 	bool bTakedownValid = false;
 	bool bDamageValid = false;
 	bool bCarsValid = false;
+	bool bCamerasValid = false;
 	bool bTrafficSettingsValid = false;
 	bool bTrafficVehiclesValid = false;
 };

@@ -120,11 +120,12 @@ void FDNDataCarsSpec::Define()
 			Range(TEXT("HandbrakeTorque"), 0.f, 20000.f, [](FDNCarConfigRow& R, float V) { R.HandbrakeTorque = V; });
 		});
 
-		It("CameraDistanceCm, CameraHeightCm, CameraFov, NitroAccelMps2", [this]()
+		It("NitroAccelMps2 e a assistencia de derrapagem (inicio, ganho, teto)", [this]()
 		{
-			Range(TEXT("CameraDistanceCm"), 150.f, 2000.f, [](FDNCarConfigRow& R, float V) { R.CameraDistanceCm = V; });
-			Range(TEXT("CameraHeightCm"), 0.f, 600.f, [](FDNCarConfigRow& R, float V) { R.CameraHeightCm = V; });
-			Range(TEXT("CameraFov"), 60.f, 120.f, [](FDNCarConfigRow& R, float V) { R.CameraFov = V; });
+			Range(TEXT("DriftAssistStartDeg"), 0.f, 80.f, [](FDNCarConfigRow& R, float V) { R.DriftAssistStartDeg = V; });
+			// ganho e teto sao um par: os dois zero (desligada) ou os dois maiores que zero; por isso o extremo de baixo vale no par
+			Range(TEXT("DriftAssistGain"), 0.f, 500.f, [](FDNCarConfigRow& R, float V) { R.DriftAssistGain = V; R.DriftAssistMax = V > 0.f ? 100.f : 0.f; });
+			Range(TEXT("DriftAssistMax"), 0.f, 2000.f, [](FDNCarConfigRow& R, float V) { R.DriftAssistMax = V; R.DriftAssistGain = V > 0.f ? 10.f : 0.f; });
 			Range(TEXT("NitroAccelMps2"), 0.f, 40.f, [](FDNCarConfigRow& R, float V) { R.NitroAccelMps2 = V; });
 		});
 
@@ -140,6 +141,14 @@ void FDNDataCarsSpec::Define()
 			Bad(TEXT("HandbrakeRearGrip acima do maximo"), TEXT("HandbrakeRearGrip"), [](FDNCarConfigRow& R) { R.HandbrakeRearGrip = 1.501f; });
 			Bad(TEXT("HandbrakeRearGrip NaN"), TEXT("HandbrakeRearGrip"), [this](FDNCarConfigRow& R) { R.HandbrakeRearGrip = NaNf; });
 			Bad(TEXT("HandbrakeRearGrip abaixo do minimo"), TEXT("HandbrakeRearGrip"), [](FDNCarConfigRow& R) { R.HandbrakeRearGrip = 0.049f; });
+		});
+
+		It("assistencia de derrapagem: ganho e teto sao um par (os dois zero ou os dois maiores que zero)", [this]()
+		{
+			Good(TEXT("os dois zero (desligada)"), [](FDNCarConfigRow& R) { R.DriftAssistGain = 0.f; R.DriftAssistMax = 0.f; });
+			Good(TEXT("os dois ligados"), [](FDNCarConfigRow& R) { R.DriftAssistGain = 10.f; R.DriftAssistMax = 300.f; });
+			Bad(TEXT("ganho sem teto"), TEXT("DriftAssist"), [](FDNCarConfigRow& R) { R.DriftAssistGain = 10.f; R.DriftAssistMax = 0.f; });
+			Bad(TEXT("teto sem ganho"), TEXT("DriftAssist"), [](FDNCarConfigRow& R) { R.DriftAssistGain = 0.f; R.DriftAssistMax = 300.f; });
 		});
 
 		It("campo fora da propria faixa da exatamente um erro, o da faixa (o produto nao repete o aviso)", [this]()
@@ -185,11 +194,10 @@ void FDNDataCarsSpec::Define()
 		{
 			FDNCarConfigRow R = DNTest::CarRow();
 			R.MassKg = 1.f;
-			R.CameraFov = 500.f;
+			R.NitroAccelMps2 = 999.f;
 			R.NitroAccelMps2 = -3.f;
 			const TArray<FString> Errors = FDNDataValidation::ValidateCars({ DNTest::Entry<FDNCarConfigEntry>(R, TEXT("Padrao")) });
 			TestTrue("MassKg", Cites(Errors, TEXT("MassKg")));
-			TestTrue("CameraFov", Cites(Errors, TEXT("CameraFov")));
 			TestTrue("NitroAccelMps2", Cites(Errors, TEXT("NitroAccelMps2")));
 		});
 	});
@@ -230,9 +238,9 @@ void FDNDataCarsDriftSpec::Define()
 			Same(TEXT("HandbrakeRampInSeconds"), Csv.HandbrakeRampInSeconds, Def.HandbrakeRampInSeconds);
 			Same(TEXT("HandbrakeRampOutSeconds"), Csv.HandbrakeRampOutSeconds, Def.HandbrakeRampOutSeconds);
 			Same(TEXT("HandbrakeTorque"), Csv.HandbrakeTorque, Def.HandbrakeTorque);
-			Same(TEXT("CameraDistanceCm"), Csv.CameraDistanceCm, Def.CameraDistanceCm);
-			Same(TEXT("CameraHeightCm"), Csv.CameraHeightCm, Def.CameraHeightCm);
-			Same(TEXT("CameraFov"), Csv.CameraFov, Def.CameraFov);
+			Same(TEXT("DriftAssistStartDeg"), Csv.DriftAssistStartDeg, Def.DriftAssistStartDeg);
+			Same(TEXT("DriftAssistGain"), Csv.DriftAssistGain, Def.DriftAssistGain);
+			Same(TEXT("DriftAssistMax"), Csv.DriftAssistMax, Def.DriftAssistMax);
 			Same(TEXT("NitroAccelMps2"), Csv.NitroAccelMps2, Def.NitroAccelMps2);
 		});
 
@@ -247,9 +255,8 @@ void FDNDataCarsDriftSpec::Define()
 			TestEqual("barra", D.RollbarScaling, 0.15f);
 			TestEqual("freio de mao: torque", D.HandbrakeTorque, 6000.f);
 			TestEqual("freio de mao nao solta a traseira", D.HandbrakeRearGrip, 1.f);
-			TestEqual("camera: distancia", D.CameraDistanceCm, 650.f);
-			TestEqual("camera: altura", D.CameraHeightCm, 150.f);
-			TestEqual("camera: FOV", D.CameraFov, 90.f);
+			TestEqual("assistencia de derrapagem desligada no template", D.DriftAssistGain, 0.f);
+			TestEqual("assistencia: teto zero", D.DriftAssistMax, 0.f);
 		});
 
 		It("os presets das teclas existem no CSV: Padrao, arcade-1, arcade-2, arcade-3", [this]()

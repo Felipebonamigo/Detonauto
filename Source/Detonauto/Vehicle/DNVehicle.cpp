@@ -225,11 +225,6 @@ void ADNVehicle::ApplyRuntimeParameters(const FDNCarConfig& C)
 	// centro de massa: deslocamento em relação ao calculado pela malha (COMNudge do corpo)
 	GetMesh()->SetCenterOfMass(FVector(0.0f, 0.0f, -C.CenterOfMassDropCm), NAME_None);
 
-	// câmera
-	CameraBoom->TargetArmLength = C.CameraDistanceCm;
-	CameraBoom->SocketOffset.Z = C.CameraHeightCm;
-	Camera->SetFieldOfView(C.CameraFov);
-
 	// aderência: a lateral (curva de deslizamento) vale nas 4 rodas; a traseira também leva o fator do eixo e o freio de mão
 	HandbrakeRamp = 0.0f;
 	AppliedRearMultiplier = -1.0f;
@@ -240,11 +235,11 @@ void ADNVehicle::ApplyRuntimeParameters(const FDNCarConfig& C)
 		UE_LOG(LogDetonauto, Display,
 			TEXT("ADNVehicle: preset '%s' aplicado: massa pedida=%.0f kg (no corpo=%.1f kg), COM local=%s (queda pedida=%.0f cm), torque=%.0f, "
 				"aderência lateral=%.2f, traseira x%.2f, freio de mão traseira x%.2f (rampa %.2f/%.2f s, torque %.0f), mola=%.0f, amortecimento=%.2f, "
-				"curso=%.0f cm, barra=%.2f, ganho do volante=%.2f, câmera=%.0f/%.0f cm FOV %.0f, turbo=%.0f m/s²"),
+				"curso=%.0f cm, barra=%.2f, ganho do volante=%.2f, turbo=%.0f m/s², assistência de derrapagem: início %.0f graus, ganho %.1f, teto %.0f"),
 			*CarId.ToString(), C.MassKg, Body->GetBodyMass(), *Body->GetMassSpaceLocal().GetTranslation().ToCompactString(), C.CenterOfMassDropCm,
 			C.MaxTorque, C.LateralGrip, C.RearGripFactor, C.HandbrakeRearGrip, C.HandbrakeRampInSeconds, C.HandbrakeRampOutSeconds, C.HandbrakeTorque,
 			C.SuspensionStiffness, C.SuspensionDampingRatio, C.SuspensionTravelCm, C.RollbarScaling, C.SteeringGain,
-			C.CameraDistanceCm, C.CameraHeightCm, C.CameraFov, C.NitroAccelMps2);
+			C.NitroAccelMps2, C.DriftAssistStartDeg, C.DriftAssistGain, C.DriftAssistMax);
 	}
 }
 
@@ -329,6 +324,20 @@ void ADNVehicle::BeginPlay()
 		ApplyRuntimeParameters(Car);
 	}
 
+	// câmera: os modos de Data/Cameras.csv; -DNCamera=<índice> começa num modo (ferramentas de teste)
+	if (const UDNGameDataSubsystem* Data = DataSubsystemOf(this))
+	{
+		CameraModes = Data->GetCameraModes();
+	}
+	if (CameraModes.IsEmpty())
+	{
+		CameraModes.Add(FDNCameraMode{ TEXT("alta-longe"), FDNCameraConfig() });
+	}
+	int32 StartCamera = 0;
+	FParse::Value(FCommandLine::Get(), TEXT("DNCamera="), StartCamera);
+	bDriftAssist = !FParse::Param(FCommandLine::Get(), TEXT("DNNoAssist"));
+	SetCameraMode(StartCamera);
+
 	// os ossos das rodas no pose de referência (sem Anim Blueprint, é o pose em que o esqueleto fica)
 	WheelBoneRotations.Reset();
 	if (const USkeletalMesh* Skeletal = GetMesh()->GetSkeletalMeshAsset())
@@ -395,7 +404,7 @@ FString ADNVehicle::TurboText() const
 TArray<FString> ADNVehicle::HudLines() const
 {
 	TArray<FString> Lines = {
-		FString::Printf(TEXT("Preset: %s     (1 = arcade-1   2 = arcade-2   3 = arcade-3   0 = Padrao)"), *CarId.ToString()),
+		FString::Printf(TEXT("Preset: %s     (1 = arcade-1   2 = arcade-2   3 = arcade-3   0 = Padrao)     Câmera: %s (C)"), *CarId.ToString(), *CameraName()),
 		FString::Printf(TEXT("Velocidade: %.0f km/h"), SpeedKmh()),
 		TurboText() };
 	if (DentMaterial)
@@ -477,6 +486,16 @@ void ADNVehicle::Tick(float DeltaSeconds)
 		GetMesh()->AddForce(GetActorForwardVector() * (Car.NitroAccelMps2 * 100.0f * Chaos()->Mass));
 	}
 
+	// assistência de derrapagem (Core/DNDriftAssist): contra-esterço automático proporcional ao excesso de ângulo de deslize
+	if (bDriftAssist && Car.DriftAssistGain > 0.0f)
+	{
+		const float Accel = FDNDriftAssist::YawAcceleration(Car.DriftAssist(), SlipAngleDegNow(), SpeedKmh(), GetMesh()->GetPhysicsAngularVelocityInDegrees().Z);
+		if (Accel != 0.0f)
+		{
+			GetMesh()->AddTorqueInDegrees(FVector(0.0f, 0.0f, Accel), NAME_None, true); // aceleração angular [graus/s²]
+		}
+	}
+
 	// modo de teste: barra vazia e desligado por um tempo, enche de novo
 	if (bTurboTestMode && !Turbo->IsActive() && Turbo->GetBar() <= 0.0f)
 	{
@@ -528,6 +547,9 @@ void ADNVehicle::CreateInputAssets()
 	Left.Modifiers.Add(NewObject<UInputModifierNegate>(MappingContext));
 	MappingContext->MapKey(HandbrakeAction, EKeys::SpaceBar);
 	MappingContext->MapKey(TurboAction, EKeys::LeftShift);
+	CameraAction = NewObject<UInputAction>(this, TEXT("DN_CameraAction"));
+	CameraAction->ValueType = EInputActionValueType::Boolean;
+	MappingContext->MapKey(CameraAction, EKeys::C);
 
 	// batidas simuladas de teste: T Y U = frente (pequena, média, máxima), G H J = lado esquerdo, V = limpar
 	const FKey DentKeys[] = { EKeys::T, EKeys::Y, EKeys::U, EKeys::G, EKeys::H, EKeys::J, EKeys::V };
@@ -579,6 +601,7 @@ void ADNVehicle::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 		Input->BindAction(HandbrakeAction, ETriggerEvent::Completed, this, &ADNVehicle::HandbrakeStop);
 		Input->BindAction(TurboAction, ETriggerEvent::Started, this, &ADNVehicle::TurboStart);
 		Input->BindAction(TurboAction, ETriggerEvent::Completed, this, &ADNVehicle::TurboStop);
+		Input->BindAction(CameraAction, ETriggerEvent::Started, this, &ADNVehicle::CameraKey);
 		for (int32 i = 0; i < PresetActions.Num(); ++i)
 		{
 			Input->BindAction(PresetActions[i], ETriggerEvent::Started, this, &ADNVehicle::PresetKey, i);
@@ -638,6 +661,11 @@ void ADNVehicle::TurboStart(const FInputActionValue& Value)
 void ADNVehicle::TurboStop(const FInputActionValue& Value)
 {
 	SetTurboButton(false);
+}
+
+void ADNVehicle::CameraKey(const FInputActionValue& Value)
+{
+	CycleCamera();
 }
 
 void ADNVehicle::PresetKey(const FInputActionValue& Value, int32 HotkeyIndex)
@@ -857,14 +885,62 @@ void ADNVehicle::FlushImpacts(double Now)
 
 void ADNVehicle::RestoreChaseCamera()
 {
-	CameraBoom->bEnableCameraRotationLag = true;
-	CameraBoom->SetRelativeRotation(FRotator::ZeroRotator);
-	CameraBoom->TargetArmLength = Car.CameraDistanceCm;
-	CameraBoom->SocketOffset.Z = Car.CameraHeightCm;
+	SetCameraMode(CameraIndex);
+}
+
+FString ADNVehicle::CameraName() const
+{
+	return CameraModes.IsValidIndex(CameraIndex) ? CameraModes[CameraIndex].Id : FString(TEXT("-"));
+}
+
+void ADNVehicle::CycleCamera()
+{
+	SetCameraMode(FDNCameraCycle::Next(CameraIndex, CameraModes.Num()));
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicle: câmera '%s'"), *CameraName());
+}
+
+void ADNVehicle::SetCameraMode(int32 Index)
+{
+	if (CameraModes.IsEmpty())
+	{
+		return;
+	}
+	CameraIndex = CameraModes.IsValidIndex(Index) ? Index : 0;
+	const FDNCameraConfig& C = CameraModes[CameraIndex].Config;
+	CameraBoom->SetRelativeRotation(FRotator(C.PitchDeg, 0.0f, 0.0f));
+	CameraBoom->bEnableCameraRotationLag = C.Smoothing > 0.0f;
+	CameraBoom->CameraRotationLagSpeed = C.Smoothing > 0.0f ? C.Smoothing : 2.0f;
+	if (C.Anchor == EDNCameraAnchor::Chase)
+	{
+		// atrás do carro, num braço: não balança nem inclina junto com a carroceria
+		CameraBoom->SetRelativeLocation(FVector::ZeroVector);
+		CameraBoom->TargetArmLength = C.DistanceCm;
+		CameraBoom->SocketOffset = FVector(0.0f, 0.0f, C.HeightCm);
+		CameraBoom->bInheritPitch = false;
+		CameraBoom->bInheritRoll = false;
+	}
+	else
+	{
+		// presa ao carro (capô, para-choque, motorista): sem braço, na posição pedida, e acompanha a carroceria inteira
+		CameraBoom->SetRelativeLocation(FVector(C.ForwardCm, C.SideCm, C.HeightCm));
+		CameraBoom->TargetArmLength = 0.0f;
+		CameraBoom->SocketOffset = FVector::ZeroVector;
+		CameraBoom->bInheritPitch = true;
+		CameraBoom->bInheritRoll = true;
+	}
+	Camera->SetFieldOfView(C.Fov);
+}
+
+float ADNVehicle::SlipAngleDegNow() const
+{
+	return FDNDriftAssist::SlipAngleDeg(GetActorTransform().InverseTransformVectorNoScale(GetVelocity()));
 }
 
 void ADNVehicle::SetShotCamera(float YawDegrees)
 {
+	CameraBoom->SetRelativeLocation(FVector::ZeroVector); // os modos presos ao carro deslocam o braço; a vista de foto orbita o carro
+	CameraBoom->bInheritPitch = false;
+	CameraBoom->bInheritRoll = false;
 	CameraBoom->bEnableCameraRotationLag = false;
 	CameraBoom->bInheritYaw = true;
 	CameraBoom->SetRelativeRotation(FRotator(-12.0f, YawDegrees, 0.0f));

@@ -27,6 +27,7 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bTakedownValid = FDNDataValidation::ValidateTakedown(Data.TakedownConfig).IsEmpty();
 	bDamageValid = FDNDataValidation::ValidateDamage(Data.DamageConfig).IsEmpty();
 	bCarsValid = FDNDataValidation::ValidateCars(Data.CarConfigs).IsEmpty();
+	bCamerasValid = FDNDataValidation::ValidateCameras(Data.CameraModes).IsEmpty();
 	bTrafficSettingsValid = FDNDataValidation::ValidateTrafficSettings(Data.TrafficSettings).IsEmpty();
 	bTrafficVehiclesValid = FDNDataValidation::ValidateTrafficVehicles(Data.Vehicles).IsEmpty();
 	bDataValid = Errors.IsEmpty();
@@ -63,6 +64,23 @@ FDNTakedownConfig UDNGameDataSubsystem::GetTakedownConfig() const
 FDNDamageConfig UDNGameDataSubsystem::GetDamageConfig() const
 {
 	return (bDamageValid && Data.DamageConfig.Num() == 1) ? Data.DamageConfig[0].Row.ToConfig() : FDNDamageConfig();
+}
+
+TArray<FDNCameraMode> UDNGameDataSubsystem::GetCameraModes() const
+{
+	TArray<FDNCameraMode> Modes;
+	if (bCamerasValid)
+	{
+		for (const FDNCameraConfigEntry& E : Data.CameraModes)
+		{
+			Modes.Add(FDNCameraMode{ E.Id, E.Row.ToConfig() });
+		}
+	}
+	if (Modes.IsEmpty())
+	{
+		Modes.Add(FDNCameraMode{ TEXT("alta-longe"), FDNCameraConfig() });
+	}
+	return Modes;
 }
 
 FDNTrafficSettings UDNGameDataSubsystem::GetTrafficSettings() const

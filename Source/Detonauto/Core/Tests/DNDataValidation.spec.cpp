@@ -620,6 +620,7 @@ void FDNDataAllSpec::Define()
 			Data.TakedownConfig = { DNTest::TakedownEntry() };
 			Data.DamageConfig = { DNTest::DamageEntry() };
 			Data.CarConfigs = { DNTest::CarEntry() };
+			Data.CameraModes = { DNTest::CameraEntry() };
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -642,8 +643,11 @@ void FDNDataAllSpec::Define()
 			Data.DamageConfig[0].Row.MaxDents = 0;
 			Data.CarConfigs = { DNTest::CarEntry() };
 			Data.CarConfigs[0].Row.MassKg = 1.f;
+			Data.CameraModes = { DNTest::CameraEntry() };
+			Data.CameraModes[0].Row.Fov = 1.f;
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
 			ExpectError(*this, TEXT("carros"), Errors, { TEXT("Cars.csv"), TEXT("MassKg") });
+			ExpectError(*this, TEXT("cameras"), Errors, { TEXT("Cameras.csv"), TEXT("Fov") });
 			ExpectError(*this, TEXT("config do dano"), Errors, { TEXT("Damage.csv"), TEXT("MaxDents") });
 			ExpectError(*this, TEXT("config do turbo"), Errors, { TEXT("Turbo.csv"), TEXT("MaxBar") });
 			ExpectError(*this, TEXT("config do crash"), Errors, { TEXT("Crash.csv"), TEXT("MaxMultiplier") });
@@ -666,6 +670,7 @@ void FDNDataAllSpec::Define()
 			ExpectError(*this, TEXT("sem takedown"), Errors, { TEXT("Takedown.csv"), TEXT("uma linha") });
 			ExpectError(*this, TEXT("sem dano"), Errors, { TEXT("Damage.csv"), TEXT("uma linha") });
 			ExpectError(*this, TEXT("sem carros"), Errors, { TEXT("Cars.csv"), TEXT("Padrao") });
+			ExpectError(*this, TEXT("sem cameras"), Errors, { TEXT("Cameras.csv"), TEXT("alta-longe") });
 		});
 	});
 }

@@ -1,5 +1,5 @@
-Id,MassKg,MaxTorque,LateralGrip,SuspensionStiffness,SteeringGain,CenterOfMassDropCm,SuspensionDampingRatio,SuspensionTravelCm,RollbarScaling,RearGripFactor,HandbrakeRearGrip,HandbrakeRampInSeconds,HandbrakeRampOutSeconds,HandbrakeTorque,CameraDistanceCm,CameraHeightCm,CameraFov,NitroAccelMps2
-Padrao,1500,750,1.0,250,1.0,0,0.5,10,0.15,1.0,1.0,0.1,0.5,6000,650,150,90,10
-arcade-1,1200,850,1.0,170,1.0,25,0.55,18,0.05,1.0,1.0,0.1,0.5,6000,810,185,95,12
-arcade-2,1200,850,1.0,170,1.0,25,0.55,18,0.05,0.85,0.35,0.12,0.7,3000,810,185,95,12
-arcade-3,1350,800,1.0,210,1.0,15,0.5,14,0.1,0.92,0.35,0.12,0.7,3000,810,185,95,12
+Id,MassKg,MaxTorque,LateralGrip,SuspensionStiffness,SteeringGain,CenterOfMassDropCm,SuspensionDampingRatio,SuspensionTravelCm,RollbarScaling,RearGripFactor,HandbrakeRearGrip,HandbrakeRampInSeconds,HandbrakeRampOutSeconds,HandbrakeTorque,NitroAccelMps2,DriftAssistStartDeg,DriftAssistGain,DriftAssistMax
+Padrao,1500,750,1.0,250,1.0,0,0.5,10,0.15,1.0,1.0,0.1,0.5,6000,10,15,0,0
+arcade-1,1200,850,1.0,170,1.0,25,0.55,18,0.05,1.0,1.0,0.1,0.5,6000,12,15,0,0
+arcade-2,1200,850,1.0,170,1.0,25,0.55,18,0.05,1.0,0.3,0.12,0.7,3000,12,22,12,400
+arcade-3,1350,800,1.0,210,1.0,15,0.5,14,0.1,0.92,0.35,0.12,0.7,3000,12,25,10,350

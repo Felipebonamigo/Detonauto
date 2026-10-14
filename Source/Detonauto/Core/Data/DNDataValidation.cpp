@@ -544,16 +544,64 @@ TArray<FString> FDNDataValidation::ValidateCars(const TArray<FDNCarConfigEntry>&
 		Range(TEXT("HandbrakeRampInSeconds"), R.HandbrakeRampInSeconds, 0.01f, 3.0f);
 		Range(TEXT("HandbrakeRampOutSeconds"), R.HandbrakeRampOutSeconds, 0.01f, 3.0f);
 		Range(TEXT("HandbrakeTorque"), R.HandbrakeTorque, 0.0f, 20000.0f);
-		Range(TEXT("CameraDistanceCm"), R.CameraDistanceCm, 150.0f, 2000.0f);
-		Range(TEXT("CameraHeightCm"), R.CameraHeightCm, 0.0f, 600.0f);
-		Range(TEXT("CameraFov"), R.CameraFov, 60.0f, 120.0f);
 		Range(TEXT("NitroAccelMps2"), R.NitroAccelMps2, 0.0f, 40.0f);
+		Range(TEXT("DriftAssistStartDeg"), R.DriftAssistStartDeg, 0.0f, 80.0f);
+		const bool bAssistGain = Range(TEXT("DriftAssistGain"), R.DriftAssistGain, 0.0f, 500.0f);
+		const bool bAssistMax = Range(TEXT("DriftAssistMax"), R.DriftAssistMax, 0.0f, 2000.0f);
+		// ganho e teto são um par: os dois zero (desligada) ou os dois maiores que zero; um só não faz nada e é erro de digitação
+		if (bAssistGain && bAssistMax && (R.DriftAssistGain == 0.0f) != (R.DriftAssistMax == 0.0f))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': DriftAssistGain (%g) e DriftAssistMax (%g) precisam ser os dois zero (assistência desligada) ou os dois maiores que zero."), CarsFile, *Id, R.DriftAssistGain, R.DriftAssistMax));
+		}
 
 		if (bRear && bBrake && R.RearGripFactor * R.HandbrakeRearGrip < MinRearGripProduct)
 		{
 			Errors.Add(FString::Printf(TEXT("%s, linha '%s': RearGripFactor (%.3f) x HandbrakeRearGrip (%.3f) = %.4f, abaixo do mínimo 0,295: com o freio de mão cheio o carro roda (docs/presets-carro.md). Ajuste os dois campos em passos de 0,02."),
 				CarsFile, *Id, R.RearGripFactor, R.HandbrakeRearGrip, R.RearGripFactor * R.HandbrakeRearGrip));
 		}
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateCameras(const TArray<FDNCameraConfigEntry>& Rows)
+{
+	constexpr const TCHAR* CamerasFile = TEXT("Cameras.csv");
+	TArray<FString> Errors;
+	CheckIds(CamerasFile, Rows, Errors);
+	if (!Rows.ContainsByPredicate([](const FDNCameraConfigEntry& E) { return E.Id.Equals(TEXT("alta-longe"), ESearchCase::IgnoreCase); }))
+	{
+		Errors.Add(FString::Printf(TEXT("%s: falta a linha 'alta-longe' (é a câmera padrão do carro)."), CamerasFile));
+	}
+
+	for (const FDNCameraConfigEntry& E : Rows)
+	{
+		const FDNCameraConfigRow& R = E.Row;
+		const FString& Id = E.Id;
+		auto Range = [&](const TCHAR* Field, float Value, float Min, float Max) { return CheckRange(CamerasFile, Id, Field, Value, Min, true, Max, true, Errors); };
+		EDNCameraAnchor Anchor = EDNCameraAnchor::Chase;
+		const bool bAnchor = FDNCameraCycle::ParseAnchor(R.Anchor, Anchor);
+		if (!bAnchor)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Anchor' precisa ser Chase ou Car (veio '%s')."), CamerasFile, *Id, *R.Anchor));
+		}
+		// Chase: o braço tem comprimento; Car: a câmera está presa ao carro e a distância precisa ser 0
+		if (bAnchor && Anchor == EDNCameraAnchor::Car)
+		{
+			if (R.DistanceCm != 0.0f)
+			{
+				Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'DistanceCm' precisa ser 0 quando Anchor é Car (veio %g)."), CamerasFile, *Id, R.DistanceCm));
+			}
+		}
+		else
+		{
+			Range(TEXT("DistanceCm"), R.DistanceCm, 150.0f, 3000.0f);
+		}
+		Range(TEXT("HeightCm"), R.HeightCm, -50.0f, 800.0f);
+		Range(TEXT("ForwardCm"), R.ForwardCm, -300.0f, 400.0f);
+		Range(TEXT("SideCm"), R.SideCm, -150.0f, 150.0f);
+		Range(TEXT("PitchDeg"), R.PitchDeg, -45.0f, 45.0f);
+		Range(TEXT("Fov"), R.Fov, 40.0f, 120.0f);
+		Range(TEXT("Smoothing"), R.Smoothing, 0.0f, 30.0f);
 	}
 	return Errors;
 }
@@ -572,5 +620,6 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateTakedown(Data.TakedownConfig));
 	Errors.Append(ValidateDamage(Data.DamageConfig));
 	Errors.Append(ValidateCars(Data.CarConfigs));
+	Errors.Append(ValidateCameras(Data.CameraModes));
 	return Errors;
 }

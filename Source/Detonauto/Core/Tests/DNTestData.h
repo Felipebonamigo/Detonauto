@@ -105,10 +105,24 @@ namespace DNTest
 		R.HandbrakeRampInSeconds = C.HandbrakeRampInSeconds;
 		R.HandbrakeRampOutSeconds = C.HandbrakeRampOutSeconds;
 		R.HandbrakeTorque = C.HandbrakeTorque;
-		R.CameraDistanceCm = C.CameraDistanceCm;
-		R.CameraHeightCm = C.CameraHeightCm;
-		R.CameraFov = C.CameraFov;
 		R.NitroAccelMps2 = C.NitroAccelMps2;
+		R.DriftAssistStartDeg = C.DriftAssistStartDeg;
+		R.DriftAssistGain = C.DriftAssistGain;
+		R.DriftAssistMax = C.DriftAssistMax;
+		return R;
+	}
+
+	inline FDNCameraConfigRow CameraRow(const FDNCameraConfig& C = FDNCameraConfig())
+	{
+		FDNCameraConfigRow R;
+		R.Anchor = C.Anchor == EDNCameraAnchor::Car ? TEXT("Car") : TEXT("Chase");
+		R.DistanceCm = C.DistanceCm;
+		R.HeightCm = C.HeightCm;
+		R.ForwardCm = C.ForwardCm;
+		R.SideCm = C.SideCm;
+		R.PitchDeg = C.PitchDeg;
+		R.Fov = C.Fov;
+		R.Smoothing = C.Smoothing;
 		return R;
 	}
 
@@ -125,6 +139,7 @@ namespace DNTest
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }
 	inline FDNDamageConfigEntry DamageEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNDamageConfigEntry>(DamageRow(), Id); }
+	inline FDNCameraConfigEntry CameraEntry(const TCHAR* Id = TEXT("alta-longe")) { return Entry<FDNCameraConfigEntry>(CameraRow(), Id); }
 	inline FDNCarConfigEntry CarEntry(const TCHAR* Id = TEXT("Padrao")) { return Entry<FDNCarConfigEntry>(CarRow(), Id); }
 
 	/**

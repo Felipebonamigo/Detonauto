@@ -1,5 +1,5 @@
 // Testes do carro (lote 12): a rampa do freio de mao e as relacoes entre os presets de Data/Cars.csv que o Felipe pediu
-// (arcade-1 mais leve e macio, arcade-2 com traseira que escorrega, arcade-3 no meio, camera mais longe que a do Padrao).
+// (arcade-1 mais leve e macio, arcade-2 com traseira que escorrega, arcade-3 no meio, assistencia de derrapagem nos que derrapam).
 // Portados do protótipo (Sandbox, DNCarTuning.spec.cpp), agora sobre o CSV real lido por FDNDataLoader.
 
 #include <limits>
@@ -102,7 +102,7 @@ void FDNCarSpec::Define()
 			TestEqual("mesma mola", A2->SuspensionStiffness, A1->SuspensionStiffness);
 			TestEqual("mesmo curso", A2->SuspensionTravelCm, A1->SuspensionTravelCm);
 			TestEqual("mesma barra", A2->RollbarScaling, A1->RollbarScaling);
-			TestTrue("aderencia traseira menor", A2->RearGripFactor < A1->RearGripFactor);
+			TestEqual("J1: fora do freio de mao a traseira nao escorrega: igual ao arcade-1", A2->RearGripFactor, A1->RearGripFactor);
 			TestTrue("o freio de mao tira aderencia da traseira", A2->HandbrakeRearGrip < 1.f);
 			TestTrue("a rampa de volta e mais lenta que a de ida (recupera suave)", A2->HandbrakeRampOutSeconds > A2->HandbrakeRampInSeconds);
 		});
@@ -115,22 +115,25 @@ void FDNCarSpec::Define()
 			const FDNCarConfigRow* A3 = Find(TEXT("arcade-3"));
 			if (!TestNotNull("Padrao", P) || !TestNotNull("arcade-1", A1) || !TestNotNull("arcade-2", A2) || !TestNotNull("arcade-3", A3)) { return; }
 			TestTrue("massa entre Padrao e arcade-1", A3->MassKg > A1->MassKg && A3->MassKg < P->MassKg);
-			TestTrue("aderencia traseira entre arcade-2 e arcade-1", A3->RearGripFactor > A2->RearGripFactor && A3->RearGripFactor < A1->RearGripFactor);
-			TestEqual("freio de mao igual ao do arcade-2 (a diferenca esta na traseira)", A3->HandbrakeRearGrip, A2->HandbrakeRearGrip);
+			TestTrue("aderencia traseira um pouco menor que a do arcade-1 (e maior que a do arcade-2 com o freio de mao)", A3->RearGripFactor < A1->RearGripFactor && A3->RearGripFactor * A3->HandbrakeRearGrip > 0.295f);
 			TestTrue("freio de mao solta a traseira", A3->HandbrakeRearGrip < 1.f);
 			TestTrue("mola entre arcade-1 e Padrao", A3->SuspensionStiffness > A1->SuspensionStiffness && A3->SuspensionStiffness < P->SuspensionStiffness);
 		});
 
-		It("a camera dos presets e pelo menos 20% mais longe e mais alta que a do Padrao", [this]()
+		It("a assistencia de derrapagem: desligada no Padrao e no arcade-1, ligada no arcade-2 e no arcade-3 (J2)", [this]()
 		{
-			const FDNCarConfigRow* P = Find(TEXT("Padrao"));
-			if (!TestNotNull("Padrao", P)) { return; }
-			for (const TCHAR* Name : { TEXT("arcade-1"), TEXT("arcade-2"), TEXT("arcade-3") })
+			for (const TCHAR* Name : { TEXT("Padrao"), TEXT("arcade-1") })
 			{
 				const FDNCarConfigRow* R = Find(Name);
 				if (!TestNotNull(Name, R)) { continue; }
-				TestTrue(FString::Printf(TEXT("%s: distancia"), Name), R->CameraDistanceCm >= P->CameraDistanceCm * 1.2f);
-				TestTrue(FString::Printf(TEXT("%s: altura"), Name), R->CameraHeightCm > P->CameraHeightCm);
+				TestEqual(FString::Printf(TEXT("%s: ganho"), Name), R->DriftAssistGain, 0.f);
+			}
+			for (const TCHAR* Name : { TEXT("arcade-2"), TEXT("arcade-3") })
+			{
+				const FDNCarConfigRow* R = Find(Name);
+				if (!TestNotNull(Name, R)) { continue; }
+				TestTrue(FString::Printf(TEXT("%s: ganho > 0"), Name), R->DriftAssistGain > 0.f);
+				TestTrue(FString::Printf(TEXT("%s: teto > 0"), Name), R->DriftAssistMax > 0.f);
 			}
 		});
 	});

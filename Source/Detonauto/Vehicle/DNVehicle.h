@@ -27,6 +27,8 @@
 #include "CoreMinimal.h"
 #include "WheeledVehiclePawn.h"
 #include "Core/DNCar.h"
+#include "Core/DNCamera.h"
+#include "Core/DNGameDataSubsystem.h"
 #include "Core/DNDamage.h"
 #include "Core/DNDentParams.h"
 #include "DNVehicle.generated.h"
@@ -70,6 +72,9 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> TurboAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> CameraAction;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UInputAction>> PresetActions;
@@ -154,8 +159,20 @@ public:
 	/** Câmera parada olhando o carro de um ângulo (YawDegrees em relação à frente), para as capturas de tela. */
 	void SetShotCamera(float YawDegrees);
 
-	/** Volta a câmera de perseguição dos números do preset. */
+	/** Volta a câmera ao modo escolhido (Data/Cameras.csv). */
 	void RestoreChaseCamera();
+
+	/** Próximo modo de câmera (tecla C), na ordem de Cameras.csv. */
+	void CycleCamera();
+	/** Muda para o modo de câmera Index (fora da lista: o primeiro). */
+	void SetCameraMode(int32 Index);
+	FString CameraName() const;
+
+	/** Assistência de derrapagem ligada (padrão sim); -DNNoAssist desliga para as medições de comparação. */
+	bool bDriftAssist = true;
+
+	/** Ângulo de deslize agora [graus] (positivo = velocidade à direita do nariz). */
+	float SlipAngleDegNow() const;
 
 	/** Linhas do HUD de debug: preset, velocidade, turbo e amassados. */
 	TArray<FString> HudLines() const;
@@ -174,6 +191,7 @@ protected:
 	void HandbrakeStop(const FInputActionValue& Value);
 	void TurboStart(const FInputActionValue& Value);
 	void TurboStop(const FInputActionValue& Value);
+	void CameraKey(const FInputActionValue& Value);
 	void PresetKey(const FInputActionValue& Value, int32 HotkeyIndex);
 	void DentKey(const FInputActionValue& Value, int32 DentIndex);
 
@@ -231,6 +249,9 @@ protected:
 	float TurboEmptySeconds = 0.0f;
 	/** Segundos que faltam da vista de dano (as teclas de batida simulada giram a câmera para o amassado aparecer). */
 	float DentViewSecondsLeft = 0.0f;
+
+	TArray<FDNCameraMode> CameraModes;
+	int32 CameraIndex = 0;
 
 	/** Rotação do osso de cada roda no pose de referência (espaço do componente): converte o curso da suspensão para o espaço do osso. */
 	TArray<FQuat> WheelBoneRotations;

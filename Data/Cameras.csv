@@ -1,0 +1,6 @@
+Id,Anchor,DistanceCm,HeightCm,ForwardCm,SideCm,PitchDeg,Fov,Smoothing
+alta-longe,Chase,810,185,0,0,0,95,2
+alta-muito-longe,Chase,1300,420,0,0,-10,90,2
+capo,Car,0,112,100,0,-2,100,0
+frente-para-choque,Car,0,45,245,0,0,100,0
+motorista,Car,0,95,-5,-35,0,95,0

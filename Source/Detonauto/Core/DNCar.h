@@ -6,6 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/DNDriftAssist.h"
 
 /** Um preset de carro. As unidades são as do Chaos Vehicles (cm, kg, N·m) quando não disser outra coisa. */
 struct FDNCarConfig
@@ -40,15 +41,15 @@ struct FDNCarConfig
 	/** Torque do freio de mão nas rodas traseiras (MaxHandBrakeTorque do Chaos). */
 	float HandbrakeTorque = 6000.0f;
 
-	/** Câmera: distância atrás do carro [cm]. */
-	float CameraDistanceCm = 650.0f;
-	/** Câmera: altura acima do carro [cm]. */
-	float CameraHeightCm = 150.0f;
-	/** Câmera: campo de visão [graus]. */
-	float CameraFov = 90.0f;
-
 	/** Aceleração extra para frente enquanto o turbo está ativo [m/s²]. 0 = o turbo não empurra. */
 	float NitroAccelMps2 = 10.0f;
+
+	/** Assistência de derrapagem (Core/DNDriftAssist.h): ângulo de deslize [graus] a partir do qual age, ganho [graus/s² por grau de excesso] e teto [graus/s²]. Ganho e teto zero = desligada. */
+	float DriftAssistStartDeg = 15.0f;
+	float DriftAssistGain = 0.0f;
+	float DriftAssistMax = 0.0f;
+
+	FDNDriftAssistConfig DriftAssist() const { return FDNDriftAssistConfig{ DriftAssistStartDeg, DriftAssistGain, DriftAssistMax }; }
 };
 
 /**

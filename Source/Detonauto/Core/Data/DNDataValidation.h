@@ -45,6 +45,12 @@ struct FDNDataValidation
 	 */
 	static TArray<FString> ValidateCars(const TArray<FDNCarConfigEntry>& Rows);
 
+	/**
+	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros
+	 *  campos em faixas fechadas (ver DNDataValidation.cpp).
+	 */
+	static TArray<FString> ValidateCameras(const TArray<FDNCameraConfigEntry>& Rows);
+
 	/** Todas as tabelas, com as referências entre elas. */
 	static TArray<FString> ValidateAll(const FDNData& Data);
 

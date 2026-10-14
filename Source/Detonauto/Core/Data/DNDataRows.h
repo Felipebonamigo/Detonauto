@@ -15,6 +15,7 @@
 //   Takedown.csv        Id + os campos de FDNTakedownConfig (uma linha)
 //   Damage.csv          Id + os campos de FDNDamageConfig (uma linha)
 //   Cars.csv            Id + os campos de FDNCarConfig (uma linha por preset; "Padrao" obrigatória)
+//   Cameras.csv         Id + Anchor + os campos de FDNCameraConfig (um modo por linha, na ordem da tecla C; "alta-longe" obrigatória)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -29,6 +30,7 @@
 #include "Core/DNTakedown.h"
 #include "Core/DNDamage.h"
 #include "Core/DNCar.h"
+#include "Core/DNCamera.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -367,10 +369,10 @@ struct FDNCarConfigRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeRampInSeconds = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeRampOutSeconds = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HandbrakeTorque = 0.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CameraDistanceCm = 0.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CameraHeightCm = 0.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CameraFov = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float NitroAccelMps2 = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftAssistStartDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftAssistGain = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DriftAssistMax = 0.0f;
 
 	FDNCarConfig ToConfig() const
 	{
@@ -389,10 +391,42 @@ struct FDNCarConfigRow : public FTableRowBase
 		C.HandbrakeRampInSeconds = HandbrakeRampInSeconds;
 		C.HandbrakeRampOutSeconds = HandbrakeRampOutSeconds;
 		C.HandbrakeTorque = HandbrakeTorque;
-		C.CameraDistanceCm = CameraDistanceCm;
-		C.CameraHeightCm = CameraHeightCm;
-		C.CameraFov = CameraFov;
 		C.NitroAccelMps2 = NitroAccelMps2;
+		C.DriftAssistStartDeg = DriftAssistStartDeg;
+		C.DriftAssistGain = DriftAssistGain;
+		C.DriftAssistMax = DriftAssistMax;
+		return C;
+	}
+};
+
+/** Data/Cameras.csv (um modo de câmera por linha; "alta-longe" é obrigatória). Significado de cada campo: FDNCameraConfig em Core/DNCamera.h. */
+USTRUCT(BlueprintType)
+struct FDNCameraConfigRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	/** "Chase" (câmera de perseguição) ou "Car" (presa ao carro). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Anchor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DistanceCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HeightCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ForwardCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SideCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PitchDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float Fov = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float Smoothing = 0.0f;
+
+	/** Âncora desconhecida cai em Chase (a validação já recusou o arquivo antes). */
+	FDNCameraConfig ToConfig() const
+	{
+		FDNCameraConfig C;
+		FDNCameraCycle::ParseAnchor(Anchor, C.Anchor);
+		C.DistanceCm = DistanceCm;
+		C.HeightCm = HeightCm;
+		C.ForwardCm = ForwardCm;
+		C.SideCm = SideCm;
+		C.PitchDeg = PitchDeg;
+		C.Fov = Fov;
+		C.Smoothing = Smoothing;
 		return C;
 	}
 };
@@ -416,6 +450,7 @@ using FDNCrashConfigEntry = TDNTableEntry<FDNCrashConfigRow>;
 using FDNTakedownConfigEntry = TDNTableEntry<FDNTakedownConfigRow>;
 using FDNDamageConfigEntry = TDNTableEntry<FDNDamageConfigRow>;
 using FDNCarConfigEntry = TDNTableEntry<FDNCarConfigRow>;
+using FDNCameraConfigEntry = TDNTableEntry<FDNCameraConfigRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -431,4 +466,5 @@ struct FDNData
 	TArray<FDNTakedownConfigEntry> TakedownConfig;
 	TArray<FDNDamageConfigEntry> DamageConfig;
 	TArray<FDNCarConfigEntry> CarConfigs;
+	TArray<FDNCameraConfigEntry> CameraModes;
 };
