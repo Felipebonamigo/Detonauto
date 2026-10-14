@@ -106,9 +106,10 @@ public:
 
 	ADNVehicle();
 
-	/** Id do preset de Data/Cars.csv aplicado ao nascer (Padrao, arcade-1, arcade-2, arcade-3...). */
+	/** Id do preset de Data/Cars.csv aplicado ao nascer (Padrao, arcade-1, arcade-2, arcade-3...). O arcade-3 é o que o Felipe mais
+	 *  gostou no playtest 1 (curva boa); Padrao e arcade-1 ficam como referência. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="DN Carro")
-	FName CarId = FName(TEXT("Padrao"));
+	FName CarId = FName(TEXT("arcade-3"));
 
 	/** Modo de teste do turbo: a barra começa cheia e enche de novo 2 s depois de esvaziar. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="DN Carro")
