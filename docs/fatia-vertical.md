@@ -60,3 +60,20 @@ O que mais vende um jogo de batida é a câmera.
 - Hora do dia e direção do sol escolhidas para o carro do jogador não virar
   silhueta na aproximação.
 - Aprovação: o Felipe joga 10 rodadas e responde o roteiro curto de sensação.
+
+## Lote 21: som base
+
+Som pesa tanto quanto a imagem na sensação de qualidade. Seguir a skill
+`som-livre` (licenças, tratamento com ffmpeg, registro).
+
+- **Motor:** camadas por rotação (marcha lenta, média, alta) misturadas pela
+  rotação do Chaos, mais carga (acelerador) e um "assobio" de turbo quando o
+  turbo liga. MetaSounds (aprovado na proposta de recursos).
+- **Batidas em três faixas** pela variação de velocidade (leve, média, forte),
+  com variação aleatória de altura e uma camada de vidro e de metal raspando.
+- **Pneus:** chiado ligado ao ângulo de deslize.
+- **Ambiente:** cidade ao fundo, baixo.
+- Fonte: Sonniss GDC (sem crédito; o WAV original fica no PC, fora do git, e o
+  asset importado só entra no repositório público com o sim do Felipe) e
+  Freesound/Kenney CC0. Parâmetros em `Data/Audio.csv`.
+- Aprovação: o Felipe ouve jogando; custo de CPU medido.
