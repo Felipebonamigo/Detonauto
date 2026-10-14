@@ -1,2 +1,2 @@
-Id,DentMinDeltaVMs,ZoneDestroyDeltaVMs,DentMaxDepthCm,DentDepthPerMs,DentBaseRadiusCm,MaxDents,PartDetachDeltaVMs,PartDetachZoneDamage,DestroyedTotalDamage,MaxActive
-padrao,2.0,30.0,25.0,1.5,30.0,8,12.0,0.6,0.5,24
+Id,DentMinDeltaVMs,ZoneDestroyDeltaVMs,DentMaxDepthCm,DentDepthPerMs,DentBaseRadiusCm,MaxDents,PartDetachDeltaVMs,PartDetachZoneDamage,DestroyedTotalDamage,MaxActive,MorphCurveExponent,MorphRisePerSecond
+padrao,2.0,30.0,25.0,1.5,30.0,8,12.0,0.6,0.5,24,0.7,10.0

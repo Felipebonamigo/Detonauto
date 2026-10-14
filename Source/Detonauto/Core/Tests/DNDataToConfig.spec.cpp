@@ -137,8 +137,10 @@ void FDNDataToConfigSpec::Define()
 			FDNDamageConfigRow R;
 			R.DentMinDeltaVMs = 2.5f; R.ZoneDestroyDeltaVMs = 31.f; R.DentMaxDepthCm = 26.f; R.DentDepthPerMs = 1.6f;
 			R.DentBaseRadiusCm = 31.f; R.MaxDents = 9; R.PartDetachDeltaVMs = 13.f; R.PartDetachZoneDamage = 0.7f;
-			R.DestroyedTotalDamage = 0.6f; R.MaxActive = 25;
+			R.DestroyedTotalDamage = 0.6f; R.MaxActive = 25; R.MorphCurveExponent = 0.8f; R.MorphRisePerSecond = 12.f;
 			const FDNDamageConfig C = R.ToConfig();
+			TestEqual("MorphCurveExponent", C.MorphCurveExponent, 0.8f);
+			TestEqual("MorphRisePerSecond", C.MorphRisePerSecond, 12.f);
 			TestEqual("DentMinDeltaVMs", C.DentMinDeltaVMs, 2.5f);
 			TestEqual("ZoneDestroyDeltaVMs", C.ZoneDestroyDeltaVMs, 31.f);
 			TestEqual("DentMaxDepthCm", C.DentMaxDepthCm, 26.f);

@@ -73,6 +73,8 @@ namespace DNTest
 		R.PartDetachZoneDamage = C.PartDetachZoneDamage;
 		R.DestroyedTotalDamage = C.DestroyedTotalDamage;
 		R.MaxActive = C.MaxActive;
+		R.MorphCurveExponent = C.MorphCurveExponent;
+		R.MorphRisePerSecond = C.MorphRisePerSecond;
 		return R;
 	}
 

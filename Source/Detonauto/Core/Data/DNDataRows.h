@@ -347,6 +347,8 @@ struct FDNDamageConfigRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PartDetachZoneDamage = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DestroyedTotalDamage = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxActive = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MorphCurveExponent = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MorphRisePerSecond = 0.0f;
 
 	FDNDamageConfig ToConfig() const
 	{
@@ -361,6 +363,8 @@ struct FDNDamageConfigRow : public FTableRowBase
 		C.PartDetachZoneDamage = PartDetachZoneDamage;
 		C.DestroyedTotalDamage = DestroyedTotalDamage;
 		C.MaxActive = MaxActive;
+		C.MorphCurveExponent = MorphCurveExponent;
+		C.MorphRisePerSecond = MorphRisePerSecond;
 		return C;
 	}
 };

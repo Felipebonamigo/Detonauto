@@ -112,6 +112,19 @@ void FDNDataDamageSpec::Define()
 			Bad(TEXT("DestroyedTotalDamage NaN"), TEXT("DestroyedTotalDamage"), [this](FDNDamageConfigRow& R) { R.DestroyedTotalDamage = NaNf; });
 		});
 
+		It("lote 17: MorphCurveExponent em (0, 4] e MorphRisePerSecond em (0, 100]", [this]()
+		{
+			Good(TEXT("expoente 0,7 e subida 10"), [](FDNDamageConfigRow& R) { R.MorphCurveExponent = 0.7f; R.MorphRisePerSecond = 10.f; });
+			Bad(TEXT("expoente 0"), TEXT("MorphCurveExponent"), [](FDNDamageConfigRow& R) { R.MorphCurveExponent = 0.f; });
+			Good(TEXT("expoente 4"), [](FDNDamageConfigRow& R) { R.MorphCurveExponent = 4.f; });
+			Bad(TEXT("expoente 4,01"), TEXT("MorphCurveExponent"), [](FDNDamageConfigRow& R) { R.MorphCurveExponent = 4.01f; });
+			Bad(TEXT("expoente NaN"), TEXT("MorphCurveExponent"), [this](FDNDamageConfigRow& R) { R.MorphCurveExponent = NaNf; });
+			Bad(TEXT("subida 0"), TEXT("MorphRisePerSecond"), [](FDNDamageConfigRow& R) { R.MorphRisePerSecond = 0.f; });
+			Good(TEXT("subida 100"), [](FDNDamageConfigRow& R) { R.MorphRisePerSecond = 100.f; });
+			Bad(TEXT("subida 101"), TEXT("MorphRisePerSecond"), [](FDNDamageConfigRow& R) { R.MorphRisePerSecond = 101.f; });
+			Bad(TEXT("subida inf"), TEXT("MorphRisePerSecond"), [this](FDNDamageConfigRow& R) { R.MorphRisePerSecond = Inff; });
+		});
+
 		It("um erro nao esconde o outro: acumula todos", [this]()
 		{
 			FDNDamageConfigRow R = DNTest::DamageRow();
@@ -156,6 +169,8 @@ void FDNDataDamageDriftSpec::Define()
 			Same(TEXT("PartDetachZoneDamage"), Csv.PartDetachZoneDamage, Def.PartDetachZoneDamage);
 			Same(TEXT("DestroyedTotalDamage"), Csv.DestroyedTotalDamage, Def.DestroyedTotalDamage);
 			Same(TEXT("MaxActive"), Csv.MaxActive, Def.MaxActive);
+			Same(TEXT("MorphCurveExponent"), Csv.MorphCurveExponent, Def.MorphCurveExponent);
+			Same(TEXT("MorphRisePerSecond"), Csv.MorphRisePerSecond, Def.MorphRisePerSecond);
 		});
 
 		It("o padrao da struct tem os valores do contrato (docs/regras-dano.md)", [this]()
@@ -171,6 +186,8 @@ void FDNDataDamageDriftSpec::Define()
 			TestEqual("PartDetachZoneDamage", D.PartDetachZoneDamage, 0.6f);
 			TestEqual("DestroyedTotalDamage", D.DestroyedTotalDamage, 0.5f);
 			TestEqual("MaxActive", D.MaxActive, 24);
+			TestEqual("MorphCurveExponent (docs/regras-dano-visual.md)", D.MorphCurveExponent, 0.7f);
+			TestEqual("MorphRisePerSecond", D.MorphRisePerSecond, 10.0f);
 		});
 	});
 }

@@ -518,6 +518,9 @@ TArray<FString> FDNDataValidation::ValidateDamage(const TArray<FDNDamageConfigEn
 		{
 			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'MaxActive' precisa ser pelo menos 1 (veio %d)."), DamageFile, *Id, R.MaxActive));
 		}
+		// lote 17: alvos de deformação por zona
+		CheckRange(DamageFile, Id, TEXT("MorphCurveExponent"), R.MorphCurveExponent, 0.0f, false, 4.0f, true, Errors);
+		CheckRange(DamageFile, Id, TEXT("MorphRisePerSecond"), R.MorphRisePerSecond, 0.0f, false, 100.0f, true, Errors);
 	}
 	return Errors;
 }

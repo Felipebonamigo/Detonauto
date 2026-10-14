@@ -67,6 +67,10 @@ struct FDNDamageConfig
 	float PartDetachZoneDamage = 0.6f;
 	/** Dano total (média das 5 zonas) que destrói o veículo (inclusive), de 0 a 1. */
 	float DestroyedTotalDamage = 0.5f;
+	/** Curva do peso dos alvos de deformação: peso = dano^expoente (lote 17; < 1 = o amassado aparece cedo e satura devagar). */
+	float MorphCurveExponent = 0.7f;
+	/** Subida máxima do peso dos alvos de deformação por segundo (10 = 0,1 s até o cheio; o metal não "cresce" devagar). */
+	float MorphRisePerSecond = 10.0f;
 	/** Máximo de peças soltas ativas ao mesmo tempo (corpos físicos). */
 	int32 MaxActive = 24;
 };
