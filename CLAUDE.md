@@ -25,6 +25,16 @@ No início de uma sessão, descubra em que sprint o Felipe está. Quando houver
 acesso às páginas acima, leia o progresso de lá. A cada revisão de escopo
 trimestral, quebre o próximo trimestre em sprints de duas semanas.
 
+## Rotinas do Claude
+
+- Rotinas prontas em `.claude/skills/`: `verificar-no-pc`, `jogar-e-capturar`,
+  `fechar-lote`, `modelo-3d`, `triar-playtest` e `ligar-unreal-mcp`.
+- Sessão do PC com o editor aberto: use a skill `unreal-mcp` para montar cena e
+  materiais (ligue uma vez com `ligar-unreal-mcp`, porta 8010).
+- Problemas de playtest chegam como Issues "[Playtest]" pelo modelo em
+  `.github/ISSUE_TEMPLATE/playtest.yml`; o commit que corrige diz "fecha #N".
+- Recursos do Unreal propostos e ainda não aprovados: `docs/proposta-recursos-unreal.md`.
+
 ## Ambiente
 
 - Unreal Engine 5.8, projeto em C++, Visual Studio Community, Windows.
