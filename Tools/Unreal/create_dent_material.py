@@ -201,6 +201,9 @@ def build(dest, report):
 
     # Usado em malha estática e esquelética (os pedaços do carro são estáticos presos ao esqueleto).
     material.set_editor_property("used_with_skeletal_mesh", True)
+    # Lote 17: a carroceria virou malha com esqueleto e alvos de deformação (SK_DNSportsCarBody); sem esta flag o jogo mostra o
+    # material padrão (xadrez cinza) no lugar da pintura.
+    material.set_editor_property("used_with_morph_targets", True)
     # A malha da carroceria é Nanite: sem esta flag a engine troca o material pelo padrão (aviso "missing usage flag Nanite").
     material.set_editor_property("used_with_nanite", True)
     # Nanite precisa saber o quanto o material pode deslocar um vértice (para não cortar o objeto por engano).
