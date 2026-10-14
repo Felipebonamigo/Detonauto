@@ -8,7 +8,9 @@
 //  A3 excesso = |ângulo| - início, e só conta se positivo (exatamente no início: zero); saída = ganho x excesso, no máximo Max;
 //  A4 abaixo de 10 km/h não age; sobe linear até 30 km/h (evita tremer parado e em manobra de estacionar);
 //  A5 se o carro já gira para a direção certa a 120 graus/s ou mais, não empurra (evita passar do ponto); a meio caminho, metade;
-//  A6 ganho zero ou teto zero desliga a assistência; NaN, infinito ou negativo em qualquer entrada vale zero.
+//  A6 ganho zero ou teto zero desliga a assistência; NaN, infinito ou negativo em qualquer entrada vale zero;
+//  A7 só age com o carro no chão: 3 rodas ou mais em contato (decisão da revisão do lote 14). No ar, de lado ou capotado, depois de
+//     uma batida, não gira o destroço.
 
 #include <limits>
 #include "Misc/AutomationTest.h"
@@ -134,6 +136,18 @@ void FDNDriftAssistSpec::Define()
 			C.StartDeg = 35.f;
 			TestEqual("30 graus agora e abaixo", FDNDriftAssist::YawAcceleration(C, 30.f, 80.f, 0.f), 0.f);
 			TestEqual("40 graus: 5 de excesso", FDNDriftAssist::YawAcceleration(C, 40.f, 80.f, 0.f), 50.f, 1e-3f);
+		});
+	});
+
+	Describe("IsGrounded", [this]()
+	{
+		It("A7: 3 rodas ou mais em contato: no chao; 2 ou menos (de lado, no ar, capotado): nao", [this]()
+		{
+			TestTrue("4 rodas", FDNDriftAssist::IsGrounded(4));
+			TestTrue("3 rodas", FDNDriftAssist::IsGrounded(3));
+			TestFalse("2 rodas (de lado)", FDNDriftAssist::IsGrounded(2));
+			TestFalse("no ar (0 rodas)", FDNDriftAssist::IsGrounded(0));
+			TestFalse("negativo", FDNDriftAssist::IsGrounded(-1));
 		});
 	});
 }

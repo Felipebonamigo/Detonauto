@@ -89,6 +89,9 @@ carro do template (`BP_SportsCar_Pawn`, lido do Blueprint e rodado na sonda `DNS
 
   Os números testados à parte: início 20 / ganho 100 / teto 2000 segura em 36 graus (recupera em 0,18 s, "grudado"); início 30 / ganho 40 / teto 1500
   deixa 64 a 67 graus. Escolhi 25/50/1500: derrapa até uns 50 graus antes de corrigir e **nunca** chega perto de 90.
+- **Só no chão (revisão do lote 14):** a assistência só age com 3 rodas ou mais em contato (`FDNDriftAssist::IsGrounded`), para não girar o carro
+  no ar ou capotado depois de uma batida. Medido de novo depois da mudança: `arcade-3` 52,2 graus e recupera em 0,44 s; `arcade-2` 54,3 graus e 0,43 s
+  (iguais aos de antes). Mutação: 3 de 3 mortos.
 - A assistência liga por padrão; `-DNNoAssist` desliga (medição de comparação). Quem sente é o Felipe: se parecer "grudado", subir o início ou baixar o teto.
 
 ## J3. Turbo "quase não dá diferença"

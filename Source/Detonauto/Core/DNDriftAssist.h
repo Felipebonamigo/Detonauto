@@ -26,6 +26,11 @@ struct FDNDriftAssist
 	static constexpr float FullSpeedKmh = 30.0f;
 	/** Girando para a direção certa a esta guinada [graus/s] ou mais, não empurra mais (evita passar do ponto). */
 	static constexpr float RecoveringYawDegS = 120.0f;
+	/** Rodas em contato com o chão para a assistência agir (A7): menos que isso é carro no ar, de lado ou capotado. */
+	static constexpr int32 MinWheelsInContact = 3;
+
+	/** Carro no chão para efeito da assistência (A7). */
+	static bool IsGrounded(int32 WheelsInContact) { return WheelsInContact >= MinWheelsInContact; }
 
 	/** Ângulo de deslize [graus]: atan2(Vy, Vx) da velocidade no espaço do carro (positivo = velocidade à direita do nariz). */
 	static float SlipAngleDeg(const FVector& LocalVelocityCmS);

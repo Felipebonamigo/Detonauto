@@ -486,8 +486,14 @@ void ADNVehicle::Tick(float DeltaSeconds)
 		GetMesh()->AddForce(GetActorForwardVector() * (Car.NitroAccelMps2 * 100.0f * Chaos()->Mass));
 	}
 
-	// assistência de derrapagem (Core/DNDriftAssist): contra-esterço automático proporcional ao excesso de ângulo de deslize
-	if (bDriftAssist && Car.DriftAssistGain > 0.0f)
+	// assistência de derrapagem (Core/DNDriftAssist): contra-esterço automático proporcional ao excesso de ângulo de deslize;
+	// só no chão (A7), para não girar o carro no ar ou capotado depois de uma batida
+	int32 WheelsInContact = 0;
+	for (const UChaosVehicleWheel* Wheel : Chaos()->Wheels)
+	{
+		WheelsInContact += (Wheel && !Wheel->IsInAir()) ? 1 : 0;
+	}
+	if (bDriftAssist && Car.DriftAssistGain > 0.0f && FDNDriftAssist::IsGrounded(WheelsInContact))
 	{
 		const float Accel = FDNDriftAssist::YawAcceleration(Car.DriftAssist(), SlipAngleDegNow(), SpeedKmh(), GetMesh()->GetPhysicsAngularVelocityInDegrees().Z);
 		if (Accel != 0.0f)
