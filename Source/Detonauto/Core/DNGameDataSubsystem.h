@@ -63,6 +63,12 @@ public:
 	 */
 	bool TryGetCarConfig(const FString& Id, FDNCarConfig& Out) const;
 
+	/** O tipo de peça de rua de Data/Breakables.csv (sem diferenciar a caixa). Falso, sem mexer em Out, se o tipo não existe ou a
+	 *  tabela é inválida: quem chama trata a peça como sólida e registra no log (nenhum tipo vale o padrão às escondidas). */
+	bool TryGetBreakableKind(const FString& Kind, FDNBreakableKind& Out) const;
+	/** Os valores globais de Data/BreakableSettings.csv, ou o padrão se a tabela é inválida (S1). */
+	FDNBreakableSettings GetBreakableSettings() const;
+
 private:
 	FDNData Data;
 	TArray<FString> Errors;
@@ -75,4 +81,6 @@ private:
 	bool bCamerasValid = false;
 	bool bTrafficSettingsValid = false;
 	bool bTrafficVehiclesValid = false;
+	bool bBreakablesValid = false;
+	bool bBreakableSettingsValid = false;
 };

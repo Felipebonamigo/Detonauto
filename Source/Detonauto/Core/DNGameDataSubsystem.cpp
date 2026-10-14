@@ -30,6 +30,8 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bCamerasValid = FDNDataValidation::ValidateCameras(Data.CameraModes).IsEmpty();
 	bTrafficSettingsValid = FDNDataValidation::ValidateTrafficSettings(Data.TrafficSettings).IsEmpty();
 	bTrafficVehiclesValid = FDNDataValidation::ValidateTrafficVehicles(Data.Vehicles).IsEmpty();
+	bBreakablesValid = FDNDataValidation::ValidateBreakables(Data.Breakables).IsEmpty();
+	bBreakableSettingsValid = FDNDataValidation::ValidateBreakableSettings(Data.BreakableSettings).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -111,6 +113,26 @@ bool UDNGameDataSubsystem::TryGetMedalThresholds(const FString& CrossingId, FDNM
 	}
 	Out = Thresholds;
 	return true;
+}
+
+bool UDNGameDataSubsystem::TryGetBreakableKind(const FString& Kind, FDNBreakableKind& Out) const
+{
+	if (!bBreakablesValid)
+	{
+		return false;
+	}
+	const FDNBreakableEntry* Entry = Data.Breakables.FindByPredicate([&Kind](const FDNBreakableEntry& E) { return E.Id.Equals(Kind, ESearchCase::IgnoreCase); });
+	if (!Entry)
+	{
+		return false;
+	}
+	Out = Entry->Row.ToKind();
+	return true;
+}
+
+FDNBreakableSettings UDNGameDataSubsystem::GetBreakableSettings() const
+{
+	return (bBreakableSettingsValid && Data.BreakableSettings.Num() == 1) ? Data.BreakableSettings[0].Row.ToSettings() : FDNBreakableSettings();
 }
 
 bool UDNGameDataSubsystem::TryGetCarConfig(const FString& Id, FDNCarConfig& Out) const

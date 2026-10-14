@@ -44,6 +44,10 @@ struct FDNDataValidation
 	 *  RearGripFactor x HandbrakeRearGrip >= 0,295 (abaixo disso o carro roda com o freio de mão: docs/presets-carro.md).
 	 */
 	static TArray<FString> ValidateCars(const TArray<FDNCarConfigEntry>& Rows);
+	/** Breakables.csv (mobiliário destrutível, docs/regras-mobiliario.md): ids e as faixas de cada campo. */
+	static TArray<FString> ValidateBreakables(const TArray<FDNBreakableEntry>& Rows);
+	/** BreakableSettings.csv: uma linha e as faixas de cada campo. */
+	static TArray<FString> ValidateBreakableSettings(const TArray<FDNBreakableSettingsEntry>& Rows);
 
 	/**
 	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros

@@ -82,6 +82,32 @@ namespace DNTest
 		return R;
 	}
 
+	inline FDNBreakableRow BreakableRow(const FDNBreakableKind& K = FDNBreakableKind())
+	{
+		FDNBreakableRow R;
+		R.MassKg = K.MassKg;
+		R.MinBreakSpeedKmh = K.MinBreakSpeedKmh;
+		R.LaunchFactor = K.LaunchFactor;
+		R.LaunchUpMs = K.LaunchUpMs;
+		R.TopplesAtBase = K.bTopplesAtBase;
+		R.BreakHeightCm = K.BreakHeightCm;
+		R.Points = K.Points;
+		return R;
+	}
+
+	inline FDNBreakableSettingsRow BreakableSettingsRow(const FDNBreakableSettings& S = FDNBreakableSettings())
+	{
+		FDNBreakableSettingsRow R;
+		R.ArcadeMassFactor = S.ArcadeMassFactor;
+		R.MaxSpeedLossPct = S.MaxSpeedLossPct;
+		R.MaxLaunchMs = S.MaxLaunchMs;
+		R.MaxActiveProps = S.MaxActiveProps;
+		R.SleepSpeedMs = S.SleepSpeedMs;
+		R.SleepAfterS = S.SleepAfterS;
+		R.IgnoreCarS = S.IgnoreCarS;
+		return R;
+	}
+
 	inline FDNTrafficSettingsRow SettingsRow(const FDNTrafficSettings& C = FDNTrafficSettings())
 	{
 		FDNTrafficSettingsRow R;

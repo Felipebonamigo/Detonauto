@@ -641,5 +641,58 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateDamage(Data.DamageConfig));
 	Errors.Append(ValidateCars(Data.CarConfigs));
 	Errors.Append(ValidateCameras(Data.CameraModes));
+	Errors.Append(ValidateBreakables(Data.Breakables));
+	Errors.Append(ValidateBreakableSettings(Data.BreakableSettings));
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateBreakables(const TArray<FDNBreakableEntry>& Rows)
+{
+	constexpr const TCHAR* BreakablesFile = TEXT("Breakables.csv");
+	TArray<FString> Errors;
+	if (Rows.IsEmpty())
+	{
+		Errors.Add(FString::Printf(TEXT("%s: nenhuma linha (pelo menos um tipo de peça de rua)."), BreakablesFile));
+	}
+	CheckIds(BreakablesFile, Rows, Errors);
+	for (const FDNBreakableEntry& E : Rows)
+	{
+		const FDNBreakableRow& R = E.Row;
+		CheckRange(BreakablesFile, E.Id, TEXT("MassKg"), R.MassKg, 0.0f, false, 5000.0f, true, Errors);
+		CheckRange(BreakablesFile, E.Id, TEXT("MinBreakSpeedKmh"), R.MinBreakSpeedKmh, 0.0f, true, 200.0f, true, Errors);
+		CheckRange(BreakablesFile, E.Id, TEXT("LaunchFactor"), R.LaunchFactor, 0.0f, true, 3.0f, true, Errors);
+		CheckRange(BreakablesFile, E.Id, TEXT("LaunchUpMs"), R.LaunchUpMs, 0.0f, true, 20.0f, true, Errors);
+		CheckRange(BreakablesFile, E.Id, TEXT("BreakHeightCm"), R.BreakHeightCm, 0.0f, true, 500.0f, true, Errors);
+		if (R.Points < 0)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Points' não pode ser negativo (veio %d)."), BreakablesFile, *E.Id, R.Points));
+		}
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateBreakableSettings(const TArray<FDNBreakableSettingsEntry>& Rows)
+{
+	constexpr const TCHAR* BreakableSettingsFile = TEXT("BreakableSettings.csv");
+	TArray<FString> Errors;
+	if (Rows.Num() != 1)
+	{
+		Errors.Add(FString::Printf(TEXT("%s: precisa ter exatamente uma linha (veio %d)."), BreakableSettingsFile, Rows.Num()));
+	}
+	CheckIds(BreakableSettingsFile, Rows, Errors);
+	for (const FDNBreakableSettingsEntry& E : Rows)
+	{
+		const FDNBreakableSettingsRow& R = E.Row;
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("ArcadeMassFactor"), R.ArcadeMassFactor, 0.0f, false, 10.0f, true, Errors);
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("MaxSpeedLossPct"), R.MaxSpeedLossPct, 0.0f, true, 100.0f, true, Errors);
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("MaxLaunchMs"), R.MaxLaunchMs, 0.0f, false, 100.0f, true, Errors);
+		if (R.MaxActiveProps < 1)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'MaxActiveProps' precisa ser pelo menos 1 (veio %d)."), BreakableSettingsFile, *E.Id, R.MaxActiveProps));
+		}
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("SleepSpeedMs"), R.SleepSpeedMs, 0.0f, false, 10.0f, true, Errors);
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("SleepAfterS"), R.SleepAfterS, 0.0f, false, 60.0f, true, Errors);
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("IgnoreCarS"), R.IgnoreCarS, 0.0f, true, 5.0f, true, Errors);
+	}
 	return Errors;
 }

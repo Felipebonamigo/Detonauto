@@ -17,6 +17,9 @@
 //   Damage.csv          Id + os campos de FDNDamageConfig (uma linha)
 //   Cars.csv            Id + os campos de FDNCarConfig (uma linha por preset; "Padrao" obrigatória)
 //   Cameras.csv         Id + Anchor + os campos de FDNCameraConfig (um modo por linha, na ordem da tecla C; "alta-longe" obrigatória)
+//   Breakables.csv      Id, MassKg, MinBreakSpeedKmh, LaunchFactor, LaunchUpMs, TopplesAtBase, BreakHeightCm, Points (um tipo de peça
+//                       de rua por linha)
+//   BreakableSettings.csv Id + os campos de FDNBreakableSettings (uma linha, id "padrao")
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -32,6 +35,7 @@
 #include "Core/DNDamage.h"
 #include "Core/DNCar.h"
 #include "Core/DNCamera.h"
+#include "Core/DNBreakable.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -459,6 +463,63 @@ struct FDNCameraConfigRow : public FTableRowBase
 	}
 };
 
+/** Data/Breakables.csv: uma linha por tipo de peça de rua (poste, arvore, banco...). Significado de cada campo:
+ *  FDNBreakableKind em Core/DNBreakable.h; contrato em docs/regras-mobiliario.md. */
+USTRUCT(BlueprintType)
+struct FDNBreakableRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MassKg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MinBreakSpeedKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LaunchFactor = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LaunchUpMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool TopplesAtBase = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float BreakHeightCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 Points = 0;
+
+	FDNBreakableKind ToKind() const
+	{
+		FDNBreakableKind K;
+		K.MassKg = MassKg;
+		K.MinBreakSpeedKmh = MinBreakSpeedKmh;
+		K.LaunchFactor = LaunchFactor;
+		K.LaunchUpMs = LaunchUpMs;
+		K.bTopplesAtBase = TopplesAtBase;
+		K.BreakHeightCm = BreakHeightCm;
+		K.Points = Points;
+		return K;
+	}
+};
+
+/** Data/BreakableSettings.csv: os valores globais do mobiliário destrutível (uma linha, id "padrao"). Campos: FDNBreakableSettings. */
+USTRUCT(BlueprintType)
+struct FDNBreakableSettingsRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ArcadeMassFactor = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MaxSpeedLossPct = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MaxLaunchMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxActiveProps = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SleepSpeedMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SleepAfterS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float IgnoreCarS = 0.0f;
+
+	FDNBreakableSettings ToSettings() const
+	{
+		FDNBreakableSettings S;
+		S.ArcadeMassFactor = ArcadeMassFactor;
+		S.MaxSpeedLossPct = MaxSpeedLossPct;
+		S.MaxLaunchMs = MaxLaunchMs;
+		S.MaxActiveProps = MaxActiveProps;
+		S.SleepSpeedMs = SleepSpeedMs;
+		S.SleepAfterS = SleepAfterS;
+		S.IgnoreCarS = IgnoreCarS;
+		return S;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -479,6 +540,8 @@ using FDNTakedownConfigEntry = TDNTableEntry<FDNTakedownConfigRow>;
 using FDNDamageConfigEntry = TDNTableEntry<FDNDamageConfigRow>;
 using FDNCarConfigEntry = TDNTableEntry<FDNCarConfigRow>;
 using FDNCameraConfigEntry = TDNTableEntry<FDNCameraConfigRow>;
+using FDNBreakableEntry = TDNTableEntry<FDNBreakableRow>;
+using FDNBreakableSettingsEntry = TDNTableEntry<FDNBreakableSettingsRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -495,4 +558,6 @@ struct FDNData
 	TArray<FDNDamageConfigEntry> DamageConfig;
 	TArray<FDNCarConfigEntry> CarConfigs;
 	TArray<FDNCameraConfigEntry> CameraModes;
+	TArray<FDNBreakableEntry> Breakables;
+	TArray<FDNBreakableSettingsEntry> BreakableSettings;
 };
