@@ -86,6 +86,33 @@ satura a 32 m/s. Com pontos só na destruição, a rodada valia zero. Decisão:
 - Os limites de medalha do cruzamento de exemplo (`Crossings.csv`) serão
   recalibrados com a medição do lote 13c, não antes.
 
+**Implementação (lote 13c):** `FDNCrash::RegisterDamage` com um livro por veículo
+(`FDNCrashVehicleLedger`, guardado pelo carro de tráfego). Decisões, cada uma com
+teste em `Core/Tests/DNCrash.spec.cpp` (P1 a P6):
+
+| Ponto | Decisão |
+|---|---|
+| P1 | Pontos = valor × fração do dano total adicionada (`FDNDamage::TotalDamage`, média das 5 zonas, de 0 a 1), truncado, depois cadeia e multiplicador (C1, C2) |
+| P2 | Destruir paga o que falta até 100%; destruído não paga mais; a soma nunca passa de 100% |
+| P3 | Impacto com dano (e destruição) é elo da cadeia, na mesma janela de 1,5 s |
+| P4 | Sem dano, dano NaN ou negativo: nada (nem pontos nem elo); valor ≤ 0 e rodada encerrada: ignorados |
+| P5 | O livro é por veículo e zera quando o carro volta do pool |
+| P6 | O truncamento tem tolerância de 0,001 ponto contra o erro do float (1 − 0,3f = 0,69999998 faria 700 virar 699) |
+
+Na rodada (`ADNCrashTestGameMode`), só pontua depois da primeira batida no jogador.
+
+**Medição (14 out, `crash-probe.ps1`, 40 carros, 3 rodadas por velocidade):**
+
+| Entrada | Pontos | Destruídos | Medalha (limites atuais 1000 / 5000 / 12000) | Duração da rodada |
+|---|---|---|---|---|
+| 100 km/h | 13 480; 12 093; 3 559 | 1; 1; 0 | ouro; ouro; bronze | 24,0; 15,9; 14,6 s |
+| 130 km/h | 2 516; 2 374; 2 212 | 0; 0; 0 | bronze nas três | 12,4; 12,3; 12,4 s |
+
+A 100 km/h o carro do jogador atravessa a fila e acorda até 38 carros (cadeia
+longa); a 130 km/h ele é desviado no primeiro impacto e acorda 10. A variação
+entre rodadas iguais é grande (a física roda em passo livre). Os limites de
+medalha ficam como estão até o par decidir com estes números.
+
 ## 3. Medalhas
 
 Cada cruzamento define três limites crescentes: bronze, prata e ouro. A medalha
