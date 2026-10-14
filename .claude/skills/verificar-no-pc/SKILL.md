@@ -29,8 +29,8 @@ Feche o editor do Unreal antes: ele trava a DLL do módulo.
 - Compile antes: o runner (`UnrealEditor-Cmd`, sem janela, `-nullrhi`) carrega a DLL já compilada.
 - Sem `-Filter` roda tudo que começa com `Detonauto`. Grupos de hoje (prefixo `Detonauto.`): `Amassado`, `Camera`, `Carro`,
   `Componentes`, `Crash`, `Dados`, `Dano`, `Globo`, `Medalhas`, `Pontuacao`, `Progresso`, `Registro`, `Subsistemas`,
-  `Takedown`, `Trafego`, `Turbo`. Vários juntos com `+`, como no lote 14. O exemplo `Detonauto.Score` do cabeçalho do
-  script não existe: a pontuação é `Detonauto.Pontuacao`.
+  `Takedown`, `Trafego`, `Turbo`. Vários juntos com `+`, como no lote 14. A pontuação é `Detonauto.Pontuacao` (o exemplo
+  do cabeçalho do script já usa esse nome).
 - `-TimeoutSeconds` (padrão 600).
 - Deu certo: `RESUMO: N aprovados, 0 reprovados, 0 não rodaram` e saída 0. Saída 1: algum `[FALHOU]` (a mensagem vem
   logo abaixo), algum não rodou, nenhum teste no filtro, ou timeout.

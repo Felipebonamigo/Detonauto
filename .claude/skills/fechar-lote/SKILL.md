@@ -1,6 +1,6 @@
 ---
 name: fechar-lote
-description: Fecha um lote do Detonauto: mede o custo de dano, tráfego ou efeitos (crash-measure.ps1, lookdev-measure.ps1, measure.ps1, registro em docs/desempenho.md), registra a licença de asset novo, faz commits pequenos em português, atualiza docs/estado-atual.md e marca o progresso na página dos sprints. Use para "fechar o lote", "encerrar a sessão", "atualizar o estado atual", "registrar a medição" ou "marcar o sprint".
+description: 'Fecha um lote do Detonauto: mede o custo de dano, tráfego ou efeitos (crash-measure.ps1, lookdev-measure.ps1, measure.ps1, registro em docs/desempenho.md), registra a licença de asset novo, faz commits pequenos em português, atualiza docs/estado-atual.md e marca o progresso na página dos sprints. Use para "fechar o lote", "encerrar a sessão", "atualizar o estado atual", "registrar a medição" ou "marcar o sprint".'
 ---
 # Fechar um lote
 
