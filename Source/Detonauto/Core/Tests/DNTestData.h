@@ -76,6 +76,18 @@ namespace DNTest
 		return R;
 	}
 
+	inline FDNTrafficSettingsRow SettingsRow(const FDNTrafficSettings& C = FDNTrafficSettings())
+	{
+		FDNTrafficSettingsRow R;
+		R.WakeDistanceM = C.WakeDistanceM;
+		R.WakeAheadM = C.WakeAheadM;
+		R.WakeAheadMinClosingKmh = C.WakeAheadMinClosingKmh;
+		R.DespawnDistanceM = C.DespawnDistanceM;
+		R.StillSpeedMs = C.StillSpeedMs;
+		R.MaxSpawnPerFrame = C.MaxSpawnPerFrame;
+		return R;
+	}
+
 	inline FDNCarConfigRow CarRow(const FDNCarConfig& C = FDNCarConfig())
 	{
 		FDNCarConfigRow R;

@@ -188,6 +188,58 @@ void FDNGameDataSubsystemSpec::Define()
 			TestFalse("tabela invalida: nenhum preset vale", Sub->TryGetCarConfig(TEXT("Padrao"), Out));
 		});
 
+		It("trafego e medalhas: do CSV real; configuracao e veiculos invalidos voltam ao padrao ou ficam vazios", [this]()
+		{
+			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();
+			TestEqual("antes de carregar: veiculos vazios", Sub->GetTrafficVehicles().Num(), 0);
+			Sub->Reload();
+			TestEqual("WakeDistanceM do CSV real", Sub->GetTrafficSettings().WakeDistanceM, FDNTrafficSettings().WakeDistanceM);
+			TestEqual("MaxSpawnPerFrame do CSV real", Sub->GetTrafficSettings().MaxSpawnPerFrame, FDNTrafficSettings().MaxSpawnPerFrame);
+			TestEqual("cinco veiculos de trafego", Sub->GetTrafficVehicles().Num(), 5);
+
+			FDNMedalThresholds T;
+			TestTrue("exemplo-rio-01", Sub->TryGetMedalThresholds(TEXT("exemplo-rio-01"), T));
+			TestEqual("bronze", T.Bronze, 1000);
+			TestEqual("prata", T.Silver, 5000);
+			TestEqual("ouro", T.Gold, 12000);
+			TestTrue("caixa diferente", Sub->TryGetMedalThresholds(TEXT("EXEMPLO-RIO-02"), T));
+			TestEqual("e e o segundo cruzamento", T.Gold, 20000);
+			TestFalse("nao existe", Sub->TryGetMedalThresholds(TEXT("nao-existe"), T));
+			TestEqual("falha nao mexe na saida", T.Gold, 20000);
+
+			FDNData Data;
+			FDNTrafficSettingsRow S = DNTest::SettingsRow();
+			S.WakeDistanceM = 7.f;
+			Data.TrafficSettings = { DNTest::Entry<FDNTrafficSettingsEntry>(S) };
+			FDNTrafficVehicleRow V;
+			V.Name = TEXT("Teste"); V.ValueCash = 777; V.MassKg = 1000.f; V.Class = TEXT("sedan");
+			Data.Vehicles = { DNTest::Entry<FDNTrafficVehicleEntry>(V, TEXT("v1")) };
+			FDNCrossingRow C;
+			C.CityId = TEXT("x"); C.Order = 1; C.Bronze = 10; C.Silver = 20; C.Gold = 30;
+			Data.Crossings = { DNTest::Entry<FDNCrossingEntry>(C, TEXT("c1")) };
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->ApplyData(MoveTemp(Data), {});
+			TestEqual("WakeDistanceM da linha", Sub->GetTrafficSettings().WakeDistanceM, 7.f);
+			TestEqual("veiculo da linha", Sub->GetTrafficVehicles().Num(), 1);
+			TestEqual("valor do veiculo", Sub->GetTrafficVehicles()[0].Row.ValueCash, 777);
+			TestTrue("limites da linha", Sub->TryGetMedalThresholds(TEXT("c1"), T));
+			TestEqual("ouro da linha", T.Gold, 30);
+
+			FDNData Bad;
+			FDNTrafficSettingsRow BadS = DNTest::SettingsRow();
+			BadS.WakeDistanceM = -1.f; // invalida
+			Bad.TrafficSettings = { DNTest::Entry<FDNTrafficSettingsEntry>(BadS) };
+			V.ValueCash = 0; // invalido
+			Bad.Vehicles = { DNTest::Entry<FDNTrafficVehicleEntry>(V, TEXT("v1")) };
+			C.Silver = 10; // nao estritamente crescente
+			Bad.Crossings = { DNTest::Entry<FDNCrossingEntry>(C, TEXT("c1")) };
+			AddExpectedError(TEXT("Dados do jogo:"), EAutomationExpectedErrorFlags::Contains, 0);
+			Sub->ApplyData(MoveTemp(Bad), {});
+			TestEqual("configuracao invalida volta ao padrao", Sub->GetTrafficSettings().WakeDistanceM, FDNTrafficSettings().WakeDistanceM);
+			TestEqual("veiculos invalidos: vazio", Sub->GetTrafficVehicles().Num(), 0);
+			TestFalse("limites invalidos: sem medalha", Sub->TryGetMedalThresholds(TEXT("c1"), T));
+		});
+
 		It("recarregar substitui o estado anterior (nao acumula erros)", [this]()
 		{
 			UDNGameDataSubsystem* Sub = DNTest::NewSubsystem<UDNGameDataSubsystem>();

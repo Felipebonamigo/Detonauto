@@ -11,6 +11,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Core/Data/DNDataRows.h"
+#include "Core/DNMedals.h"
 #include "DNGameDataSubsystem.generated.h"
 
 UCLASS()
@@ -40,6 +41,12 @@ public:
 	FDNCrashConfig GetCrashConfig() const;
 	FDNTakedownConfig GetTakedownConfig() const;
 	FDNDamageConfig GetDamageConfig() const;
+	/** Os números do tráfego do CSV, ou o padrão se TrafficSettings.csv é inválido (S1). */
+	FDNTrafficSettings GetTrafficSettings() const;
+	/** Os carros de tráfego do CSV; vazio se TrafficVehicles.csv é inválido ou não foi carregado. */
+	const TArray<FDNTrafficVehicleEntry>& GetTrafficVehicles() const;
+	/** Limites das medalhas do cruzamento (sem diferenciar a caixa). Falso, sem mexer em Out, se não existe ou os limites são inválidos. */
+	bool TryGetMedalThresholds(const FString& CrossingId, FDNMedalThresholds& Out) const;
 
 	/**
 	 *  O preset de carro de Data/Cars.csv (sem diferenciar a caixa). Falso, sem mexer em Out, se o preset não existe ou se a
@@ -56,4 +63,6 @@ private:
 	bool bTakedownValid = false;
 	bool bDamageValid = false;
 	bool bCarsValid = false;
+	bool bTrafficSettingsValid = false;
+	bool bTrafficVehiclesValid = false;
 };

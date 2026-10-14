@@ -27,6 +27,8 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bTakedownValid = FDNDataValidation::ValidateTakedown(Data.TakedownConfig).IsEmpty();
 	bDamageValid = FDNDataValidation::ValidateDamage(Data.DamageConfig).IsEmpty();
 	bCarsValid = FDNDataValidation::ValidateCars(Data.CarConfigs).IsEmpty();
+	bTrafficSettingsValid = FDNDataValidation::ValidateTrafficSettings(Data.TrafficSettings).IsEmpty();
+	bTrafficVehiclesValid = FDNDataValidation::ValidateTrafficVehicles(Data.Vehicles).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -61,6 +63,36 @@ FDNTakedownConfig UDNGameDataSubsystem::GetTakedownConfig() const
 FDNDamageConfig UDNGameDataSubsystem::GetDamageConfig() const
 {
 	return (bDamageValid && Data.DamageConfig.Num() == 1) ? Data.DamageConfig[0].Row.ToConfig() : FDNDamageConfig();
+}
+
+FDNTrafficSettings UDNGameDataSubsystem::GetTrafficSettings() const
+{
+	return (bTrafficSettingsValid && Data.TrafficSettings.Num() == 1) ? Data.TrafficSettings[0].Row.ToSettings() : FDNTrafficSettings();
+}
+
+const TArray<FDNTrafficVehicleEntry>& UDNGameDataSubsystem::GetTrafficVehicles() const
+{
+	static const TArray<FDNTrafficVehicleEntry> None;
+	return bTrafficVehiclesValid ? Data.Vehicles : None;
+}
+
+bool UDNGameDataSubsystem::TryGetMedalThresholds(const FString& CrossingId, FDNMedalThresholds& Out) const
+{
+	const FDNCrossingEntry* Entry = Data.Crossings.FindByPredicate([&CrossingId](const FDNCrossingEntry& E) { return E.Id.Equals(CrossingId, ESearchCase::IgnoreCase); });
+	if (!Entry)
+	{
+		return false;
+	}
+	FDNMedalThresholds Thresholds;
+	Thresholds.Bronze = Entry->Row.Bronze;
+	Thresholds.Silver = Entry->Row.Silver;
+	Thresholds.Gold = Entry->Row.Gold;
+	if (!FDNMedals::Validate(Thresholds))
+	{
+		return false;
+	}
+	Out = Thresholds;
+	return true;
 }
 
 bool UDNGameDataSubsystem::TryGetCarConfig(const FString& Id, FDNCarConfig& Out) const
