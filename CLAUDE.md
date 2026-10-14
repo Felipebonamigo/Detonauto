@@ -17,7 +17,7 @@ variáveis) ficam em inglês, como é o padrão do Unreal.
 
 - Cronograma geral: https://claude.ai/artifact/UxU6zFtkNGTvHEwYH3ZB98
 - Sprints com progresso salvo: https://claude.ai/artifact/NkqnCgL7CW5YDtbE5hbSA7
-- Estúdio, com os 4 jogos do Felipe, ferramentas, pré-configurações e pendências
+- Estúdio, com os jogos do Felipe, ferramentas, pré-configurações e pendências
   em comum: https://claude.ai/artifact/72KXW2Tve5gB65BHD1CDp6 (documento do
   Claude Docs, lido pelo conector)
 
@@ -29,6 +29,16 @@ trimestral, quebre o próximo trimestre em sprints de duas semanas.
 
 - Rotinas prontas em `.claude/skills/`: `verificar-no-pc`, `jogar-e-capturar`,
   `fechar-lote`, `modelo-3d`, `triar-playtest` e `ligar-unreal-mcp`.
+- Mais rotinas (14/10/2026): `revisar-sem-compilar` (confere o C++ antes do commit,
+  porque a nuvem não compila), `achar-gargalo`, `ler-crash`, `publicar-na-steam`,
+  `declaracao-ia`, `conferir-fato` (cidades e pontos turísticos), `som-livre` e `traduzir`.
+- Também servem as skills do Claude que já vêm instaladas: `skill-creator`
+  (testa se uma rotina dispara com o jeito de o Felipe pedir),
+  `statistical-analysis` (quantas partidas ou rodadas uma comparação precisa
+  para valer), `computer-use` (no PC, pelo app do Claude, abre o executável,
+  navega pelos menus e tira print; o Felipe liga em Settings > This computer >
+  Computer use) e `fewer-permission-prompts` (no PC, libera de vez os comandos
+  só de leitura que mais pedem permissão).
 - Sessão do PC com o editor aberto: use a skill `unreal-mcp` para montar cena e
   materiais (ligue uma vez com `ligar-unreal-mcp`, porta 8010).
 - Problemas de playtest chegam como Issues "[Playtest]" pelo modelo em
@@ -68,7 +78,7 @@ trimestral, quebre o próximo trimestre em sprints de duas semanas.
 
 Nenhum asset entra no projeto sem uma linha em `docs/licencas.csv`.
 
-- **Modelos 3D em comum aos 4 jogos:** antes de baixar ou gerar, procure na aba
+- **Modelos 3D em comum aos jogos do estúdio:** antes de baixar ou gerar, procure na aba
   "Modelos 3D" do doc do estúdio e no repositório `Felipebonamigo/acervo-3d`.
   Modelo novo entra nos dois no mesmo dia, além da linha em `docs/licencas.csv`.
 
