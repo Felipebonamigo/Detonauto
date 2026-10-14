@@ -97,6 +97,11 @@ void ADNVehicleTestGameMode::StartPlay()
 			ScriptEvents.Add(Event);
 		}
 	}
+	int32 ParkedCars = 0;
+	if (FParse::Value(Cmd, TEXT("DNParkedCars="), ParkedCars) && ParkedCars > 0)
+	{
+		SpawnParkedCars(FMath::Min(ParkedCars, 12));
+	}
 	bProbe = FParse::Param(Cmd, TEXT("DNCarProbe"));
 	if (bProbe)
 	{
@@ -112,6 +117,33 @@ void ADNVehicleTestGameMode::StartPlay()
 			: (Scenario == TEXT("Turbo") || Scenario == TEXT("Accel")) ? 3.6f : (Scenario == TEXT("Wall") ? 7.0f : (Scenario == TEXT("Steer") ? 16.0f : (Scenario == TEXT("Boost") ? 16.0f : 10.0f)));
 		UE_LOG(LogDetonauto, Display, TEXT("DNCarProbe: cenário '%s' de %.0f s iniciado"), *Scenario, ScenarioSeconds);
 	}
+}
+
+void ADNVehicleTestGameMode::SpawnParkedCars(int32 Count)
+{
+	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+	const FTransform Base = Spot ? Spot->GetActorTransform() : FTransform(FVector(0.0f, 0.0f, 120.0f));
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	// -DNParkedDamage=0 estaciona intactos: a diferença para os amassados é o custo dos alvos de deformação
+	float Damage = 1.0f;
+	FParse::Value(FCommandLine::Get(), TEXT("DNParkedDamage="), Damage);
+	int32 Spawned = 0;
+	for (int32 i = 0; i < Count; ++i)
+	{
+		// 9 m entre eles, à frente e 4 m à direita (a faixa ao lado na cena de aparência): a câmera de jogo os vê, e o carro do
+		// jogador passa por eles no cenário "andando" sem bater
+		const FVector Location = Base.TransformPosition(FVector(900.0f * (i + 1), 400.0f, 0.0f));
+		if (ADNVehicle* Car = GetWorld()->SpawnActor<ADNVehicle>(ADNVehicle::StaticClass(), Location, Base.Rotator(), Params))
+		{
+			for (int32 Zone = 0; Zone < FDNDamageMorph::ZoneCount && Damage > 0.0f; ++Zone)
+			{
+				Car->DNZone(Zone, Damage);
+			}
+			++Spawned;
+		}
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: %d de %d carro(s) estacionado(s) com dano %.2f nas 5 zonas"), Spawned, Count, Damage);
 }
 
 ADNVehicle* ADNVehicleTestGameMode::FindVehicle() const

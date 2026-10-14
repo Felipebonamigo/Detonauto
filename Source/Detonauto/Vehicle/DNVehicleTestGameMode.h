@@ -52,6 +52,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerStart> MapStart;
 
+	/** Medição de custo do dano visual (lote 17, -DNParkedCars=N): N carros do jogador, parados à frente e à direita, com as 5 zonas
+	 *  amassadas (-DNParkedDamage=0 a 1, padrão 1; 0 = intactos). Até 12. */
+	void SpawnParkedCars(int32 Count);
+
 	/** Roteiro de teclas (-DNKeys): pressiona e solta teclas REAIS pelo PlayerController, o mesmo caminho do teclado do jogador. */
 	void KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds);
 

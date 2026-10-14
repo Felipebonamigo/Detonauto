@@ -41,7 +41,7 @@ param(
     [switch]$ShotDent,
     [int]$WallKmh = 0,                   # cenário Wall: segura esta velocidade na aproximação (0 = acelerador a fundo)
     [string]$Map = '/Engine/Maps/Entry',   # /Game/Detonauto/Maps/L_Lookdev: cena de aparência (o GameMode usa o PlayerStart do mapa)
-    [int]$ResX = 1280,                  # janela de -Play, -Keys, -Shot e -ShotDent
+    [int]$ResX = 1280,                  # janela de -Play, -Keys, -Shot e -ShotDent (cenário: 640x360, ou esta se vier na linha)
     [int]$ResY = 720,
     [string[]]$ExtraArgs = @(),         # argumentos extras para o jogo (ex.: -DNTraffic=0)
     [switch]$AlvoPS5,                   # perfil de qualidade "alvo PS5" (DN_AlvoPS5 em Config/DefaultDeviceProfiles.ini; docs/desempenho.md)
@@ -78,7 +78,10 @@ elseif ($Play) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes') }
 elseif ($ShotDent) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes', '-DNShotDent') }
 elseif ($Shot) { $a += @("-ResX=$ResX", "-ResY=$ResY", '-ForceRes', '-DNCarShot') }
 else {
-    $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario")
+    # cenário em 640x360, a não ser que -ResX/-ResY venham na linha (a captura da parede do lote 17 precisa ver o amassado)
+    $sx = if ($PSBoundParameters.ContainsKey('ResX')) { $ResX } else { 640 }
+    $sy = if ($PSBoundParameters.ContainsKey('ResY')) { $ResY } else { 360 }
+    $a += @("-ResX=$sx", "-ResY=$sy", '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario")
     if ($WallKmh -gt 0) { $a += "-DNWallKmh=$WallKmh" }
     if ($PSBoundParameters.ContainsKey('Throttle')) { $a += ("-DNThrottle=" + $Throttle.ToString([Globalization.CultureInfo]::InvariantCulture)) }
     if ($TurboOn) { $a += '-DNTurboOn' }

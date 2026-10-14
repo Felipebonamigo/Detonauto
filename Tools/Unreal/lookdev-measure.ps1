@@ -19,6 +19,7 @@ param(
     [ValidateSet('parado', 'andando')][string[]]$Scenario = @('parado', 'andando'),
     [int]$Warmup = 15,
     [int]$Measure = 10,
+    [string[]]$ExtraArgs = @(),         # argumentos extras para o jogo (ex.: -DNParkedCars=6, os 6 carros amassados do lote 17)
     [string]$EngineVersion
 )
 $ErrorActionPreference = 'Stop'
@@ -31,7 +32,7 @@ $others = @(Get-Process UnrealEditor, UnrealEditor-Cmd -ErrorAction SilentlyCont
 if ($others.Count -gt 0) { Write-Host "AVISO: há $($others.Count) Unreal aberto(s) ($(($others | ForEach-Object MainWindowTitle | Where-Object { $_ }) -join '; ')): os números ficam distorcidos." }
 $gpu = (Get-CimInstance Win32_VideoController | Select-Object -First 1).Name
 $cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
-Write-Host "Máquina: $gpu | $cpu | janela 1920x1080 | perfil DN_AlvoPS5 | aquecimento $Warmup s, medição $Measure s"
+Write-Host "Máquina: $gpu | $cpu | janela 1920x1080 | perfil DN_AlvoPS5 | aquecimento $Warmup s, medição $Measure s | extras: $($ExtraArgs -join ' ')"
 
 function Get-Stats([double[]]$v) {
     $s = $v | Sort-Object
@@ -47,7 +48,7 @@ foreach ($name in $Scenario) {
     if ($name -eq 'andando') { $keys = "W@2-$($stop + 1);" + $keys }
     $before = @(Get-ChildItem $csvDir -Filter *.csv -ErrorAction SilentlyContinue | ForEach-Object FullName)
     & (Join-Path $PSScriptRoot 'vehicle-probe.ps1') -Uproject $ctx.Uproject -Map /Game/Detonauto/Maps/L_Lookdev -ResX 1920 -ResY 1080 -AlvoPS5 `
-        -Exec 't.MaxFPS 0' -Keys $keys -TimeoutSeconds ($stop + 240) | Out-Null
+        -Exec 't.MaxFPS 0' -Keys $keys -TimeoutSeconds ($stop + 240) -ExtraArgs $ExtraArgs | Out-Null
     $csv = Get-ChildItem $csvDir -Filter *.csv -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.FullName } | Sort-Object LastWriteTime | Select-Object -Last 1
     if (-not $csv) { Write-Host "[$name] sem CSV"; $failed++; continue }
     # Leitura direta (o Import-Csv recusa: o CSV do Unreal pode repetir nomes de coluna). O arquivo termina com linhas de eventos e o
