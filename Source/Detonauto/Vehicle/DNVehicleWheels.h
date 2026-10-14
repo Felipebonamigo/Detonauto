@@ -58,7 +58,7 @@ public:
 		SlipThreshold = 100.0f;
 		SkidThreshold = 100.0f;
 		MaxSteerAngle = 0.0f;
-		MaxBrakeTorque = 4500.0f;
+		MaxBrakeTorque = 1500.0f; // o template tem 1500 atrás (o protótipo usava 4500, errado)
 		MaxHandBrakeTorque = 6000.0f;
 	}
 };

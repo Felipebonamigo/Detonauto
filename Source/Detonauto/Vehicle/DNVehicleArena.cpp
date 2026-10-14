@@ -78,6 +78,15 @@ ADNTestArena::ADNTestArena()
 	Sun->SetMobility(EComponentMobility::Movable);
 	Sun->SetRelativeRotation(FRotator(-50.0f, -35.0f, 0.0f));
 	Sun->SetIntensity(6.0f);
+	Sun->ForwardShadingPriority = 1; // com duas luzes direcionais, o motor avisa na tela qual vale no forward shading: o sol
+
+	// luz de preenchimento do lado oposto: sem ela o lado do carro que fica na sombra do sol aparece preto nas câmeras laterais
+	UDirectionalLightComponent* Fill = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Fill"));
+	Fill->SetupAttachment(Root);
+	Fill->SetMobility(EComponentMobility::Movable);
+	Fill->SetRelativeRotation(FRotator(-35.0f, 145.0f, 0.0f));
+	Fill->SetIntensity(3.0f);
+	Fill->SetCastShadows(false);
 
 	USkyLightComponent* Sky = CreateDefaultSubobject<USkyLightComponent>(TEXT("Sky"));
 	Sky->SetupAttachment(Root);

@@ -45,6 +45,21 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<ADNTestArena> Arena;
 
+	/** Roteiro de teclas (-DNKeys): pressiona e solta teclas REAIS pelo PlayerController, o mesmo caminho do teclado do jogador. */
+	void KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds);
+
+	struct FScriptEvent
+	{
+		FString What;       // nome da tecla (W, T, SpaceBar...), ou SHOT, CAM<yaw>, QUIT
+		float Start = 0.0f;
+		float End = -1.0f;  // soltar; teclas sem fim soltam 0,15 s depois
+		bool bPressed = false;
+		bool bDone = false;
+	};
+	TArray<FScriptEvent> ScriptEvents;
+	float ScriptTime = 0.0f;
+	int32 ScriptShots = 0;
+
 	void ScenarioTick(ADNVehicle& Vehicle, float DeltaSeconds);
 	void ShotTick(ADNVehicle& Vehicle, float DeltaSeconds);
 	void ProbeFinish(ADNVehicle& Vehicle);
@@ -58,6 +73,14 @@ protected:
 	bool bPrepared = false;
 	FString Scenario;
 	float WallTargetKmh = 0.0f;
+	/** Cenário Steer: entrada de esterço mantida (-DNSteer, 0 a 1) e as medidas da curva em regime. */
+	float SteerInput = 1.0f;
+	float SteerT0 = -1.0f;
+	float SteerAtSpeedSince = -1.0f;
+	double SteerRadiusSum = 0.0;
+	double SteerYawSum = 0.0;
+	double SteerFrontAngleSum = 0.0;
+	int32 SteerSamples = 0;
 	float ScenarioSeconds = 10.0f;
 	float ScenarioTime = 0.0f;
 	float ShotTime = 0.0f;

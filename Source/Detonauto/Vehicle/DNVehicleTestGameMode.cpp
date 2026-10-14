@@ -8,6 +8,8 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerController.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Misc/CommandLine.h"
 #include "HAL/PlatformMisc.h"
 #include "UnrealClient.h"
@@ -46,14 +48,43 @@ void ADNVehicleTestGameMode::StartPlay()
 	const TCHAR* Cmd = FCommandLine::Get();
 	bShotDent = FParse::Param(Cmd, TEXT("DNShotDent"));
 	bShot = bShotDent || FParse::Param(Cmd, TEXT("DNCarShot"));
+	// roteiro de teclas: -DNKeys=W@0.5-9;T@3;SHOT@4;CAM90@5;QUIT@8   (tecla@início[-fim]; separado por ponto e vírgula)
+	FString KeyScript;
+	if (FParse::Value(Cmd, TEXT("DNKeys="), KeyScript))
+	{
+		TArray<FString> Items;
+		KeyScript.ParseIntoArray(Items, TEXT(";"));
+		for (const FString& Item : Items)
+		{
+			FString What, Times;
+			if (!Item.Split(TEXT("@"), &What, &Times))
+			{
+				continue;
+			}
+			FScriptEvent Event;
+			Event.What = What;
+			FString StartText, EndText;
+			if (Times.Split(TEXT("-"), &StartText, &EndText))
+			{
+				Event.Start = FCString::Atof(*StartText);
+				Event.End = FCString::Atof(*EndText);
+			}
+			else
+			{
+				Event.Start = FCString::Atof(*Times);
+			}
+			ScriptEvents.Add(Event);
+		}
+	}
 	bProbe = FParse::Param(Cmd, TEXT("DNCarProbe"));
 	if (bProbe)
 	{
 		Scenario = TEXT("Sin");
 		FParse::Value(Cmd, TEXT("DNCarScenario="), Scenario);
 		FParse::Value(Cmd, TEXT("DNWallKmh="), WallTargetKmh);
+		FParse::Value(Cmd, TEXT("DNSteer="), SteerInput);
 		ScenarioSeconds = (Scenario == TEXT("Handbrake") || Scenario == TEXT("Turn") || Scenario == TEXT("Switch")) ? 9.0f
-			: (Scenario == TEXT("Turbo") || Scenario == TEXT("Accel")) ? 3.6f : (Scenario == TEXT("Wall") ? 7.0f : 10.0f);
+			: (Scenario == TEXT("Turbo") || Scenario == TEXT("Accel")) ? 3.6f : (Scenario == TEXT("Wall") ? 7.0f : (Scenario == TEXT("Steer") ? 16.0f : 10.0f));
 		UE_LOG(LogDetonauto, Display, TEXT("DNCarProbe: cenário '%s' de %.0f s iniciado"), *Scenario, ScenarioSeconds);
 	}
 }
@@ -66,12 +97,20 @@ ADNVehicle* ADNVehicleTestGameMode::FindVehicle() const
 void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!bProbe && !bShot)
+	if (!bProbe && !bShot && ScriptEvents.IsEmpty())
 	{
 		return;
 	}
 	ADNVehicle* Vehicle = FindVehicle();
 	if (!Vehicle)
+	{
+		return;
+	}
+	if (!ScriptEvents.IsEmpty())
+	{
+		KeyScriptTick(*Vehicle, DeltaSeconds);
+	}
+	if (!bProbe && !bShot)
 	{
 		return;
 	}
@@ -90,6 +129,70 @@ void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 	else
 	{
 		ScenarioTick(*Vehicle, DeltaSeconds);
+	}
+}
+
+void ADNVehicleTestGameMode::KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds)
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+	{
+		return;
+	}
+	ScriptTime += DeltaSeconds;
+	auto Send = [PC](const FKey& Key, EInputEvent Event) { PC->InputKey(FInputKeyEventArgs::CreateSimulated(Key, Event, Event == IE_Released ? 0.0f : 1.0f, 1)); };
+	for (FScriptEvent& E : ScriptEvents)
+	{
+		if (E.bDone || ScriptTime < E.Start)
+		{
+			continue;
+		}
+		if (E.What == TEXT("SHOT"))
+		{
+			E.bDone = true;
+			FScreenshotRequest::RequestScreenshot(FString::Printf(TEXT("dn-play-%d"), ++ScriptShots), E.End > 0.0f, false); // fim > 0: com o HUD
+		}
+		else if (E.What == TEXT("QUIT"))
+		{
+			E.bDone = true;
+			FPlatformMisc::RequestExit(false);
+		}
+		else if (E.What.StartsWith(TEXT("DENT")))
+		{
+			// DENT<fx>:<fy>:<fz>: uma batida máxima na caixa da carroceria nesta fração (-1..1) da extensão; só para achar a superfície
+			E.bDone = true;
+			TArray<FString> F;
+			E.What.Mid(4).ParseIntoArray(F, TEXT(":"));
+			if (F.Num() == 3)
+			{
+				Vehicle.SimulateImpactAtBoxFraction(20.0f, FVector(FCString::Atof(*F[0]), FCString::Atof(*F[1]), FCString::Atof(*F[2])));
+			}
+		}
+		else if (E.What.StartsWith(TEXT("DEMO")))
+		{
+			E.bDone = true;
+			Vehicle.ApplyDemoDents(FCString::Atoi(*E.What.Mid(4)));
+		}
+		else if (E.What.StartsWith(TEXT("CAM")))
+		{
+			E.bDone = true;
+			Vehicle.SetShotCamera(FCString::Atof(*E.What.Mid(3)));
+		}
+		else
+		{
+			const FKey Key(*E.What);
+			const float End = E.End >= 0.0f ? E.End : E.Start + 0.15f;
+			if (!E.bPressed)
+			{
+				E.bPressed = true;
+				Send(Key, IE_Pressed);
+			}
+			if (ScriptTime >= End)
+			{
+				E.bDone = true;
+				Send(Key, IE_Released);
+			}
+		}
 	}
 }
 
@@ -182,6 +285,42 @@ void ADNVehicleTestGameMode::ScenarioTick(ADNVehicle& Vehicle, float DeltaSecond
 			MinSpeedKmh = FMath::Min(MinSpeedKmh, SpeedKmh);
 		}
 	}
+	else if (Scenario == TEXT("Steer"))
+	{
+		// Curva em regime (playtest 1: "curva dura"): segura a velocidade -DNWallKmh (controle proporcional), espera 1 s dentro de
+		// 3 km/h do alvo e entra com o esterço -DNSteer mantido por 6 s. Mede, nos 3 s finais (regime), a guinada [graus/s], o raio
+		// (velocidade / guinada) e o ângulo real das rodas da frente.
+		const float Target = WallTargetKmh > 0.0f ? WallTargetKmh : 60.0f;
+		Move->SetThrottleInput(FMath::Clamp(0.4f + (Target - SpeedKmh) * 0.08f, 0.0f, 1.0f));
+		if (SteerT0 < 0.0f)
+		{
+			Move->SetSteeringInput(0.0f);
+			SteerAtSpeedSince = FMath::Abs(SpeedKmh - Target) < 3.0f ? (SteerAtSpeedSince < 0.0f ? ScenarioTime : SteerAtSpeedSince) : -1.0f;
+			if (SteerAtSpeedSince >= 0.0f && ScenarioTime - SteerAtSpeedSince >= 1.0f)
+			{
+				SteerT0 = ScenarioTime;
+				SpeedAtManeuver = SpeedKmh;
+			}
+		}
+		else
+		{
+			Move->SetSteeringInput(FMath::Clamp(SteerInput * Vehicle.AppliedSteeringGain, -1.0f, 1.0f));
+			const float Since = ScenarioTime - SteerT0;
+			const double YawDegS = Vehicle.GetMesh()->GetPhysicsAngularVelocityInDegrees().Z;
+			if (Since >= 3.0f && Since < 6.0f && FMath::Abs(YawDegS) > 1.0)
+			{
+				const double V = Vehicle.GetVelocity().Size2D() / 100.0;
+				SteerRadiusSum += V / FMath::DegreesToRadians(FMath::Abs(YawDegS));
+				SteerYawSum += FMath::Abs(YawDegS);
+				SteerFrontAngleSum += FMath::Abs(Move->Wheels[0]->GetSteerAngle());
+				++SteerSamples;
+			}
+			if (Since >= 6.0f)
+			{
+				ScenarioSeconds = ScenarioTime; // fecha agora
+			}
+		}
+	}
 	else if (Scenario == TEXT("Wall"))
 	{
 		// Reto contra a parede (~3,3 s a fundo); com -DNWallKmh=N segura a velocidade em N km/h (controle proporcional:
@@ -240,6 +379,13 @@ void ADNVehicleTestGameMode::ProbeFinish(ADNVehicle& Vehicle)
 	{
 		UE_LOG(LogDetonauto, Display, TEXT("DNDent: ao fim: %d amassado(s) de %d, %d batida(s) reais, maior variação de velocidade %.1f m/s, destruído=%d"),
 			Vehicle.DentCount(), Vehicle.MaxDentCount(), Vehicle.RealImpactTotal(), Vehicle.MaxRealImpactMs(), Vehicle.IsDestroyed() ? 1 : 0);
+	}
+	if (Scenario == TEXT("Steer"))
+	{
+		const double N = FMath::Max(SteerSamples, 1);
+		UE_LOG(LogDetonauto, Display, TEXT("DNCarProbe: CURVA preset=%s | alvo=%.0f km/h (entrou a %.0f) | esterço=%.2f | regime (3 s): guinada=%.1f graus/s, raio=%.1f m, rodas da frente=%.1f graus, amostras=%d, aceleração lateral=%.2f g"),
+			*Vehicle.CarId.ToString(), WallTargetKmh > 0.0f ? WallTargetKmh : 60.0f, SpeedAtManeuver, SteerInput, SteerYawSum / N, SteerRadiusSum / N, SteerFrontAngleSum / N, SteerSamples,
+			(SteerSamples > 0 ? (Vehicle.SpeedKmh() / 3.6) * FMath::DegreesToRadians(SteerYawSum / N) / 9.81 : 0.0));
 	}
 	if (Scenario == TEXT("Handbrake") || Scenario == TEXT("Turn"))
 	{

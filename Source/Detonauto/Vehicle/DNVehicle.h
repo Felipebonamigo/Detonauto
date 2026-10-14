@@ -135,6 +135,9 @@ public:
 	/** Uma batida simulada: variação de velocidade [m/s], zona e ponto local na carroceria [cm]. */
 	void SimulateImpact(float DeltaVMs, EDNDamageZone Zone, const FVector& LocalPositionCm);
 
+	/** Batida na caixa da carroceria na fração Fraction (-1..1 por eixo) da extensão, em torno do centro: para achar a superfície. */
+	void SimulateImpactAtBoxFraction(float DeltaVMs, const FVector& Fraction);
+
 	/** Até 8 amassados de profundidade máxima espalhados pela carroceria (para tirar foto). */
 	void ApplyDemoDents(int32 Count);
 
@@ -150,6 +153,9 @@ public:
 
 	/** Câmera parada olhando o carro de um ângulo (YawDegrees em relação à frente), para as capturas de tela. */
 	void SetShotCamera(float YawDegrees);
+
+	/** Volta a câmera de perseguição dos números do preset. */
+	void RestoreChaseCamera();
 
 	/** Linhas do HUD de debug: preset, velocidade, turbo e amassados. */
 	TArray<FString> HudLines() const;
@@ -223,6 +229,8 @@ protected:
 	float AppliedRearMultiplier = -1.0f;
 	/** Segundos com a barra do turbo vazia e desligado (modo de teste). */
 	float TurboEmptySeconds = 0.0f;
+	/** Segundos que faltam da vista de dano (as teclas de batida simulada giram a câmera para o amassado aparecer). */
+	float DentViewSecondsLeft = 0.0f;
 
 	/** Rotação do osso de cada roda no pose de referência (espaço do componente): converte o curso da suspensão para o espaço do osso. */
 	TArray<FQuat> WheelBoneRotations;

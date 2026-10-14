@@ -30,12 +30,16 @@
 param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Row = 'Padrao',
-    [ValidateSet('Sin', 'Accel', 'Turbo', 'Handbrake', 'Turn', 'Switch', 'Wall')][string]$Scenario = 'Sin',
+    [ValidateSet('Sin', 'Accel', 'Turbo', 'Handbrake', 'Turn', 'Switch', 'Wall', 'Steer')][string]$Scenario = 'Sin',
+    [double]$Steer = 1.0,                # cenário Steer: entrada de esterço mantida (0 a 1); a velocidade vem de -WallKmh
     [switch]$Play,
+    [string]$Keys,                      # roteiro de teclas REAIS (ver DNVehicleTestGameMode.h): ex. 'W@0.5-9;T@3;SHOT@4;QUIT@8'
     [switch]$Shot,
     [switch]$ShotDent,
     [int]$WallKmh = 0,                   # cenário Wall: segura esta velocidade na aproximação (0 = acelerador a fundo)
     [string]$Map = '/Engine/Maps/Entry',
+    [string[]]$ExtraArgs = @(),         # argumentos extras para o jogo (ex.: -DNTraffic=0)
+    [string]$GameMode = 'DNVehicleTestGameMode',   # DNCrashTestGameMode: estrada sem parede (use -Keys; -DNTraffic=0 sem tráfego)
     [int]$TimeoutSeconds = 240,
     [string]$EngineVersion
 )
@@ -45,21 +49,24 @@ $ErrorActionPreference = 'Stop'
 try { $ctx = Resolve-UnrealContext $Uproject $EngineVersion } catch { Write-Error $_.Exception.Message; exit 1 }
 $exe = Join-Path $ctx.Root 'Engine\Binaries\Win64\UnrealEditor.exe'
 $projDir = Split-Path $ctx.Uproject
-$tag = if ($Play) { "$Row-play" } elseif ($ShotDent) { "$Row-shotdent" } elseif ($Shot) { "$Row-shot" } else { "$Row-$Scenario" }
+$tag = if ($Keys) { "$Row-keys" } elseif ($Play) { "$Row-play" } elseif ($ShotDent) { "$Row-shotdent" } elseif ($Shot) { "$Row-shot" } else { "$Row-$Scenario" }
 $log = Join-Path $projDir "Saved\Logs\vehicle-probe-$tag.log"
 New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
 if (Test-Path $log) { Remove-Item $log }
 
-$a = @("`"$($ctx.Uproject)`"", "$Map`?game=/Script/$($ctx.Name).DNVehicleTestGameMode", '-game', '-windowed', '-novsync', '-nosplash', '-nosound',
+$a = @("`"$($ctx.Uproject)`"", "$Map`?game=/Script/$($ctx.Name).$GameMode", '-game', '-windowed', '-novsync', '-nosplash', '-nosound',
     "-DNCarRow=$Row", "-abslog=`"$log`"")
-if ($Play) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes') }
+if ($Keys) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', "-DNKeys=$Keys") }
+elseif ($Play) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes') }
 elseif ($ShotDent) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNShotDent') }
 elseif ($Shot) { $a += @('-ResX=1280', '-ResY=720', '-ForceRes', '-DNCarShot') }
 else {
     $a += @('-ResX=640', '-ResY=360', '-ForceRes', '-DNCarProbe', "-DNCarScenario=$Scenario")
     if ($WallKmh -gt 0) { $a += "-DNWallKmh=$WallKmh" }
+    if ($Scenario -eq 'Steer') { $a += ("-DNSteer=" + $Steer.ToString([Globalization.CultureInfo]::InvariantCulture)) }
 }
 
+$a += $ExtraArgs
 $p = Start-Process -FilePath $exe -ArgumentList $a -PassThru
 if ($Play) { Write-Host 'Jogo aberto. Feche a janela para terminar.'; $p.WaitForExit(); exit 0 }
 if (-not $p.WaitForExit($TimeoutSeconds * 1000)) { Stop-Process -Id $p.Id; Write-Error "Passou de $TimeoutSeconds s e o jogo foi fechado."; exit 1 }
@@ -67,5 +74,5 @@ if (-not (Test-Path $log)) { Write-Error 'O jogo não deixou log.'; exit 1 }
 
 Select-String -Path $log -Pattern 'ADNVehicle|DNCarProbe|DNCarShot|DNDent|LogDetonauto|Error:|Fatal' |
     ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[[^\]]*\]', '' -replace '^LogDetonauto: Display: ', '' }
-if ($Shot -or $ShotDent -or $Scenario -eq 'Wall') { Get-ChildItem (Join-Path $projDir 'Saved\Screenshots') -Recurse -Filter 'dn-*.png' -ErrorAction SilentlyContinue | ForEach-Object { "Captura: $($_.FullName)" } }
+if ($Keys -or $Shot -or $ShotDent -or $Scenario -eq 'Wall') { Get-ChildItem (Join-Path $projDir 'Saved\Screenshots') -Recurse -Filter 'dn-*.png' -ErrorAction SilentlyContinue | ForEach-Object { "Captura: $($_.FullName)" } }
 exit 0

@@ -2,6 +2,7 @@
 #include "Vehicle/DNVehicleWheels.h"
 #include "Vehicle/DNTurboComponent.h"
 #include "Core/DNGameDataSubsystem.h"
+#include "Core/DNWheelVisual.h"
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -107,6 +108,12 @@ ADNVehicle::ADNVehicle()
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(CameraBoom);
+	// Sem desfoque de movimento: a roda girando e o chão ficavam borrados (playtest 1: "embaçadas"); o Felipe não quer o efeito.
+	Camera->PostProcessSettings.bOverride_MotionBlurAmount = true;
+	Camera->PostProcessSettings.MotionBlurAmount = 0.0f;
+	Camera->PostProcessSettings.bOverride_MotionBlurMax = true;
+	Camera->PostProcessSettings.MotionBlurMax = 0.0f;
+	Camera->PostProcessBlendWeight = 1.0f;
 
 	// --- turbo: cola fina sobre o FDNTurbo do Core; quem tem as entradas (este carro) chama Step() a cada quadro ---
 	Turbo = CreateDefaultSubobject<UDNTurboComponent>(TEXT("Turbo"));
@@ -139,10 +146,12 @@ ADNVehicle::ADNVehicle()
 	// curva de torque: normalizada pelo máximo (X = RPM)
 	FRichCurve* Torque = Move->EngineSetup.TorqueCurve.GetRichCurve();
 	Torque->Reset();
-	Torque->AddKey(0.0f, 0.6f);
-	Torque->AddKey(2000.0f, 0.9f);
-	Torque->AddKey(4500.0f, 1.0f);
-	Torque->AddKey(7000.0f, 0.7f);
+	// a curva do template (BP_SportsCar_Pawn, lida do Blueprint no lote 14): a do protótipo era outra (0,0.6)(2000,0.9)(4500,1)(7000,0.7)
+	Torque->AddKey(1000.0f, 0.5f);
+	Torque->AddKey(1800.0f, 0.9f);
+	Torque->AddKey(3500.0f, 1.0f);
+	Torque->AddKey(6000.0f, 0.8f);
+	Torque->AddKey(7000.0f, 0.0f);
 
 	Move->TransmissionSetup.bUseAutomaticGears = true;
 	Move->TransmissionSetup.bUseAutoReverse = true;
@@ -240,8 +249,7 @@ void ADNVehicle::ApplyRuntimeParameters(const FDNCarConfig& C)
 }
 
 void ADNVehicle::ApplyWheelGrip(bool bForce)
-{
-	const float HandbrakeMultiplier = FDNHandbrakeRamp::RearGripMultiplier(Car.HandbrakeRearGrip, HandbrakeRamp);
+{	const float HandbrakeMultiplier = FDNHandbrakeRamp::RearGripMultiplier(Car.HandbrakeRearGrip, HandbrakeRamp);
 	if (!bForce && FMath::IsNearlyEqual(HandbrakeMultiplier, AppliedRearMultiplier, 0.002f))
 	{
 		return;
@@ -433,11 +441,14 @@ void ADNVehicle::UpdateWheelVisuals()
 		{
 			continue;
 		}
-		// Os mesmos três números que o UVehicleAnimationInstance entrega ao Anim Blueprint do template: o giro (pitch) e o
-		// esterçamento (yaw) valem no espaço do osso; o curso da suspensão vem no espaço do componente.
-		const FRotator RotOffset(Wheel->GetRotationAngle(), Wheel->GetSteerAngle(), 0.0f);
+		// Os mesmos três números que o UVehicleAnimationInstance entrega ao Anim Blueprint do template, e a mesma conta do nó
+		// FAnimNode_WheelController: giro (pitch) e esterçamento (yaw) valem no espaço do COMPONENTE (rotação nova = RotOffset x
+		// rotação do osso, também no espaço do componente), e o curso da suspensão também. A roda visual está presa ao osso, então a
+		// rotação relativa a ele é Osso^-1 x RotOffset x Osso. (A versão anterior aplicava RotOffset no espaço do osso: se o osso não
+		// tem o eixo do eixo-de-roda em Y, a roda girava em torno do eixo errado e ficava "de lado".)
 		const FVector LocOffsetComponent = -Wheel->GetSuspensionAxis() * Wheel->GetSuspensionOffset();
-		WheelVisuals[i]->SetRelativeLocationAndRotation(WheelBoneRotations[i].UnrotateVector(LocOffsetComponent), RotOffset);
+		WheelVisuals[i]->SetRelativeLocationAndRotation(FDNWheelVisual::RelativeLocation(WheelBoneRotations[i], LocOffsetComponent),
+			FDNWheelVisual::RelativeRotation(WheelBoneRotations[i], Wheel->GetRotationAngle(), Wheel->GetSteerAngle()));
 	}
 }
 
@@ -481,6 +492,15 @@ void ADNVehicle::Tick(float DeltaSeconds)
 	else
 	{
 		TurboEmptySeconds = 0.0f;
+	}
+
+	if (DentViewSecondsLeft > 0.0f)
+	{
+		DentViewSecondsLeft -= DeltaSeconds;
+		if (DentViewSecondsLeft <= 0.0f)
+		{
+			RestoreChaseCamera();
+		}
 	}
 
 	UpdateWheelVisuals();
@@ -673,6 +693,12 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 		BodyComp->SetMaterial(i, DentMaterial);
 	}
 	PushDentsToMaterial(); // todos os slots desligados
+	{
+		FVector Center, Extent;
+		GetBodyBox(Center, Extent);
+		UE_LOG(LogDetonauto, Display, TEXT("DNDent: carroceria '%s': %d vertices, %d slot(s) de material, caixa local centro=%s extensao=%s"),
+			*BodyComp->GetStaticMesh()->GetName(), BodyComp->GetStaticMesh()->GetNumVertices(0), BodyComp->GetNumMaterials(), *Center.ToCompactString(), *Extent.ToCompactString());
+	}
 
 	// batida real: o corpo físico avisa cada contato (paredes, outros carros)
 	if (bBindRealHits)
@@ -711,6 +737,14 @@ void ADNVehicle::SimulateImpact(float DeltaVMs, EDNDamageZone Zone, const FVecto
 		Result.Dent.DepthCm, Result.Dent.RadiusCm, DamageState.Dents.Num(), Result.bJustDestroyed ? TEXT(" | DESTRUIDO") : TEXT(""));
 }
 
+void ADNVehicle::SimulateImpactAtBoxFraction(float DeltaVMs, const FVector& Fraction)
+{
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FVector Point = Center + Extent * Fraction;
+	SimulateImpact(DeltaVMs, FDNDentParams::ZoneOfLocalPoint(Point, Center, Extent), Point);
+}
+
 void ADNVehicle::ApplyDemoDents(int32 Count)
 {
 	FVector Center, Extent;
@@ -744,13 +778,21 @@ void ADNVehicle::DentKey(const FInputActionValue& Value, int32 DentIndex)
 	if (DentIndex == 6)
 	{
 		ClearDents();
+		SetShotCamera(135.0f);
+		DentViewSecondsLeft = 3.0f;
 		return;
 	}
 	FVector Center, Extent;
 	GetBodyBox(Center, Extent);
 	const bool bFront = DentIndex < 3;
-	const FVector Point = bFront ? Center + FVector(Extent.X, 0.0f, 0.0f) : Center + FVector(0.0f, -Extent.Y, 0.0f);
+	// frente: a quina da frente à esquerda; lado esquerdo: a porta. O meio da frente tem a grade (aberta, sem vértices na caixa): um
+	// amassado ali não aparece (playtest 1). Medido: 0,8 / -0,8 da extensão cai na superfície e deforma. A câmera gira para vê-los.
+	const FVector Point = bFront ? Center + Extent * FVector(0.8f, -0.8f, 0.0f) : Center + Extent * FVector(0.0f, -1.0f, 0.0f);
 	SimulateImpact(SimulatedDeltaV[DentIndex % 3], bFront ? EDNDamageZone::Front : EDNDamageZone::Left, Point);
+	// A câmera de perseguição fica atrás do carro e não vê a frente nem o lado esquerdo (playtest 1: "nada acontece"): a câmera gira
+	// para a frente-esquerda por 3 s para o amassado aparecer, e depois volta.
+	SetShotCamera(135.0f);
+	DentViewSecondsLeft = 3.0f;
 }
 
 void ADNVehicle::OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
@@ -811,6 +853,14 @@ void ADNVehicle::FlushImpacts(double Now)
 		Group.DeltaVMs, WholeWindow);
 	SimulateImpact(Group.DeltaVMs, FDNDentParams::ZoneOfLocalPoint(Group.LocalPoint, Center, Extent), Group.LocalPoint);
 	GroupContacts = 0;
+}
+
+void ADNVehicle::RestoreChaseCamera()
+{
+	CameraBoom->bEnableCameraRotationLag = true;
+	CameraBoom->SetRelativeRotation(FRotator::ZeroRotator);
+	CameraBoom->TargetArmLength = Car.CameraDistanceCm;
+	CameraBoom->SocketOffset.Z = Car.CameraHeightCm;
 }
 
 void ADNVehicle::SetShotCamera(float YawDegrees)
