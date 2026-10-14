@@ -21,15 +21,15 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado) | `Source/Detonauto/Core/` | Testadas; 622 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação) | `Source/Detonauto/Core/` | Testadas; 635 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros |
 | Subsistemas de dados e de save | `Core/DNGameDataSubsystem`, `Core/DNRecordsSubsystem` | Testados sem mundo |
-| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, amassado por material, HUD de depuração |
+| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, HUD de depuração |
 | Tráfego e rodada de Crash | `Traffic/`, `Vehicle/DNCrashTestGameMode` | Lote 13 parcial: código na main, medição ainda não rodou |
 | Mapa de teste | `ADNVehicleArena`, criado por código no `/Engine/Maps/Entry` | Feio de propósito; **não serve para julgar visual** |
-| Arte | `Content/Detonauto/Vehicle/SportsCar` | Carro do template da Epic, provisório |
+| Arte | `Content/Detonauto/Vehicle/SportsCar` | Carro do template da Epic, provisório; `SK_DNSportsCarBody` é a carroceria dele com os 5 alvos, refeita por `Tools/Unreal/damage-body.ps1` |
 
 ## Lotes
 
@@ -46,6 +46,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 13b | Correções do tráfego achadas na revisão independente | Aprovado (`docs/regras-trafego.md`, seção do 13b) |
 | 16 | Visual do carro e da rua: rodas, pintura, vidros, pneus, prédios, mobiliário | Aprovado (`docs/lookdev.md`); polimento no 16b |
 | 13c | Pontuação por dano no Crash | Aprovado (`docs/regras-de-jogo.md`, revisão de 14 out): livro por veículo, P1 a P6, mutação 7 de 7 |
+| 17 | Dano visual, camada 1: deformação grande por zona | Na main, aguardando revisão (`docs/lote-17.md`): regra com mutação 18 de 19 (1 equivalente), carroceria com 5 alvos gerada no Blender, capturas a 0,3/0,6/1,0 e na parede, custo de 6 carros amassados dentro do ruído. Frente e traseira mudaram do contrato (a lataria passava das rodas) |
 
 ## Primeiro playtest (14 out)
 
@@ -129,6 +130,15 @@ melhor e ele quer cinco modos.
   nits para aparecer.
 - Substituição de texto em PowerShell com "`n" dentro de script passado ao
   Claude Code estraga linhas: editar código só com a ferramenta de edição.
+- Python do Unreal: iterar um `unreal.Array` de structs (`for slot in materials`)
+  devolve cópias; mexer nelas não muda o array. Mexa por índice e devolva
+  (`slots[i] = slot`) e confira relendo.
+- Malha com alvos de deformação precisa da flag `used_with_morph_targets` no
+  material-base, senão o jogo mostra o xadrez cinza (`WorldGridMaterial`).
+- Roteiro montado em PowerShell: número formatado com `-f` sai com vírgula
+  (`0,3`) e o console lê 0. Formatar com `CultureInfo.InvariantCulture`.
+- Saída de `*>` no PowerShell 5.1 é UTF-16: `grep` do Bash não acha texto nela
+  (use `iconv -f utf-16` ou `Get-Content -Encoding unicode`).
 
 ## Pendências do Felipe
 
@@ -146,14 +156,17 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 17: dano visual por zona (`docs/regras-dano-visual.md`).
+1. Revisão do lote 17 (`docs/lote-17.md`) e o Felipe dizer se parece batida.
 2. Lote 16b (polimento, notas do par): flocos menores e verniz mais nítido;
    poste moderno no lugar do lampião; jacarandá com pouca folha; vitrines menos
    brancas; capturas também com o sol por trás do carro (contra o sol ele vira
    silhueta).
 3. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
-4. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
-   é o caminho para a cidade e o carro finais (`docs/lookdev.md`).
+4. Lotes 18 a 21 (`docs/fatia-vertical.md`): câmera de batida, efeitos Niagara,
+   primeiro cruzamento e som base.
+5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
+   é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
+   passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
 
 Pendências de design (decidir com playtest, não fazer agora):
 

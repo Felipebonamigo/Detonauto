@@ -280,6 +280,32 @@ Um quadro isolado medido com `profilegpu` (parado, 18 s): 5,1 ms de GPU, dos qua
   seja, uns 10 ms de GPU nesta cena. Sobra orçamento para tráfego, dano e efeitos, mas cada um precisa ser medido aqui de novo.
 - A cena é de blocos simples. Com prédios do City Sample (malhas densas, materiais com várias camadas) o custo sobe.
 
+## Lote 17: dano visual por zona, 6 carros amassados (14 out 2026)
+
+Mesma máquina e protocolo do lote 15 (`lookdev-measure.ps1`, perfil `DN_AlvoPS5`, 1920x1080, nenhum outro Unreal aberto). A cena já
+tem o mobiliário e os prédios do lote 16. Os carros extras são `ADNVehicle` parados à frente e à direita, todos dentro do quadro da
+câmera de jogo (`-DNParkedCars=6`; `-DNParkedDamage=0` deixa intactos). Cada um tem a carroceria `SK_DNSportsCarBody` (7007 vértices no
+Blender, 5 alvos de deformação, cache de skin ligado).
+
+| Cenário | Frame média / p95 | Game | Draw | GPU média / p95 | Quadros |
+|---|---|---|---|---|---|
+| parado, só o carro do jogador | 4,70 / 5,32 ms | 1,34 / 2,11 ms | 4,69 / 5,31 ms | 4,35 / 4,81 ms | 2128 em 10 s |
+| parado, + 6 carros intactos | 4,82 / 5,31 ms | 1,92 / 2,61 ms | 4,81 / 5,30 ms | 4,52 / 4,99 ms | 2073 em 10 s |
+| parado, + 6 carros com as 5 zonas em 1,0 | 4,96 / 5,74 ms | 2,08 / 3,09 ms | 4,95 / 5,73 ms | 4,60 / 5,13 ms | 2014 em 10 s |
+| andando, só o carro do jogador | 4,87 / 5,62 ms | 1,59 / 2,54 ms | 4,86 / 5,62 ms | 4,45 / 4,97 ms | 1643 em 8 s |
+| andando, + 6 carros intactos | 5,09 / 5,78 ms | 2,32 / 3,38 ms | 5,08 / 5,77 ms | 4,61 / 5,18 ms | 1571 em 8 s |
+| andando, + 6 carros com as 5 zonas em 1,0 | 4,91 / 5,45 ms | 2,34 / 3,44 ms | 4,90 / 5,45 ms | 4,51 / 5,01 ms | 1628 em 8 s |
+
+**Leitura:**
+
+- **Alvos de deformação: custo abaixo do que a medição separa.** Amassados contra intactos: +0,14 ms parado e −0,18 ms andando no
+  Frame, +0,08 e −0,10 ms na GPU. É ruído (diferença menor que ~1 ms entre rodadas não é confiável). Faz sentido: 7 mil vértices por
+  carro passam por um cálculo de skin por quadro.
+- **Os carros em si custam no Game:** +0,6 a +0,7 ms com 6 carros a mais (física do Chaos de 6 veículos), longe dos 8 ms do orçamento.
+- O quadro inteiro fica perto de 5 ms (GPU 4,5 ms na 4070 Ti; estimativa de uns 9 a 10 ms numa GPU de PS5).
+- **Não medido:** carro amassado em movimento rápido perto da câmera, Lumen com muitas carrocerias deformadas na tela, e o tráfego
+  (que ainda usa cubos, `Traffic/DNTrafficVehicle`). Quando o tráfego usar o carro de verdade, medir de novo com o `crash-measure.ps1`.
+
 ## Para o Felipe testar na Sprint 6
 
 1. Abra o carro do template, jogue com Alt+P e digite `stat unit`.
