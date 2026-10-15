@@ -180,6 +180,18 @@ void ADNBreakableProp::Plow(const FVector& CarVelocityCmS)
 	Body->SetPhysicsLinearVelocity(After);
 }
 
+FDNFreezeCandidate ADNBreakableProp::FreezeCandidate() const
+{
+	FDNFreezeCandidate C;
+	C.SpeedMs = IsSimulating() ? static_cast<float>(Body->GetPhysicsLinearVelocity().Size()) / 100.0f : 0.0f;
+	const FBoxSphereBounds& B = Body->Bounds;
+	const FVector Bottom = B.Origin - FVector(0.0, 0.0, B.BoxExtent.Z + 20.0);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(DNPropGrounded), false, this);
+	FHitResult Hit;
+	C.bGrounded = GetWorld() && GetWorld()->LineTraceSingleByChannel(Hit, B.Origin, Bottom, ECC_Visibility, Params);
+	return C;
+}
+
 void ADNBreakableProp::Freeze()
 {
 	if (IsSimulating())

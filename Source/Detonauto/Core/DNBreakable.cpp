@@ -1,5 +1,6 @@
 #include "Core/DNBreakable.h"
 #include "Core/DNCar.h"
+#include "Algo/AnyOf.h"
 
 namespace
 {
@@ -82,6 +83,27 @@ FVector FDNBreakable::Plow(const FDNBreakableSettings& Settings, const FVector& 
 	FVector Out = Debris + Dir * FMath::Max(Target - Along, 0.0); // só a parte na direção do carro muda; o lado fica
 	Out.Z = FMath::Max(Out.Z, static_cast<double>(UpMs) * 100.0);
 	return Out.GetClampedToMaxSize(Positive(Settings.MaxLaunchMs, Def.MaxLaunchMs) * 100.0f);
+}
+
+int32 FDNBreakable::PickToFreeze(TConstArrayView<FDNFreezeCandidate> Candidates)
+{
+	const bool bAnyGrounded = Algo::AnyOf(Candidates, [](const FDNFreezeCandidate& C) { return C.bGrounded; });
+	int32 Best = INDEX_NONE;
+	float BestSpeed = 0.0f;
+	for (int32 i = 0; i < Candidates.Num(); ++i)
+	{
+		if (bAnyGrounded && !Candidates[i].bGrounded)
+		{
+			continue; // no ar ela ficaria flutuando
+		}
+		const float Speed = FMath::IsFinite(Candidates[i].SpeedMs) ? FMath::Abs(Candidates[i].SpeedMs) : TNumericLimits<float>::Max();
+		if (Best == INDEX_NONE || Speed < BestSpeed) // estrito: empate fica com a mais antiga
+		{
+			Best = i;
+			BestSpeed = Speed;
+		}
+	}
+	return Best;
 }
 
 bool FDNBreakable::StepSleep(const FDNBreakableSettings& Settings, float SpeedMs, float DeltaSeconds, float& InOutStillSeconds)

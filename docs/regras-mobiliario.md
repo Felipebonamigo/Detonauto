@@ -106,7 +106,9 @@ Os valores globais ficam numa linha de configuração, como em
   reiniciar.
 - **Limite:** no máximo `MaxActiveProps` peças simulando ao mesmo tempo. Use a
   mesma regra do `FDNPartPool::Plan`, com um orçamento próprio, separado das 24
-  peças do carro. Passando do limite, a peça mais antiga é congelada onde está.
+  peças do carro. Passando do limite, uma peça é congelada onde está: a **mais
+  lenta**, e nunca uma no ar se houver outra no chão (B10, revisão do 17c: banco
+  parado flutuando é pior que sumir). Empate fica com a mais antiga.
   **Nada some à vista do jogador.**
 - **Colisão:** a peça solta vira **destroço**, um tipo de colisão próprio
   (`DNDebris`, `ECC_GameTraceChannel1`). O destroço **nunca mais segura o carro**,

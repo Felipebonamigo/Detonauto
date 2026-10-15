@@ -65,6 +65,14 @@ struct FDNBreakResult
 	int32 Points = 0;
 };
 
+/** B10: uma peça solta candidata a congelar quando o orçamento estoura. */
+struct FDNFreezeCandidate
+{
+	float SpeedMs = 0.0f;
+	/** Encostada no chão (ou em outra coisa embaixo dela); no ar, congelar a deixaria flutuando. */
+	bool bGrounded = true;
+};
+
 struct FDNBreakable
 {
 	/** Braço do tombo [m] e teto do giro [rad/s] (B3, escolha deste lote). */
@@ -81,6 +89,13 @@ struct FDNBreakable
 	 *  segura carro). Carro parado ou velocidade inválida: o destroço segue como está.
 	 */
 	static FVector Plow(const FDNBreakableSettings& Settings, const FVector& CarVelocityCmS, const FVector& DebrisVelocityCmS);
+
+	/**
+	 *  B10: qual peça congelar quando o orçamento de peças simulando estoura (índice na lista, da mais antiga para a mais nova). A mais
+	 *  LENTA, e nunca uma no ar se houver outra no chão; empate fica com a mais antiga; velocidade inválida conta como a mais rápida.
+	 *  Lista vazia: INDEX_NONE.
+	 */
+	static int32 PickToFreeze(TConstArrayView<FDNFreezeCandidate> Candidates);
 };
 
 /** De onde veio uma batida do carro do jogador. */

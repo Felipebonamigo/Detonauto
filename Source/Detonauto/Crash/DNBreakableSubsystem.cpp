@@ -25,15 +25,26 @@ void UDNBreakableSubsystem::Admit(ADNBreakableProp& Prop)
 	const UDNGameDataSubsystem* Data = GameInstance ? GameInstance->GetSubsystem<UDNGameDataSubsystem>() : nullptr;
 	const int32 MaxActive = (Data ? Data->GetBreakableSettings() : FDNBreakableSettings()).MaxActiveProps;
 	const FDNPartPoolPlan Plan = FDNPartPool::Plan(MaxActive, Active.Num(), 1);
-	for (int32 i = 0; i < Plan.Recycle; ++i)
+	for (int32 i = 0; i < Plan.Recycle && !Active.IsEmpty(); ++i)
 	{
-		if (ADNBreakableProp* Oldest = Active.IsEmpty() ? nullptr : Active[0].Get())
+		// B10: a mais lenta, nunca uma no ar se houver outra no chão (congelada no ar ela ficaria flutuando)
+		TArray<FDNFreezeCandidate> Candidates;
+		for (const TWeakObjectPtr<ADNBreakableProp>& P : Active)
 		{
-			Oldest->Freeze(); // congela onde está e sai da lista (OnPropFrozen)
+			Candidates.Add(P.IsValid() ? P->FreezeCandidate() : FDNFreezeCandidate());
 		}
-		if (!Active.IsEmpty() && Active[0].Get() == nullptr)
+		const int32 Pick = FDNBreakable::PickToFreeze(Candidates);
+		if (ADNBreakableProp* Chosen = Active.IsValidIndex(Pick) ? Active[Pick].Get() : nullptr)
 		{
-			Active.RemoveAt(0);
+			UE_LOG(LogDetonauto, Display, TEXT("DNProp: orçamento de %d peças soltas cheio: congela %s (%s) a %.1f m/s, %s, entre %d"), MaxActive,
+				*Chosen->Kind.ToString(), *Chosen->GetName(), Candidates[Pick].SpeedMs, Candidates[Pick].bGrounded ? TEXT("no chão") : TEXT("no ar"),
+				Candidates.Num());
+			Chosen->Freeze(); // congela onde está e sai da lista (OnPropFrozen)
+			Active.RemoveAll([Chosen](const TWeakObjectPtr<ADNBreakableProp>& P) { return P.Get() == Chosen; }); // mesmo se já não simulava
+		}
+		else if (Active.IsValidIndex(Pick))
+		{
+			Active.RemoveAt(Pick);
 		}
 	}
 	if (Plan.Accepted > 0)
@@ -43,10 +54,6 @@ void UDNBreakableSubsystem::Admit(ADNBreakableProp& Prop)
 	else
 	{
 		Prop.Freeze();
-	}
-	if (Plan.Recycle > 0)
-	{
-		UE_LOG(LogDetonauto, Display, TEXT("DNProp: orçamento de %d peças soltas cheio: %d congelada(s) onde estavam"), MaxActive, Plan.Recycle);
 	}
 }
 

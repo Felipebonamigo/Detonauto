@@ -55,6 +55,9 @@ public:
 	/** B9: o carro alcançou este destroço (velocidade do carro em cm/s): ele sai da frente; o que já dormiu volta a simular. */
 	void Plow(const FVector& CarVelocityCmS);
 
+	/** B10: velocidade e se está apoiada (traço curto para baixo, do centro até 20 cm abaixo do ponto mais baixo). */
+	FDNFreezeCandidate FreezeCandidate() const;
+
 	/** Para de simular onde está (sono ou orçamento estourado). */
 	void Freeze();
 

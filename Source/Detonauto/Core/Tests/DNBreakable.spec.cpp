@@ -13,7 +13,9 @@
 //  B8 sono: a peça solta dorme depois de SleepAfterS seguidos abaixo de SleepSpeedMs;
 //  B9 varrer (17c, depois de medir): destroço nunca segura o carro; o que o carro alcança sai da frente com a velocidade horizontal
 //     do carro x PlowFactor (o lado fica) e pelo menos PlowUpMs para cima, no máximo MaxLaunchMs. O carro não muda. Carro abaixo de
-//     1 m/s não varre; PlowFactor inválido ou abaixo de 1 e PlowUpMs inválido valem o padrão; destroço com NaN vale parado.
+//     1 m/s não varre; PlowFactor inválido ou abaixo de 1 e PlowUpMs inválido valem o padrão; destroço com NaN vale parado;
+//  B10 orçamento (revisão do 17c): estourou, congela a peça mais lenta, nunca uma no ar se houver outra no chão (banco parado
+//      flutuando é pior que sumir); empate fica com a mais antiga; velocidade NaN conta como a mais rápida.
 
 #include <limits>
 #include "Misc/AutomationTest.h"
@@ -198,6 +200,18 @@ void FDNBreakableSpec::Define()
 		const FVector WithBad = FDNBreakable::Plow(Bad, Car, Debris);
 		TestEqual("fator abaixo de 1 vale o padrao (nunca freia o destroco para tras do carro)", WithBad.X, 1.1 * Car.X, 0.5);
 		TestEqual("pulo NaN vale o padrao", WithBad.Z, 150.0, 0.01);
+	});
+
+	It("B10: o orcamento congela a peca mais lenta, nunca uma no ar se houver outra no chao", [this]()
+	{
+		auto C = [](float SpeedMs, bool bGrounded) { FDNFreezeCandidate X; X.SpeedMs = SpeedMs; X.bGrounded = bGrounded; return X; };
+		TestEqual("lista vazia", FDNBreakable::PickToFreeze({}), static_cast<int32>(INDEX_NONE));
+		TestEqual("a mais lenta, no chao", FDNBreakable::PickToFreeze({ C(5.f, true), C(1.f, true), C(3.f, true) }), 1);
+		TestEqual("a parada no ar perde para a rapida no chao", FDNBreakable::PickToFreeze({ C(0.1f, false), C(4.f, true) }), 1);
+		TestEqual("todas no ar: a mais lenta", FDNBreakable::PickToFreeze({ C(3.f, false), C(2.f, false) }), 1);
+		TestEqual("empate: a mais antiga", FDNBreakable::PickToFreeze({ C(2.f, true), C(2.f, true) }), 0);
+		TestEqual("velocidade NaN conta como a mais rapida", FDNBreakable::PickToFreeze({ C(NaNf, true), C(9.f, true) }), 1);
+		TestEqual("todas NaN: a mais antiga", FDNBreakable::PickToFreeze({ C(NaNf, true), C(NaNf, true) }), 0);
 	});
 }
 
