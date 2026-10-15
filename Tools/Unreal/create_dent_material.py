@@ -79,8 +79,13 @@ return float4(offset, mask);
 # Desgaste da pintura (lote 17b, camada 3 do dano visual): máscaras por pixel a partir da posição local P (cm), da caixa da carroceria
 # (C centro, E extensão), do peso de cada zona (ZA = frente, traseira, esquerda; ZB = direita, teto; o C++ manda os mesmos pesos dos
 # alvos de deformação), da cor de vértice VC (onde cada zona amassa, com as cristas dos vincos; gravada pelo
-# Tools/Blender/make_damage_morphs.py: R frente, G traseira, B laterais, A teto) e de ruído 3D procedural (nenhuma textura).
-# Eixos do Unreal: +X frente, +Y direita, +Z cima. Saída: float4 (primer, metal nu, risco, fuligem), cada um de 0 a 1.
+# Tools/Blender/make_damage_morphs.py: R frente, G traseira, B laterais, A teto), da máscara dos amassados DM (perto do ponto de
+# batida), da normal local NL e de ruído 3D procedural (nenhuma textura). Eixos do Unreal: +X frente, +Y direita, +Z cima.
+# Saída: float4 (primer, metal nu, risco, fuligem), cada um de 0 a 1.
+# Fim do 17b (revisão): as lascas pareciam confete (retângulos claros espalhados por igual). Agora só nascem onde o dano local
+# passa de 0,08, em grupos, mais densas perto da batida; a borda vem de ruído com distorção de domínio; o teto não pega a asa. Os
+# "retângulos" eram os riscos: o ruído deles é comprido em X e curto em Y e Z, e nas faces de frente (plano Y-Z) virava quadradinho
+# de 3 cm. Raspão corre ao longo do carro: agora some nas faces viradas para a frente e para trás.
 WEAR_HLSL = """
 struct DNWearNoise
 {
@@ -100,39 +105,53 @@ float3 q = (P - C) / max(E, float3(1.0, 1.0, 1.0));
 float fx = q.x * 0.5 + 0.5;
 float hz = q.z * 0.5 + 0.5;
 // onde amassou: o peso de cada zona vezes a cor de vértice (cristas dos vincos), dentro da região larga da zona (a caixa limita a
-// carroceria estática de reserva, que não tem a cor de vértice e chega toda branca)
+// carroceria estática de reserva, que não tem a cor de vértice e chega toda branca). O teto só sobre a cabine: a asa traseira, alta,
+// é da traseira
 float wf = 1.0 - smoothstep(0.0, 0.35, 1.0 - fx);
 float wr = 1.0 - smoothstep(0.0, 0.35, fx);
-float wt = smoothstep(0.6, 0.9, hz);
+float wt = smoothstep(0.6, 0.9, hz) * smoothstep(0.12, 0.25, fx) * (1.0 - smoothstep(0.70, 0.80, fx));
 float sideW = q.y < 0.0 ? ZA.z * smoothstep(0.3, 0.8, -q.y) : ZB.x * smoothstep(0.3, 0.8, q.y);
 float d = saturate(ZA.x * wf * VC.r + ZA.y * wr * VC.g + sideW * VC.b + ZB.y * wt * VA);
-float on = step(0.001, d);
-// lascas: manchas largas (o ruído grande manda) com borda recortada (o fino), só onde o campo passa do limiar; o limiar desce com o
-// dano, então elas nascem nas cristas e crescem. No miolo da lasca, metal nu
-float field = n.fbm(P / 35.0) * 0.65 + n.fbm(P / max(Size, 1.0)) * 0.35;
-float th = 0.74 - 0.6 * Cov * pow(d, 1.5);
-float chip = smoothstep(th, th + 0.012, field) * on * Paint;
-float metal = smoothstep(th + 0.05, th + 0.062, field) * on * Paint;
+// a ponta da frente e a da traseira são a chapa que mais amassa: contam como dobra, com o dano da zona. P é a posição já amassada
+// (a frente em 1,0 recua ~60 cm), então a faixa vai até 25% do comprimento a partir da caixa intacta
+float tipF = 1.0 - smoothstep(0.0, 0.25, 1.0 - fx);
+float tipR = 1.0 - smoothstep(0.0, 0.25, fx);
+d = saturate(d + 0.45 * (ZA.x * tipF + ZA.y * tipR));
+// concentração: nada em chapa lisa (dano local abaixo de 0,08), cheio nas cristas e perto da batida (máscara dos amassados)
+float k = saturate((d - 0.08) / 0.5 + DM * 3.0 * step(0.001, d));
+// grupos de tamanhos variados: manchas largas que ligam e desligam a lasca
+float cluster = smoothstep(0.42, 0.62, n.fbm(P / 55.0 + 7.7));
+// borda irregular: o campo da lasca é lido num espaço distorcido por outro ruído (sem célula quadrada à vista)
+float3 warp = float3(n.fbm(P / 16.0 + 3.1), n.fbm(P / 16.0 + 17.3), n.fbm(P / 16.0 + 41.7)) - 0.5;
+float3 Q = P + warp * 18.0;
+float field = n.fbm(Q / 28.0) * 0.55 + n.fbm(Q / max(Size, 1.0)) * 0.45;
+float th = 0.77 - 0.30 * saturate(Cov * 5.0) * k * (0.35 + 0.65 * cluster);
+float chip = smoothstep(th, th + 0.015, field) * step(0.05, k) * Paint;
+// no miolo das lascas grandes, metal nu
+float metal = smoothstep(th + 0.075, th + 0.09, field) * step(0.05, k) * Paint;
 float primer = saturate(chip - metal);
-// riscos compridos ao longo do carro (raspão), finos na altura e na largura
-float s = n.v(float3(P.x / 120.0, P.y / 2.0, P.z / 2.0));
-float scratch = smoothstep(0.74, 0.80, s) * Scr * saturate(d * 2.0) * Paint;
+// riscos compridos ao longo do carro (raspão), finos na altura, só onde amassou e só nas faces que correm ao longo do carro
+float s = n.v(float3(P.x / 120.0, P.y / 2.5, P.z / 2.5));
+float along = 1.0 - smoothstep(0.35, 0.65, abs(normalize(NL).x));
+float scratch = smoothstep(0.74, 0.79, s) * Scr * saturate(d * 2.0) * along * Paint;
 // fuligem e sujeira: manchas largas, mais fortes onde amassou mais
 float soot = Soot * d * (0.6 + 0.4 * n.v(P / 40.0));
 return float4(primer, metal, scratch, soot);
 """
 
+# Cor em camadas (fim do 17b): primer cinza-claro (albedo 0,5), metal nu cinza-aço; o risco mostra primer (antes clareava a tinta e
+# saía rosa); a fuligem escurece
 WEAR_COLOR_HLSL = """
-float3 c = lerp(Col, float3(0.16, 0.16, 0.15), M.x);
-c = lerp(c, float3(0.42, 0.42, 0.43), M.y);
-c = lerp(c, c * 0.4 + 0.33, M.z);
+float3 c = lerp(Col, float3(0.50, 0.50, 0.49), M.x);
+c = lerp(c, float3(0.56, 0.57, 0.58), M.y);
+c = lerp(c, float3(0.45, 0.45, 0.44), 0.8 * M.z);
 return c * (1.0 - 0.8 * M.w);
 """
 
 # (metálico, aspereza, verniz): primer fosco e sem verniz, metal nu sem verniz, risco tira metade do verniz, fuligem deixa fosco
 WEAR_SURFACE_HLSL = """
 float metal = lerp(lerp(Met, 0.0, M.x), 1.0, M.y);
-float rough = lerp(lerp(lerp(Rgh, 0.65, M.x), 0.35, M.y), 0.5, M.z);
+float rough = lerp(lerp(lerp(Rgh, 0.70, M.x), 0.35, M.y), 0.6, M.z);
 rough = lerp(rough, 0.85, M.w);
 float coat = Coat * (1.0 - M.x - M.y) * (1.0 - 0.5 * M.z) * (1.0 - 0.7 * M.w);
 return float3(metal, saturate(rough), saturate(coat));
@@ -432,8 +451,15 @@ def build(dest, report):
 
     # --- desgaste da pintura por zona (lote 17b): o C++ manda a caixa da carroceria, os pesos das zonas e os valores de Damage.csv ---
     wear = custom_node(mel, material, WEAR_HLSL, "Desgaste por zona (lascas, metal, riscos, fuligem)",
-                       ("P", "C", "E", "ZA", "ZB", "Cov", "Size", "Scr", "Soot", "Paint", "VC", "VA"), unreal.CustomMaterialOutputType.CMOT_FLOAT4, 0, 800)
+                       ("P", "C", "E", "ZA", "ZB", "Cov", "Size", "Scr", "Soot", "Paint", "VC", "VA", "DM", "NL"), unreal.CustomMaterialOutputType.CMOT_FLOAT4, 0, 800)
     mel.connect_material_expressions(local, "", wear, "P")
+    # a normal no espaço do carro: os riscos correm ao longo do carro e somem nas faces de frente e de trás
+    local_n = node(mel, material, unreal.MaterialExpressionTransform, -400, 1750)
+    local_n.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD)
+    local_n.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
+    mel.connect_material_expressions(normal, "", local_n, "")
+    mel.connect_material_expressions(local_n, "", wear, "NL")
+    mel.connect_material_expressions(mask, "", wear, "DM")  # perto da batida: a máscara dos amassados
     # a saída principal do nó de cor de vértice tem 3 canais (RGB): o alfa (teto) vai por um pino próprio
     vertex_color = node(mel, material, unreal.MaterialExpressionVertexColor, -400, 1680)
     mel.connect_material_expressions(vertex_color, "", wear, "VC")

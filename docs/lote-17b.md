@@ -55,6 +55,29 @@ Ferramentas novas para as capturas:
 - `-DNSunYaw=G` gira o sol só naquela execução.
 - O piloto `-DNCruiseKmh` solta o carro na primeira batida real; daí em diante, mandam as teclas do roteiro.
 
+### Lascas sem confete (revisão do fechamento)
+
+As lascas pareciam confete: retângulos claros e pequenos espalhados por igual no capô, no para-lama e na asa. Achado por eliminação
+no motor: zerando só a cobertura das lascas os retângulos ficavam; zerando também os riscos, sumiam. Eram os **riscos**. O ruído deles
+é comprido em X (120 cm) e curto em Y e Z (3 cm); nas faces viradas para a frente, que são planos Y-Z, virava quadradinho de 3 cm.
+
+O que mudou no material (`create_dent_material.py`, sem dado novo):
+- os riscos usam a normal local e somem nas faces de frente e de trás: raspão corre ao longo do carro;
+- as lascas só nascem onde o dano local passa de 0,08 (zona × cor de vértice das cristas, mais a ponta da frente ou da traseira
+  com o dano da zona), em grupos de tamanhos variados, e ficam mais densas perto da batida (a máscara dos amassados);
+- a borda da lasca vem de ruído com distorção de domínio;
+- a cor fica em camadas: primer cinza-claro fosco (albedo 0,5, aspereza 0,7) e, no miolo das lascas grandes, metal nu
+  cinza-aço (metálico 1, aspereza 0,35). O risco mostra primer em vez de clarear a tinta;
+- a máscara do teto fica só sobre a cabine: a asa traseira só ganha lasca com a traseira batida (na batida real, só de frente, a
+  asa fica limpa);
+- a posição que o material lê é a da chapa já amassada. A frente em 1,0 recua ~60 cm, então a faixa da ponta vai até 25% do
+  comprimento.
+
+Antes e depois: [`lascas-antes-depois.jpg`](img/dano-zonas-17b/lascas-antes-depois.jpg) e
+[`lascas-de-perto.jpg`](img/dano-zonas-17b/lascas-de-perto.jpg). As capturas `lookdev-1.0-frente-esquerda.jpg` e
+`parede-100kmh-frente-esq.jpg` foram refeitas. Na frente as lascas ficam esparsas; nas dobras da porta e na asa (com a traseira
+batida) elas aparecem em grupos. Os riscos ainda quase não se leem a 3 m.
+
 ### Custo: pendente
 
 A medição com 37,8 mil vértices (6 carros amassados contra 6 intactos, como no lote 17) não fechou: outras sessões (TDFende e
