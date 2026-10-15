@@ -231,7 +231,11 @@ void ADNVehicleTestGameMode::SpawnParkedCars(int32 Count)
 	// -DNParkedDamage=0 estaciona intactos: a diferença para os amassados é o custo dos alvos de deformação
 	float Damage = 1.0f;
 	FParse::Value(FCommandLine::Get(), TEXT("DNParkedDamage="), Damage);
-	int32 Spawned = 0;
+	// lote 18b: -DNParkedDamageAtS=S aplica o dano S segundos depois (tempo do jogo), para as peças soltarem e voarem dentro da janela
+	// de medição; sem ele o dano entra ao nascer e as peças já pousaram quando a medição começa
+	float DamageAtS = 0.0f;
+	FParse::Value(FCommandLine::Get(), TEXT("DNParkedDamageAtS="), DamageAtS);
+	TArray<TWeakObjectPtr<ADNVehicle>> Cars;
 	for (int32 i = 0; i < Count; ++i)
 	{
 		// 9 m entre eles, à frente e 4 m à direita (a faixa ao lado na cena de aparência): a câmera de jogo os vê, e o carro do
@@ -239,14 +243,31 @@ void ADNVehicleTestGameMode::SpawnParkedCars(int32 Count)
 		const FVector Location = Base.TransformPosition(FVector(900.0f * (i + 1), 400.0f, 0.0f));
 		if (ADNVehicle* Car = GetWorld()->SpawnActor<ADNVehicle>(ADNVehicle::StaticClass(), Location, Base.Rotator(), Params))
 		{
-			for (int32 Zone = 0; Zone < FDNDamageMorph::ZoneCount && Damage > 0.0f; ++Zone)
+			Cars.Add(Car);
+		}
+	}
+	auto Apply = [Cars, Damage]()
+	{
+		for (const TWeakObjectPtr<ADNVehicle>& Car : Cars)
+		{
+			for (int32 Zone = 0; Car.IsValid() && Zone < FDNDamageMorph::ZoneCount && Damage > 0.0f; ++Zone)
 			{
 				Car->DNZone(Zone, Damage);
 			}
-			++Spawned;
 		}
+		UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: dano %.2f nas 5 zonas de %d carro(s) estacionado(s)"), Damage, Cars.Num());
+	};
+	if (DamageAtS > 0.0f)
+	{
+		FTimerHandle Timer;
+		GetWorldTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda(Apply), DamageAtS, false);
 	}
-	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: %d de %d carro(s) estacionado(s) com dano %.2f nas 5 zonas"), Spawned, Count, Damage);
+	else
+	{
+		Apply();
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: %d de %d carro(s) estacionado(s), dano %.2f %s"), Cars.Num(), Count, Damage,
+		DamageAtS > 0.0f ? *FString::Printf(TEXT("em %.1f s"), DamageAtS) : TEXT("ao nascer"));
 }
 
 void ADNVehicleTestGameMode::SpawnPropLine(const FString& Kinds, float StartM, float SpacingM)

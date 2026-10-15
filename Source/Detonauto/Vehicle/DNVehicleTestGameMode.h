@@ -56,7 +56,8 @@ protected:
 	TObjectPtr<APlayerStart> MapStart;
 
 	/** Medição de custo do dano visual (lote 17, -DNParkedCars=N): N carros do jogador, parados à frente e à direita, com as 5 zonas
-	 *  amassadas (-DNParkedDamage=0 a 1, padrão 1; 0 = intactos). Até 12. */
+	 *  amassadas (-DNParkedDamage=0 a 1, padrão 1; 0 = intactos). Até 12. -DNParkedDamageAtS=S: o dano entra S segundos depois (lote 18b,
+	 *  as peças voando dentro da janela de medição). */
 	void SpawnParkedCars(int32 Count);
 
 	/** Batida real na cena de aparência (lote 17b, -DNWallAheadM=M): barreira de concreto atravessando a rua a M metros da largada. */
