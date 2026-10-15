@@ -34,15 +34,25 @@ testes: `docs/regras-camera.md`.
 - Aprovação: vídeo curto ou sequência de capturas da batida na parede a 100 km/h
   e contra o tráfego, mais o custo.
 
+## Lote 18b: peças que soltam e vidros que quebram
+
+Pedido do Felipe (15 out 2026): "pode sair pedaços do carro também: paralama,
+portas, vidros, aerofólio, etc., tipo o que acontece no Wreckfest". Contrato:
+`docs/regras-pecas.md`.
+
+- A peça passa por presa, pendurada e solta. O para-choque arrasta no chão, a
+  porta balança, o capô levanta.
+- Para-lamas e aerofólio voam.
+- Vidros trincam e estouram em cacos; faróis apagam.
+- Malhas separadas por script do Blender, com os mesmos alvos de deformação.
+- Vale para o carro do template agora e se repete no carro do City Sample.
+
 ## Lote 19: efeitos de batida (Niagara)
 
 - Faíscas no impacto e quando a carroceria raspa no chão ou na parede.
 - Cacos de vidro e de plástico (farol) no impacto forte.
-- **Vidro trincado** (pedido na revisão do 17b): para-brisa, vidros e faróis
-  ganham máscara de trinca no material, a partir do dano da zona (frente e teto
-  para o para-brisa). A trinca começa em 0,4 e fica estilhaçada em 1,0. O farol
-  apaga quando a frente passa de 0,6. É barato, e é o que mais falta para a
-  frente destruída ler como destruída.
+- Vidro trincado e cacos: foram para o lote 18b (`docs/regras-pecas.md`). Aqui
+  entram as faíscas do para-choque arrastando (`OnPartScrape`).
 - Fumaça de pneu na derrapagem (ligada ao ângulo de deslize da assistência).
 - Fumaça do motor quando a zona da frente passa de 60% de dano; fogo acima de
   90%, se o custo couber.
