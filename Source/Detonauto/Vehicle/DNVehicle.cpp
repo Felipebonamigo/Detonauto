@@ -1,4 +1,6 @@
 #include "Vehicle/DNVehicle.h"
+#include "Vehicle/DNCarPart.h"
+#include "Vehicle/DNGlassShards.h"
 #include "Vehicle/DNVehicleWheels.h"
 #include "Vehicle/DNTurboComponent.h"
 #include "Crash/DNBreakableProp.h"
@@ -43,6 +45,16 @@ namespace
 	const TCHAR* GlassMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Glass.SM_SportsCar_Glass");
 	const TCHAR* WheelMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Wheel.SM_SportsCar_Wheel");
 	const TCHAR* DentParentPath = TEXT("/Game/Detonauto/Vehicle/M_DNDentParent.M_DNDentParent");
+	/** Peças que soltam e vidros (lote 18b): Tools/Unreal/damage-body.ps1 -Parts. Nome: SK_DN<Modelo>_<Peça> e SK_DN<Modelo>_Glass_<Vidro>. */
+	const TCHAR* PartsDir = TEXT("/Game/Detonauto/Vehicle/SportsCar/Parts");
+	/** Cacos por vidro que estoura. */
+	constexpr int32 ShardsPerGlass = 40;
+	/** Lente de farol e lanterna (material translúcido do template, sem luz própria): a trinca deixa a lente fosca. */
+	constexpr float LensOpacity = 0.03f;
+	constexpr float LensCrackedOpacity = 0.55f;
+	/** Quanto o centro da trinca entra na caixa do vidro, em fração da meia caixa (0: na borda; 1: no meio). */
+	constexpr float GlassCrackInset = 0.7f;
+
 	/** Desfoque nas bordas (lote 18): Tools/Unreal/create_edge_blur_material.ps1. */
 	const TCHAR* EdgeBlurPath = TEXT("/Game/Detonauto/Camera/M_DNEdgeBlur.M_DNEdgeBlur");
 
@@ -440,6 +452,13 @@ void ADNVehicle::BeginPlay()
 	// contato do corpo físico sempre avisado: as peças de rua quebram mesmo com o dano desligado (lote 17c)
 	GetMesh()->SetNotifyRigidBodyCollision(true);
 	GetMesh()->OnComponentHit.AddUniqueDynamic(this, &ADNVehicle::OnCarHit);
+
+	// lote 18b: as peças que soltam e os vidros. Sempre: a carroceria tem os vãos no lugar delas, e sem elas o carro sairia esburacado.
+	// -DNNoParts só serve para comparar com a carroceria inteira de antes (capturas de antes e depois)
+	if (!FParse::Param(FCommandLine::Get(), TEXT("DNNoParts")))
+	{
+		SpawnPartsAndGlass();
+	}
 
 	// Dano e amassado visual: ligado por padrão para o Felipe testar jogando; -DNNoDents desliga (medição de referência);
 	// -DNDentMaterial liga só o material, sem amassados; -DNDents=N liga o material e aplica N amassados de demonstração.
@@ -871,6 +890,7 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 			*Parent->GetName(), *Slots);
 		return false;
 	}
+	RegisterPartMaterials(); // as peças presas e os vidros recebem os mesmos amassados e o mesmo desgaste
 	PushDentsToMaterial(); // todos os slots desligados
 	{
 		FVector Center, Extent;
@@ -909,6 +929,7 @@ void ADNVehicle::ApplyPropImpact(float DeltaVMs, const FVector& WorldPoint)
 	Impact.Zone = FDNDentParams::ZoneOfLocalPoint(Impact.LocalPositionCm, Center, Extent);
 	const FDNDamageResult Result = FDNDamage::ApplyImpact(DamageConfig, DamageState, Impact);
 	PushDentsToMaterial();
+	EvaluatePartsAndGlass(&Impact);
 	UE_LOG(LogDetonauto, Display, TEXT("DNDent: batida em peça de rua de %.1f m/s na zona %d: dano da zona +%.2f%s (rodada de Crash: %s, câmera de batida: %s)"),
 		DeltaVMs, static_cast<int32>(Impact.Zone), Result.AddedZoneDamage, Result.bDentAdded ? TEXT(", amassado novo") : TEXT(""),
 		FDNImpactPolicy::CountsForCrashRound(EDNImpactSource::Prop) ? TEXT("conta") : TEXT("não conta"),
@@ -937,6 +958,7 @@ void ADNVehicle::SimulateImpact(float DeltaVMs, EDNDamageZone Zone, const FVecto
 	Impact.LocalPositionCm = LocalPositionCm;
 	const FDNDamageResult Result = FDNDamage::ApplyImpact(DamageConfig, DamageState, Impact);
 	PushDentsToMaterial();
+	EvaluatePartsAndGlass(&Impact);
 	UE_LOG(LogDetonauto, Display, TEXT("DNDent: batida de %.1f m/s na zona %d em %s: dano da zona +%.2f, amassado %s (profundidade %.1f cm, raio %.1f cm), %d amassado(s) guardado(s)%s"),
 		DeltaVMs, static_cast<int32>(Zone), *LocalPositionCm.ToCompactString(), Result.AddedZoneDamage, Result.bDentAdded ? TEXT("novo") : TEXT("nenhum"),
 		Result.Dent.DepthCm, Result.Dent.RadiusCm, DamageState.Dents.Num(), Result.bJustDestroyed ? TEXT(" | DESTRUIDO") : TEXT(""));
@@ -978,6 +1000,7 @@ void ADNVehicle::ClearDents()
 	{
 		Skin->ClearMorphTargets();
 	}
+	ResetPartsAndGlass();
 	PushWearToMaterial();
 }
 
@@ -998,6 +1021,21 @@ void ADNVehicle::UpdateDamageMorphs(float DeltaSeconds)
 			{
 				Skin->SetMorphTarget(FName(FDNDamageMorph::TargetName(Zone)), MorphWeights[Zone], false);
 			}
+		}
+	}
+	// lote 18b: as peças presas e penduradas e os vidros amassam junto (o mesmo campo, sem fresta); a solta ignora (voa já amassada)
+	for (ADNCarPart* Part : Parts)
+	{
+		if (Part)
+		{
+			Part->SetMorphWeights(MorphWeights, FDNDamageMorph::ZoneCount);
+		}
+	}
+	for (USkeletalMeshComponent* Glass : GlassComps)
+	{
+		for (int32 Zone = 0; Zone < FDNDamageMorph::ZoneCount && Glass; ++Zone)
+		{
+			Glass->SetMorphTarget(FName(FDNDamageMorph::TargetName(Zone)), MorphWeights[Zone], false);
 		}
 	}
 	PushWearToMaterial(); // o desgaste da pintura segue o mesmo peso da deformação (também na carroceria estática)
@@ -1025,6 +1063,12 @@ void ADNVehicle::DNZone(int32 Zone, float Damage)
 	float& ZoneDamage = DamageState.ZoneDamage[Zone];
 	ZoneDamage = FMath::Max(ZoneDamage, FMath::Clamp(Damage, 0.0f, 1.0f));
 	UE_LOG(LogDetonauto, Display, TEXT("DNZone: zona %d (%s) com dano %.2f"), Zone, FDNDamageMorph::TargetName(Zone), ZoneDamage);
+	// sem batida: as peças e os vidros seguem só o dano acumulado (a peça pendura e solta pela regra; o ponto da batida é o centro da zona)
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FVector ZoneDir[FDNDamageMorph::ZoneCount] = { FVector(1, 0, 0), FVector(-1, 0, 0), FVector(0, -1, 0), FVector(0, 1, 0), FVector(0, 0, 1) };
+	LastImpactLocal = Center + Extent * ZoneDir[Zone];
+	EvaluatePartsAndGlass(nullptr);
 }
 
 void ADNVehicle::DentKey(const FInputActionValue& Value, int32 DentIndex)
@@ -1075,6 +1119,11 @@ void ADNVehicle::PlowDebris()
 		if (Prop && Overlap.GetComponent() == Prop->GetBodyComponent())
 		{
 			Prop->Plow(VelocityBeforeStepCmS); // a base e o toco também são destroço, mas não saem do lugar
+		}
+		// peça de carro solta na pista (a deste carro ou de outro): sai da frente como o mobiliário (a pendurada não muda)
+		if (ADNCarPart* Part = Cast<ADNCarPart>(Overlap.GetActor()))
+		{
+			Part->Plow(VelocityBeforeStepCmS);
 		}
 	}
 }
@@ -1406,6 +1455,14 @@ void ADNVehicle::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		UGameplayStatics::SetGlobalTimeDilation(this, 1.0f); // não deixa o mundo em câmera lenta sem o carro
 		AppliedTimeScale = 1.0f;
 	}
+	// a peça solta fica na pista (até o fim da rodada); a presa e a pendurada saem com o carro
+	for (ADNCarPart* Part : Parts)
+	{
+		if (Part && Part->GetStage() != EDNPartStage::Detached)
+		{
+			Part->Destroy();
+		}
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -1419,4 +1476,261 @@ void ADNVehicle::DNShake(int32 bOn)
 {
 	ShakeGlobalScale = bOn != 0 ? 1.0f : 0.0f;
 	UE_LOG(LogDetonauto, Display, TEXT("DNShake: tremor de velocidade %s"), bOn != 0 ? TEXT("ligado") : TEXT("desligado"));
+}
+
+// =====================================================================================================================
+// Peças que soltam e vidros (lote 18b, docs/regras-pecas.md)
+// =====================================================================================================================
+
+void ADNVehicle::SpawnPartsAndGlass()
+{
+	const UDNGameDataSubsystem* Data = DataSubsystemOf(this);
+	if (!Data || !GetMesh())
+	{
+		return;
+	}
+	UMaterialInterface* DentParent = LoadObject<UMaterialInterface>(nullptr, DentParentPath);
+	auto MeshOf = [](const FString& Name) -> USkeletalMesh*
+	{
+		const FString Asset = FString::Printf(TEXT("SK_DN%s_%s"), CarModelId, *Name);
+		return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("%s/%s.%s"), PartsDir, *Asset, *Asset));
+	};
+	for (const FDNCarPartSpec& Spec : Data->GetCarParts(CarModelId))
+	{
+		USkeletalMesh* PartMesh = MeshOf(FDNCarParts::PartName(Spec.Part));
+		if (!PartMesh)
+		{
+			UE_LOG(LogDetonauto, Error, TEXT("ADNVehicle: sem a malha da peça %s em %s (rode Tools/Unreal/damage-body.ps1 -Parts)"), FDNCarParts::PartName(Spec.Part), PartsDir);
+			continue;
+		}
+		FActorSpawnParameters Params;
+		Params.Owner = this;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ADNCarPart* Part = GetWorld()->SpawnActor<ADNCarPart>(GetActorLocation(), GetActorRotation(), Params);
+		if (!Part)
+		{
+			continue;
+		}
+		const TArray<UMaterialInstanceDynamic*> Dynamics = Part->Init(*GetMesh(), *PartMesh, Spec, DentParent);
+		Parts.Add(Part);
+		PartSpecs.Add(Spec);
+		PartStages.Add(EDNPartStage::Attached);
+		TArray<TObjectPtr<UMaterialInstanceDynamic>> Owned;
+		for (UMaterialInstanceDynamic* Dynamic : Dynamics)
+		{
+			Owned.Add(Dynamic);
+		}
+		PartMaterials.Add(Owned);
+	}
+	for (const FDNGlassSpec& Spec : Data->GetCarGlass(CarModelId))
+	{
+		USkeletalMesh* PartMesh = MeshOf(FString(TEXT("Glass_")) + FDNGlass::GlassName(Spec.Glass));
+		if (!PartMesh)
+		{
+			UE_LOG(LogDetonauto, Error, TEXT("ADNVehicle: sem a malha do vidro %s em %s"), FDNGlass::GlassName(Spec.Glass), PartsDir);
+			continue;
+		}
+		USkeletalMeshComponent* Comp = NewObject<USkeletalMeshComponent>(this, *FString::Printf(TEXT("Glass_%s"), FDNGlass::GlassName(Spec.Glass)));
+		Comp->SetupAttachment(GetMesh());
+		Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Comp->SetCanEverAffectNavigation(false);
+		Comp->SetSkeletalMesh(PartMesh);
+		Comp->RegisterComponent();
+		TArray<TObjectPtr<UMaterialInstanceDynamic>> Dynamics;
+		for (int32 i = 0; i < Comp->GetNumMaterials(); ++i)
+		{
+			if (UMaterialInterface* Material = Comp->GetMaterial(i))
+			{
+				UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(Material, this);
+				Comp->SetMaterial(i, Dynamic);
+				Dynamics.Add(Dynamic);
+			}
+		}
+		UE_LOG(LogDetonauto, Display, TEXT("ADNVehicle: vidro %s: limites %s, %d material(is) (%s), visível %d"), FDNGlass::GlassName(Spec.Glass),
+			*Comp->Bounds.GetBox().ToString(), Comp->GetNumMaterials(), Comp->GetMaterial(0) ? *Comp->GetMaterial(0)->GetName() : TEXT("-"), Comp->IsVisible() ? 1 : 0);
+		GlassComps.Add(Comp);
+		GlassSpecs.Add(Spec);
+		GlassBurst.Add(false);
+		GlassMaterials.Add(Dynamics);
+		GlassCrackCenter.Add(FVector::ZeroVector);
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicle: %d peça(s) que soltam e %d vidro(s) do %s"), Parts.Num(), GlassComps.Num(), CarModelId);
+}
+
+void ADNVehicle::RegisterPartMaterials()
+{
+	if (!DentMaterial)
+	{
+		return;
+	}
+	const UMaterial* Base = DentMaterial->GetBaseMaterial();
+	for (int32 i = 0; i < Parts.Num(); ++i)
+	{
+		for (UMaterialInstanceDynamic* Dynamic : PartMaterials[i])
+		{
+			if (Dynamic && PartStages[i] != EDNPartStage::Detached)
+			{
+				DentMaterials.AddUnique(Dynamic);
+			}
+		}
+	}
+	for (const TArray<TObjectPtr<UMaterialInstanceDynamic>>& Dynamics : GlassMaterials)
+	{
+		for (UMaterialInstanceDynamic* Dynamic : Dynamics)
+		{
+			if (Dynamic && Dynamic->GetBaseMaterial() == Base)
+			{
+				DentMaterials.AddUnique(Dynamic); // a lente de farol (material do template) fica de fora, como na carroceria do lote 17
+			}
+		}
+	}
+}
+
+EDNPartStage ADNVehicle::PartStage(EDNDamagePart Part) const
+{
+	const int32 Index = PartSpecs.IndexOfByPredicate([Part](const FDNCarPartSpec& S) { return S.Part == Part; });
+	return PartStages.IsValidIndex(Index) ? PartStages[Index] : EDNPartStage::Attached;
+}
+
+float ADNVehicle::GlassCrack(EDNGlass Glass) const
+{
+	const int32 Index = GlassSpecs.IndexOfByPredicate([Glass](const FDNGlassSpec& S) { return S.Glass == Glass; });
+	return GlassSpecs.IsValidIndex(Index) ? FDNGlass::Crack(GlassSpecs[Index], DamageState) : 0.0f;
+}
+
+bool ADNVehicle::IsGlassBurst(EDNGlass Glass) const
+{
+	const int32 Index = GlassSpecs.IndexOfByPredicate([Glass](const FDNGlassSpec& S) { return S.Glass == Glass; });
+	return GlassBurst.IsValidIndex(Index) && GlassBurst[Index];
+}
+
+void ADNVehicle::EvaluatePartsAndGlass(const FDNImpact* Impact)
+{
+	if (Impact)
+	{
+		LastImpactLocal = Impact->LocalPositionCm;
+	}
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FTransform CarFrame = BodyComp ? BodyComp->GetComponentTransform() : GetActorTransform();
+	// para fora do carro, do centro da carroceria para o ponto da batida: o lado para onde a peça solta sai
+	const FVector Outward = CarFrame.TransformVectorNoScale((LastImpactLocal - Center).GetSafeNormal());
+
+	const TArray<FDNPartChange> Changes = FDNCarParts::Evaluate(PartSpecs, PartStages, DamageState, Impact);
+	for (const FDNPartChange& Change : Changes)
+	{
+		ADNCarPart* Part = Parts.IsValidIndex(Change.Index) ? Parts[Change.Index].Get() : nullptr;
+		if (!Part)
+		{
+			continue;
+		}
+		if (Change.To == EDNPartStage::Hanging)
+		{
+			Part->Hang(LastImpactLocal);
+		}
+		else if (Change.To == EDNPartStage::Detached)
+		{
+			Part->Detach(Outward);
+			for (UMaterialInstanceDynamic* Dynamic : PartMaterials[Change.Index])
+			{
+				DentMaterials.Remove(Dynamic); // solta: voa com o amassado e o desgaste do momento
+			}
+		}
+	}
+	if (!Changes.IsEmpty())
+	{
+		ADNCarPart::EnforceBudget(*GetWorld(), DamageConfig.MaxActive);
+	}
+
+	// vidros: o centro da trinca é o ponto da batida mais perto do vidro quando a trinca começa, puxado para dentro da caixa do vidro
+	// (GlassCrackInset): a borda do para-brisa fica embaixo do capô, e a trinca nascendo ali não aparece
+	for (int32 i = 0; i < GlassSpecs.Num(); ++i)
+	{
+		const USkeletalMesh* WindowMesh = GlassComps[i] ? GlassComps[i]->GetSkeletalMeshAsset() : nullptr;
+		if (GlassCrackCenter[i].IsZero() && WindowMesh && FDNGlass::Crack(GlassSpecs[i], DamageState) > 0.0f)
+		{
+			const FBoxSphereBounds B = WindowMesh->GetImportedBounds();
+			const FVector Inner = B.BoxExtent * (1.0f - GlassCrackInset);
+			GlassCrackCenter[i] = FBox(B.Origin - Inner, B.Origin + Inner).GetClosestPointTo(LastImpactLocal);
+		}
+	}
+	const TArray<int32> Burst = FDNGlass::Evaluate(GlassSpecs, GlassBurst, DamageState, Impact);
+	PushGlassCrack();
+	for (const int32 i : Burst)
+	{
+		USkeletalMeshComponent* Glass = GlassComps.IsValidIndex(i) ? GlassComps[i].Get() : nullptr;
+		if (!Glass)
+		{
+			continue;
+		}
+		Glass->SetVisibility(false);
+		const FBoxSphereBounds B = Glass->Bounds;
+		const FVector Velocity = GetMesh()->GetPhysicsLinearVelocityAtPoint(B.Origin) + Outward * 150.0;
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		if (ADNGlassShards* Shards = GetWorld()->SpawnActor<ADNGlassShards>(FVector::ZeroVector, FRotator::ZeroRotator, Params))
+		{
+			UMaterialInterface* Material = GlassMaterials[i].IsEmpty() ? nullptr : GlassMaterials[i][0].Get();
+			Shards->Burst(B.Origin, B.BoxExtent * 0.8, Velocity, ShardsPerGlass, Material);
+		}
+		UE_LOG(LogDetonauto, Display, TEXT("DNGlass: %s estourou (trinca %.2f)"), FDNGlass::GlassName(GlassSpecs[i].Glass), FDNGlass::Crack(GlassSpecs[i], DamageState));
+	}
+}
+
+void ADNVehicle::PushGlassCrack()
+{
+	for (int32 i = 0; i < GlassSpecs.Num(); ++i)
+	{
+		const float Crack = FDNGlass::Crack(GlassSpecs[i], DamageState);
+		for (UMaterialInstanceDynamic* Dynamic : GlassMaterials[i])
+		{
+			if (!Dynamic)
+			{
+				continue;
+			}
+			// vidro de janela (material do amassado): a trinca do material; lente (material do template): fica fosca
+			Dynamic->SetScalarParameterValue(TEXT("GlassCrack"), Crack);
+			Dynamic->SetVectorParameterValue(TEXT("GlassCrackCenter"), FLinearColor(GlassCrackCenter[i].X, GlassCrackCenter[i].Y, GlassCrackCenter[i].Z));
+			Dynamic->SetScalarParameterValue(TEXT("Opacity"), FMath::Lerp(LensOpacity, LensCrackedOpacity, Crack));
+		}
+	}
+}
+
+void ADNVehicle::ResetPartsAndGlass()
+{
+	const float Zero[FDNDamageMorph::ZoneCount] = {};
+	for (int32 i = 0; i < Parts.Num(); ++i)
+	{
+		if (Parts[i])
+		{
+			Parts[i]->ResetPart();
+			Parts[i]->SetMorphWeights(Zero, FDNDamageMorph::ZoneCount);
+		}
+		PartStages[i] = EDNPartStage::Attached;
+	}
+	for (int32 i = 0; i < GlassComps.Num(); ++i)
+	{
+		GlassBurst[i] = false;
+		GlassCrackCenter[i] = FVector::ZeroVector;
+		if (GlassComps[i])
+		{
+			GlassComps[i]->SetVisibility(true);
+			GlassComps[i]->ClearMorphTargets();
+		}
+	}
+	RegisterPartMaterials();
+	PushDentsToMaterial();
+	PushGlassCrack();
+}
+
+void ADNVehicle::DNShowGlass(int32 bOn)
+{
+	for (int32 i = 0; i < GlassComps.Num(); ++i)
+	{
+		if (GlassComps[i])
+		{
+			GlassComps[i]->SetVisibility(bOn != 0 && !GlassBurst[i]);
+		}
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("DNShowGlass: vidros %s"), bOn != 0 ? TEXT("à mostra") : TEXT("escondidos"));
 }

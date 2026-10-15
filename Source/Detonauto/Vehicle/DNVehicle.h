@@ -40,6 +40,7 @@
 #include "Core/DNDamage.h"
 #include "Core/DNDamageMorph.h"
 #include "Core/DNDentParams.h"
+#include "Core/DNCarParts.h"
 #include "DNVehicle.generated.h"
 
 class UMeshComponent;
@@ -55,6 +56,7 @@ class UInputAction;
 class UInputMappingContext;
 class UChaosWheeledVehicleMovementComponent;
 class UDNTurboComponent;
+class ADNCarPart;
 struct FInputActionValue;
 
 UCLASS()
@@ -136,6 +138,14 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> WheelVisuals;
 
+	/** Lote 18b: as peças que soltam (uma por linha de Data/CarParts.csv do carro), na ordem do CSV. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ADNCarPart>> Parts;
+
+	/** Lote 18b: os vidros e lentes (Data/CarGlass.csv), presos ao chassi como a carroceria, na ordem do CSV. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USkeletalMeshComponent>> GlassComps;
+
 	/** O desfoque nas bordas (lote 18), nos blendables da câmera; nulo se o material não existe. */
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> EdgeBlurMaterial;
@@ -209,6 +219,17 @@ public:
 	/** B9 (lote 17c): o destroço de peça de rua dentro da caixa da carroceria sai da frente (FDNBreakable::Plow); o carro não muda. */
 	void PlowDebris();
 
+	// ---- peças que soltam e vidros (lote 18b, docs/regras-pecas.md) ----
+
+	/** O modelo do carro nas tabelas de peças e vidros e nos nomes das malhas (SK_DN<Modelo>_<Peça>). */
+	static constexpr const TCHAR* CarModelId = TEXT("SportsCar");
+	const TArray<TObjectPtr<ADNCarPart>>& GetParts() const { return Parts; }
+	/** Estágio da peça (Presa se o carro não tem a peça). */
+	EDNPartStage PartStage(EDNDamagePart Part) const;
+	/** Força da trinca e se estourou, por vidro (0 e falso se o carro não tem o vidro). */
+	float GlassCrack(EDNGlass Glass) const;
+	bool IsGlassBurst(EDNGlass Glass) const;
+
 	/** Ferramenta de captura (console ou EXEC: do -DNKeys): leva a zona (0 frente, 1 traseira, 2 esquerda, 3 direita, 4 teto) a
 	 *  pelo menos Damage (0 a 1), sem batida. Os alvos de deformação seguem a regra de sempre (FDNDamageMorph). */
 	UFUNCTION(Exec)
@@ -253,6 +274,10 @@ public:
 	/** Liga (1) ou desliga (0) o tremor de velocidade: o multiplicador global que o menu de acessibilidade vai guardar no save. */
 	UFUNCTION(Exec)
 	void DNShake(int32 bOn);
+
+	/** Ferramenta de captura (lote 18b): mostra (1) ou esconde (0) os vidros, para conferir o que fica atrás deles. */
+	UFUNCTION(Exec)
+	void DNShowGlass(int32 bOn);
 
 	EDNCrashCamPhase CrashCamPhase() const { return CrashCam.Phase; }
 	/** Escala de tempo que a câmera de batida pediu neste quadro (1 fora dela). */
@@ -303,6 +328,18 @@ protected:
 
 	/** Manda os pesos das zonas ao desgaste da pintura (lascas, metal nu, riscos e fuligem; lote 17b). */
 	void PushWearToMaterial();
+
+	/** Lote 18b: cria as peças e os vidros do carro (malhas em /Game/Detonauto/Vehicle/<Modelo>/Parts). */
+	void SpawnPartsAndGlass();
+	/** Põe os materiais das peças presas e dos vidros na lista dos amassados (recebem amassado e desgaste como a carroceria). */
+	void RegisterPartMaterials();
+	/** Depois de um impacto já aplicado ao dano (nulo: só o dano acumulado, como na ferramenta DNZone): pendura e solta as peças e trinca
+	 *  e estoura os vidros pelas regras do Core (FDNCarParts, FDNGlass). */
+	void EvaluatePartsAndGlass(const FDNImpact* Impact);
+	/** Manda a trinca de cada vidro ao material dele. */
+	void PushGlassCrack();
+	/** Carro novo: peças presas, vidros inteiros. */
+	void ResetPartsAndGlass();
 
 	/** Fecha a janela de contatos vencida e aplica a batida (o maior valor da janela). */
 	void FlushImpacts(double Now);
@@ -365,6 +402,19 @@ protected:
 
 	TArray<FDNCameraMode> CameraModes;
 	int32 CameraIndex = 0;
+
+	// ---- peças que soltam e vidros (lote 18b) ----
+	TArray<FDNCarPartSpec> PartSpecs;
+	TArray<EDNPartStage> PartStages;
+	/** Os materiais dinâmicos de cada peça (saem da lista dos amassados quando ela solta: voa já amassada). */
+	TArray<TArray<TObjectPtr<UMaterialInstanceDynamic>>> PartMaterials;
+	TArray<FDNGlassSpec> GlassSpecs;
+	TArray<bool> GlassBurst;
+	TArray<TArray<TObjectPtr<UMaterialInstanceDynamic>>> GlassMaterials;
+	/** Onde cada vidro trinca, no espaço do carro: o ponto da batida mais perto dele quando a trinca começa [cm]. */
+	TArray<FVector> GlassCrackCenter;
+	/** Ponto da última batida no espaço do carro (para o centro da trinca e o lado do para-choque) [cm]. */
+	FVector LastImpactLocal = FVector::ZeroVector;
 
 	/** Velocidade com que o turbo entra e sai do campo de visão (o quanto ele soma é TurboFovAddDeg de Data/CameraFx.csv). */
 	static constexpr float TurboFovBlendSpeed = 5.0f;
