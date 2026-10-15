@@ -37,6 +37,8 @@ struct FDNCameraFxSettings
 	float CrashCamOrbitHeightM = 2.5f;
 	float CrashCamOrbitDegPerS = 25.0f;
 	float CrashCamProbeCm = 20.0f;
+	/** A órbita começa tantos graus antes do lado da batida e gira para ele (aprovado por captura no lote 18). */
+	float CrashCamLeadDeg = 90.0f;
 	float WreckSteerAccelMs2 = 6.0f;
 	float WreckSteerMaxDeltaVMs = 6.0f;
 };

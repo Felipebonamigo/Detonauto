@@ -500,6 +500,7 @@ struct FDNCameraFxRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamOrbitHeightM = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamOrbitDegPerS = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamProbeCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamLeadDeg = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WreckSteerAccelMs2 = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WreckSteerMaxDeltaVMs = 0.0f;
 
@@ -530,6 +531,7 @@ struct FDNCameraFxRow : public FTableRowBase
 		S.CrashCamOrbitHeightM = CrashCamOrbitHeightM;
 		S.CrashCamOrbitDegPerS = CrashCamOrbitDegPerS;
 		S.CrashCamProbeCm = CrashCamProbeCm;
+		S.CrashCamLeadDeg = CrashCamLeadDeg;
 		S.WreckSteerAccelMs2 = WreckSteerAccelMs2;
 		S.WreckSteerMaxDeltaVMs = WreckSteerMaxDeltaVMs;
 		return S;

@@ -5,7 +5,7 @@
 // SpeedFovMaxAddDeg e TurboFovAddDeg [0, 30]; MaxFovDeg (60, 140]; FovBlendDegPerS (0, 360]; ShakeMaxDeg [0, 5]; ShakeHz (0, 60];
 // EdgeBlurMax [0, 1]; EdgeBlurInnerRadius [0, 1); CrashCamMinDeltaVMs (0, 100]; CrashCamTimeScale (0, 1]; CrashCamEnterS e
 // CrashCamExitS (0, 5]; CrashCamHoldS [0, 10]; CrashCamCooldownS [0, 30]; CrashCamOrbitRadiusM (0, 50]; CrashCamOrbitHeightM [0, 50];
-// CrashCamOrbitDegPerS [0, 360]; CrashCamProbeCm (0, 200]; WreckSteerAccelMs2 e WreckSteerMaxDeltaVMs [0, 50].
+// CrashCamOrbitDegPerS [0, 360]; CrashCamProbeCm (0, 200]; CrashCamLeadDeg [0, 180]; WreckSteerAccelMs2 e WreckSteerMaxDeltaVMs [0, 50].
 // Cameras.csv: SpeedFovScale [0, 2] e ShakeScale [0, 3].
 
 #include <limits>
@@ -79,11 +79,13 @@ void FDNDataCameraFxSpec::Define()
 			Bad(TEXT("orbita abaixo do chao"), TEXT("CrashCamOrbitHeightM"), [](FDNCameraFxRow& R) { R.CrashCamOrbitHeightM = -1.f; });
 			Bad(TEXT("orbita a 361 graus/s"), TEXT("CrashCamOrbitDegPerS"), [](FDNCameraFxRow& R) { R.CrashCamOrbitDegPerS = 361.f; });
 			Bad(TEXT("esfera de 0 cm"), TEXT("CrashCamProbeCm"), [](FDNCameraFxRow& R) { R.CrashCamProbeCm = 0.f; });
+			Bad(TEXT("orbita comeca 181 graus antes"), TEXT("CrashCamLeadDeg"), [](FDNCameraFxRow& R) { R.CrashCamLeadDeg = 181.f; });
+			Bad(TEXT("orbita comeca depois da batida"), TEXT("CrashCamLeadDeg"), [](FDNCameraFxRow& R) { R.CrashCamLeadDeg = -1.f; });
 			Bad(TEXT("controle negativo"), TEXT("WreckSteerAccelMs2"), [](FDNCameraFxRow& R) { R.WreckSteerAccelMs2 = -1.f; });
 			Bad(TEXT("teto do controle 51"), TEXT("WreckSteerMaxDeltaVMs"), [](FDNCameraFxRow& R) { R.WreckSteerMaxDeltaVMs = 51.f; });
 		});
 
-		It("ToSettings copia os 26 campos", [this]()
+		It("ToSettings copia os 27 campos", [this]()
 		{
 			FDNCameraFxSettings In;
 			float V = 1.f;
@@ -91,7 +93,7 @@ void FDNDataCameraFxSpec::Define()
 				&In.ShakeStartKmh, &In.ShakeFullKmh, &In.ShakeMaxDeg, &In.ShakeHz, &In.EdgeBlurStartKmh, &In.EdgeBlurFullKmh, &In.EdgeBlurMax,
 				&In.EdgeBlurInnerRadius, &In.CrashCamMinDeltaVMs, &In.CrashCamTimeScale, &In.CrashCamEnterS, &In.CrashCamHoldS, &In.CrashCamExitS,
 				&In.CrashCamCooldownS, &In.CrashCamOrbitRadiusM, &In.CrashCamOrbitHeightM, &In.CrashCamOrbitDegPerS, &In.CrashCamProbeCm,
-				&In.WreckSteerAccelMs2, &In.WreckSteerMaxDeltaVMs })
+				&In.CrashCamLeadDeg, &In.WreckSteerAccelMs2, &In.WreckSteerMaxDeltaVMs })
 			{
 				*F = 1000.f + V++; // um valor diferente por campo: troca de campos aparece
 			}
@@ -120,6 +122,7 @@ void FDNDataCameraFxSpec::Define()
 			TestEqual("CrashCamOrbitHeightM", Out.CrashCamOrbitHeightM, In.CrashCamOrbitHeightM);
 			TestEqual("CrashCamOrbitDegPerS", Out.CrashCamOrbitDegPerS, In.CrashCamOrbitDegPerS);
 			TestEqual("CrashCamProbeCm", Out.CrashCamProbeCm, In.CrashCamProbeCm);
+			TestEqual("CrashCamLeadDeg", Out.CrashCamLeadDeg, In.CrashCamLeadDeg);
 			TestEqual("WreckSteerAccelMs2", Out.WreckSteerAccelMs2, In.WreckSteerAccelMs2);
 			TestEqual("WreckSteerMaxDeltaVMs", Out.WreckSteerMaxDeltaVMs, In.WreckSteerMaxDeltaVMs);
 		});
@@ -156,6 +159,7 @@ void FDNDataCameraFxSpec::Define()
 			TestEqual("contrato: dispara com 15 m/s", Def.CrashCamMinDeltaVMs, 15.f);
 			TestEqual("contrato: camera lenta 0,25", Def.CrashCamTimeScale, 0.25f);
 			TestEqual("contrato: espera de 2 s", Def.CrashCamCooldownS, 2.f);
+			TestEqual("captura aprovada: orbita comeca 90 graus antes do lado da batida", Def.CrashCamLeadDeg, 90.f);
 		});
 	});
 

@@ -191,6 +191,7 @@ namespace DNTest
 		R.CrashCamOrbitHeightM = S.CrashCamOrbitHeightM;
 		R.CrashCamOrbitDegPerS = S.CrashCamOrbitDegPerS;
 		R.CrashCamProbeCm = S.CrashCamProbeCm;
+		R.CrashCamLeadDeg = S.CrashCamLeadDeg;
 		R.WreckSteerAccelMs2 = S.WreckSteerAccelMs2;
 		R.WreckSteerMaxDeltaVMs = S.WreckSteerMaxDeltaVMs;
 		return R;

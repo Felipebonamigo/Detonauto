@@ -693,6 +693,7 @@ TArray<FString> FDNDataValidation::ValidateCameraFx(const TArray<FDNCameraFxEntr
 		Range(TEXT("CrashCamOrbitHeightM"), R.CrashCamOrbitHeightM, 0.0f, true, 50.0f, true);
 		Range(TEXT("CrashCamOrbitDegPerS"), R.CrashCamOrbitDegPerS, 0.0f, true, 360.0f, true);
 		Range(TEXT("CrashCamProbeCm"), R.CrashCamProbeCm, 0.0f, false, 200.0f, true);
+		Range(TEXT("CrashCamLeadDeg"), R.CrashCamLeadDeg, 0.0f, true, 180.0f, true);
 		Range(TEXT("WreckSteerAccelMs2"), R.WreckSteerAccelMs2, 0.0f, true, 50.0f, true);
 		Range(TEXT("WreckSteerMaxDeltaVMs"), R.WreckSteerMaxDeltaVMs, 0.0f, true, 50.0f, true);
 	}
