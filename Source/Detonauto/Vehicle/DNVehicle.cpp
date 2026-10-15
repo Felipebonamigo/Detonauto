@@ -384,6 +384,8 @@ void ADNVehicle::BeginPlay()
 	int32 StartCamera = 0;
 	FParse::Value(FCommandLine::Get(), TEXT("DNCamera="), StartCamera);
 	bDriftAssist = !FParse::Param(FCommandLine::Get(), TEXT("DNNoAssist"));
+	// capturas que vão para o Felipe: sem o texto de depuração (as de revisão continuam com ele)
+	bHudHidden = FParse::Param(FCommandLine::Get(), TEXT("DNNoHud"));
 	SetCameraMode(StartCamera);
 
 	// lote 18: câmera de velocidade e de batida (Data/CameraFx.csv). Só o carro do jogador: os estacionados das ferramentas de medição
@@ -497,7 +499,7 @@ TArray<FString> ADNVehicle::HudLines() const
 
 void ADNVehicle::UpdateHud() const
 {
-	if (!GEngine || !IsLocallyControlled())
+	if (!GEngine || !IsLocallyControlled() || bHudHidden)
 	{
 		return;
 	}

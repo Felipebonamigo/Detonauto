@@ -44,6 +44,7 @@ No `vehicle-probe.ps1 -Map /Game/Detonauto/Maps/L_Lookdev -AlvoPS5 -ResX 1920 -R
 - `-DNSpeedShots=60,150,220`: captura com o HUD quando o carro passa de cada velocidade (`dn-speed-<v>kmh`).
 - `-DNEdgeBlurForce=S`: desfoque com força fixa, mesmo parado (medição de custo).
 - `-DNNoEdgeBlur`, `-DNNoShake`, `-DNNoCrashCam`.
+- `-DNNoHud`: sem o texto de depuração, para as capturas que vão para o Felipe (as de revisão ficam com ele).
 
 ## Aprovação (os 8 itens do contrato)
 

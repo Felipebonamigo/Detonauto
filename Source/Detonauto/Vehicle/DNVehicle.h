@@ -241,6 +241,9 @@ public:
 	/** Assistência de derrapagem ligada (padrão sim); -DNNoAssist desliga para as medições de comparação. */
 	bool bDriftAssist = true;
 
+	/** -DNNoHud: sem o HUD de depuração (capturas para o Felipe). */
+	bool bHudHidden = false;
+
 	// ---- câmera de velocidade e de batida (lote 18) ----
 
 	/** Liga (1) ou desliga (0) o desfoque nas bordas; para as capturas com e sem. */

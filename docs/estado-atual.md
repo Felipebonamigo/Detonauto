@@ -51,7 +51,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 16b | Polimento visual: pintura, poste moderno, folhagem, vitrines | Na main, aguardando revisão (`docs/lookdev.md`, seção 16b) |
 | 17b | Desgaste da pintura por zona e vincos mais duros | Na main, aguardando revisão (`docs/lote-17b.md`): capturas dos níveis nos 4 ângulos com o sol por trás, batida real a 100 km/h na `L_Lookdev`, lado a lado com o 17, frente em 1,0 mais destruída (recuo em rampa e capô em tenda). Custo com 37,8 mil vértices pendente (PC ocupado por outras sessões) |
 | 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
-| 18 | Câmera de velocidade e de batida | Na main, aguardando revisão (`docs/lote-18.md`): FOV, tremor e desfoque nas bordas pela velocidade; câmera de batida com câmera lenta, órbita que mostra o amassado e não entra em prédio; controle do destroço medido (−1,24 m / +1,28 m). Passe do desfoque 0,038 ms. Pendentes: quadro inteiro com e sem desfoque com o PC livre, e o Felipe jogar |
+| 18 | Câmera de velocidade e de batida | Aprovado (`docs/lote-18.md`, revisão de 15 out, com as três mudanças de contrato): FOV, tremor e desfoque nas bordas pela velocidade; câmera de batida com câmera lenta, órbita que mostra o amassado e não entra em prédio; controle do destroço medido (−1,24 m / +1,28 m). Passe do desfoque 0,038 ms. Pendentes: quadro inteiro com e sem desfoque com o PC livre, e o Felipe jogar |
 
 ## Primeiro playtest (14 out)
 
@@ -225,6 +225,10 @@ melhor e ele quer cinco modos.
 4. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
+
+**Maior buraco visual que resta (revisão do lote 18):** o carro de tráfego é uma caixa
+colorida. Batida no tráfego não dá para o Felipe julgar assim. O carro de verdade vem com o
+City Sample Vehicles (lote 20); o download no Fab é do Felipe.
 
 Pendências de design (decidir com playtest, não fazer agora):
 
