@@ -20,6 +20,8 @@
 #include "Misc/CommandLine.h"
 #include "HAL/PlatformMisc.h"
 #include "UnrealClient.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 
 ADNVehicleTestGameMode::ADNVehicleTestGameMode()
 {
@@ -122,6 +124,25 @@ void ADNVehicleTestGameMode::StartPlay()
 		FParse::Value(Cmd, TEXT("DNPropStartM="), StartM);
 		FParse::Value(Cmd, TEXT("DNPropSpacingM="), SpacingM);
 		SpawnPropLine(PropLine, StartM, SpacingM);
+	}
+	FString PropCamSpec;
+	if (FParse::Value(Cmd, TEXT("DNPropCam="), PropCamSpec, false) && !PropCamSpec.IsEmpty())
+	{
+		SpawnPropCam(PropCamSpec);
+	}
+	FString Delays;
+	if (FParse::Value(Cmd, TEXT("DNPropShotDelays="), Delays, false))
+	{
+		TArray<FString> Items;
+		Delays.ParseIntoArray(Items, TEXT(","));
+		for (const FString& Item : Items)
+		{
+			const float Seconds = FCString::Atof(*Item);
+			if (Seconds > 0.0f)
+			{
+				PropShotDelays.Add(Seconds);
+			}
+		}
 	}
 	if (FParse::Value(Cmd, TEXT("DNCruiseKmh="), CruiseKmh) && CruiseKmh > 0.0f)
 	{
@@ -239,23 +260,71 @@ void ADNVehicleTestGameMode::LogPropLineSummary() const
 		Broken, LineProps.Num(), MinKmh, 0.6f * CruiseKmh, LineMaxOffsetM, bPass ? TEXT("APROVADO") : TEXT("REPROVADO"));
 }
 
+void ADNVehicleTestGameMode::SpawnPropCam(const FString& Spec)
+{
+	TArray<FString> Parts;
+	Spec.ParseIntoArray(Parts, TEXT(","));
+	const int32 Index = Parts.Num() > 0 ? FCString::Atoi(*Parts[0]) : 0;
+	const float AheadM = Parts.Num() > 1 ? FCString::Atof(*Parts[1]) : 10.0f;
+	const float SideM = Parts.Num() > 2 ? FCString::Atof(*Parts[2]) : 5.0f;
+	const float HeightM = Parts.Num() > 3 ? FCString::Atof(*Parts[3]) : 1.5f;
+	const ADNBreakableProp* Prop = LineProps.IsValidIndex(Index) ? LineProps[Index].Get() : nullptr;
+	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+	if (!Prop || !Spot)
+	{
+		UE_LOG(LogDetonauto, Warning, TEXT("DNPropCam: sem a peça %d da fileira (-DNPropLine) ou sem largada; câmera não criada"), Index);
+		return;
+	}
+	const FVector Target = Prop->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f);
+	const FVector Location = Prop->GetActorLocation() + Spot->GetActorForwardVector() * (AheadM * 100.0f)
+		+ Spot->GetActorRightVector() * (SideM * 100.0f) + FVector(0.0f, 0.0f, HeightM * 100.0f);
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	PropCam = GetWorld()->SpawnActor<ACameraActor>(Location, (Target - Location).Rotation(), Params);
+	if (PropCam)
+	{
+		PropCam->GetCameraComponent()->SetFieldOfView(60.0f);
+		PropCam->GetCameraComponent()->SetConstraintAspectRatio(false);
+		UE_LOG(LogDetonauto, Display, TEXT("DNPropCam: câmera parada na peça %d (%s): %.1f m à frente, %.1f m ao lado, %.1f m de altura"),
+			Index, *Prop->Kind.ToString(), AheadM, SideM, HeightM);
+	}
+}
+
 void ADNVehicleTestGameMode::HandlePropBroken(ADNBreakableProp& Prop)
 {
-	// captura no contato e outra 0,8 s depois (a de antes sai em PropShotTick, a 12 m da peça)
+	// captura no contato e depois (a de antes sai em PropShotTick, a 12 m da peça)
 	++PropShots;
 	FScreenshotRequest::RequestScreenshot(FString::Printf(TEXT("dn-prop-%d-%s-contato"), PropShots, *Prop.Kind.ToString()), false, false);
-	PendingAfterName = FString::Printf(TEXT("dn-prop-%d-%s-depois"), PropShots, *Prop.Kind.ToString());
-	PendingAfterLeft = 0.8f;
+	if (PropShotDelays.IsEmpty())
+	{
+		PendingShots.Add({ 0.8f, FString::Printf(TEXT("dn-prop-%d-%s-depois"), PropShots, *Prop.Kind.ToString()) });
+	}
+	for (const float Delay : PropShotDelays)
+	{
+		PendingShots.Add({ Delay, FString::Printf(TEXT("dn-prop-%d-%s-t%03dms"), PropShots, *Prop.Kind.ToString(), FMath::RoundToInt(Delay * 1000.0f)) });
+	}
 }
 
 void ADNVehicleTestGameMode::PropShotTick(ADNVehicle& Vehicle, float DeltaSeconds)
 {
-	if (PendingAfterLeft > 0.0f)
+	if (PropCam && !bPropCamInView)
 	{
-		PendingAfterLeft -= DeltaSeconds;
-		if (PendingAfterLeft <= 0.0f)
+		if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 		{
-			FScreenshotRequest::RequestScreenshot(PendingAfterName, false, false);
+			PC->SetViewTarget(PropCam);
+			bPropCamInView = true;
+		}
+	}
+	// uma captura por quadro (o pedido seguinte no mesmo quadro trocaria o nome da anterior); a que venceu junto sai no próximo
+	bool bShotThisFrame = false;
+	for (int32 i = 0; i < PendingShots.Num(); ++i)
+	{
+		PendingShots[i].Left -= DeltaSeconds;
+		if (PendingShots[i].Left <= 0.0f && !bShotThisFrame)
+		{
+			FScreenshotRequest::RequestScreenshot(PendingShots[i].Name, false, false);
+			PendingShots.RemoveAt(i--);
+			bShotThisFrame = true;
 		}
 	}
 	const FVector Car = Vehicle.GetActorLocation();
@@ -265,8 +334,9 @@ void ADNVehicleTestGameMode::PropShotTick(ADNVehicle& Vehicle, float DeltaSecond
 		const FVector To = It->GetActorLocation() - Car;
 		const double Ahead = FVector::DotProduct(To, Forward);
 		const double Side = (To - Forward * Ahead).Size2D();
-		if (!It->IsBroken() && Ahead > 0.0 && Ahead < 1200.0 && Side < 300.0 && !PropsShotBefore.Contains(*It))
+		if (!bShotThisFrame && !It->IsBroken() && Ahead > 0.0 && Ahead < 1200.0 && Side < 300.0 && !PropsShotBefore.Contains(*It))
 		{
+			bShotThisFrame = true; // a próxima espera um quadro, senão trocaria o nome desta
 			PropsShotBefore.Add(*It);
 			FScreenshotRequest::RequestScreenshot(FString::Printf(TEXT("dn-prop-%d-%s-antes"), PropShots + 1, *It->Kind.ToString()), false, false);
 			UE_LOG(LogDetonauto, Display, TEXT("DNPropShots: %s a %.1f m, carro a %.1f km/h"), *It->Kind.ToString(), Ahead / 100.0, Vehicle.SpeedKmh());

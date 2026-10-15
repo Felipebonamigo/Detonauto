@@ -24,6 +24,7 @@ class ADNVehicle;
 class ADNTestArena;
 class APlayerStart;
 class ADNBreakableProp;
+class ACameraActor;
 
 UCLASS()
 class DETONAUTO_API ADNVehicleTestGameMode : public AGameModeBase
@@ -71,14 +72,27 @@ protected:
 	float LineMinKmh = TNumericLimits<float>::Max();
 	float LineMaxOffsetM = 0.0f;
 
-	/** -DNPropShots: captura antes (a 12 m), no contato e 0,8 s depois de cada peça quebrada (dn-prop-<n>-<tipo>-...). */
+	/** -DNPropShots: captura antes (a 12 m), no contato e depois de cada peça quebrada (dn-prop-<n>-<tipo>-...). Depois: 0,8 s
+	 *  ("depois"), ou os tempos de -DNPropShotDelays=0.1,0.25 em segundos ("t100ms", "t250ms"). */
 	void HandlePropBroken(ADNBreakableProp& Prop);
 	void PropShotTick(ADNVehicle& Vehicle, float DeltaSeconds);
 	bool bPropShots = false;
 	int32 PropShots = 0;
-	float PendingAfterLeft = 0.0f;
-	FString PendingAfterName;
+	struct FPendingShot
+	{
+		float Left = 0.0f;
+		FString Name;
+	};
+	TArray<FPendingShot> PendingShots;
+	TArray<float> PropShotDelays;
 	TSet<TWeakObjectPtr<ADNBreakableProp>> PropsShotBefore;
+
+	/** -DNPropCam=<i>,<frente m>,<lado m>,<altura m>: câmera parada perto da peça i da fileira (0 = a primeira), nos eixos da largada
+	 *  (frente = para onde o carro anda, lado + = direita), olhando para a peça 1 m acima do chão. Frente positiva põe o sol por trás. */
+	void SpawnPropCam(const FString& Spec);
+	UPROPERTY(Transient)
+	TObjectPtr<ACameraActor> PropCam;
+	bool bPropCamInView = false;
 
 	/** -DNCruiseKmh=N: piloto automático segura N km/h na reta (o log diz que o acelerador vem dele). */
 	float CruiseKmh = 0.0f;
