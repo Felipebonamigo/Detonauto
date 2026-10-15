@@ -21,7 +21,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível) | `Source/Detonauto/Core/` | Testadas; 661 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível) | `Source/Detonauto/Core/` | Testadas; 662 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros, mobiliário |
@@ -177,6 +177,10 @@ melhor e ele quer cinco modos.
   encosta nos prédios ao simular. As malhas `UCX_` no FBX não servem na 5.8 (a
   importação gera convexos a mais e dispara um `ensure`). O `split_prop.py` grava um
   `collision.json` e o `create_lookdev.py` aplica cápsulas analíticas.
+- **LFS (regra desde 15 out 2026):** asset grande se itera localmente e entra em UM commit,
+  com a versão final, nunca um commit por tentativa. O histórico já tem ~870 MB; a copa do
+  jacarandá (121 MB) entrou três vezes no 17c. Textura de modelo no máximo 2k. Antes do lote 20,
+  fazer uma árvore leve (tronco decimado, folhas em cartões, alvo de 20 MB ou menos).
 - O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
   o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
   poste) ele diz REPROVADO de propósito.
