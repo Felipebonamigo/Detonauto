@@ -23,6 +23,11 @@
 //
 // Linha de comando (só para ferramentas de teste): -DNCarRow=<id> escolhe o preset ao nascer; -DNNoDents desliga o amassado;
 // -DNDentMaterial liga só o material; -DNDents=N liga o material e aplica N amassados de demonstração.
+//
+// Câmera de velocidade e de batida (lote 18, docs/regras-camera.md, regras em Core/DNCameraFx): campo de visão pela velocidade e pelo
+// turbo, tremor, desfoque nas bordas (material M_DNEdgeBlur) e a câmera de batida com câmera lenta e o controle do destroço. Tudo anda
+// em tempo real (FApp::GetDeltaTime), porque a câmera lenta muda a escala de tempo do jogo. -DNNoEdgeBlur, -DNNoShake e -DNNoCrashCam
+// desligam cada parte; no console, DNEdgeBlur 0/1 e DNShake 0/1. -DNEdgeBlurForce=S fixa a força do desfoque (medição de custo).
 
 #pragma once
 
@@ -30,6 +35,7 @@
 #include "WheeledVehiclePawn.h"
 #include "Core/DNCar.h"
 #include "Core/DNCamera.h"
+#include "Core/DNCameraFx.h"
 #include "Core/DNGameDataSubsystem.h"
 #include "Core/DNDamage.h"
 #include "Core/DNDamageMorph.h"
@@ -129,6 +135,10 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 	/** As quatro rodas visuais, na ordem FL, FR, BL, BR. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> WheelVisuals;
+
+	/** O desfoque nas bordas (lote 18), nos blendables da câmera; nulo se o material não existe. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> EdgeBlurMaterial;
 
 	/** O primeiro dos materiais de amassado (ligado = não nulo). */
 	UPROPERTY(Transient)
@@ -231,6 +241,28 @@ public:
 	/** Assistência de derrapagem ligada (padrão sim); -DNNoAssist desliga para as medições de comparação. */
 	bool bDriftAssist = true;
 
+	// ---- câmera de velocidade e de batida (lote 18) ----
+
+	/** Liga (1) ou desliga (0) o desfoque nas bordas; para as capturas com e sem. */
+	UFUNCTION(Exec)
+	void DNEdgeBlur(int32 bOn);
+
+	/** Liga (1) ou desliga (0) o tremor de velocidade: o multiplicador global que o menu de acessibilidade vai guardar no save. */
+	UFUNCTION(Exec)
+	void DNShake(int32 bOn);
+
+	EDNCrashCamPhase CrashCamPhase() const { return CrashCam.Phase; }
+	/** Escala de tempo que a câmera de batida pediu neste quadro (1 fora dela). */
+	float CrashTimeScale() const { return AppliedTimeScale; }
+	/** Campo de visão mostrado agora (com velocidade e turbo) e a força do desfoque nas bordas. */
+	float DisplayedFov() const { return DisplayedFovDeg; }
+	float EdgeBlurStrength() const { return AppliedEdgeBlur; }
+	/** Tempo real desde o último disparo da câmera de batida [s]. */
+	float CrashCamSeconds() const { return CrashCamClockS; }
+
+	/** A vista da câmera de batida por cima da câmera do modo (CalcCamera do ator dá a do componente Camera). */
+	virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
+
 	/** Ângulo de deslize agora [graus] (positivo = velocidade à direita do nariz). */
 	float SlipAngleDegNow() const;
 
@@ -242,6 +274,8 @@ protected:
 	virtual void PreRegisterAllComponents() override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	/** Devolve a escala de tempo a 1 se o carro sair no meio da câmera lenta. */
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	void Throttle(const FInputActionValue& Value);
@@ -329,10 +363,53 @@ protected:
 	TArray<FDNCameraMode> CameraModes;
 	int32 CameraIndex = 0;
 
-	/** Abertura do campo de visão com o turbo ativo [graus], e a velocidade com que sobe e desce. */
-	static constexpr float TurboFovKickDegrees = 12.0f;
+	/** Velocidade com que o turbo entra e sai do campo de visão (o quanto ele soma é TurboFovAddDeg de Data/CameraFx.csv). */
 	static constexpr float TurboFovBlendSpeed = 5.0f;
 	float TurboFovBlend = 0.0f;
+
+	// ---- câmera de velocidade e de batida (lote 18) ----
+
+	/** Campo de visão, tremor e desfoque deste quadro, em tempo real. */
+	void UpdateSpeedCamera(float RealDt);
+	/** Avança a câmera de batida, aplica a escala de tempo e o controle do destroço, em tempo real. */
+	void UpdateCrashCam(float RealDt);
+	/** Contato real do jogador: dispara a câmera de batida se a regra deixar. */
+	void TryCrashCam(float DeltaVMs, EDNImpactSource Source, const FVector& WorldPoint);
+
+	FDNCameraFxSettings CameraFx;
+	float DisplayedFovDeg = 95.0f;
+	double ShakeTimeS = 0.0;
+	float ShakeGlobalScale = 1.0f;
+	bool bEdgeBlurOn = true;
+	/** -DNEdgeBlurForce=S: desfoque com força fixa S em qualquer velocidade, só para medir o custo (negativo = desligado). */
+	float EdgeBlurForce = -1.0f;
+	bool bCrashCamOn = true;
+	float AppliedEdgeBlur = 0.0f;
+	float AppliedTimeScale = 1.0f;
+	/** Entrada de esterço do jogador (-1 a 1), para o controle do destroço. */
+	float SteerInputRaw = 0.0f;
+
+	FDNCrashCamState CrashCam;
+	/** Ângulo da órbita em volta do carro [graus, no mundo] e o sentido do giro (+1 ou -1, para o lado da batida). */
+	float OrbitYawDeg = 0.0f;
+	float OrbitSign = 1.0f;
+	/** A câmera de batida acabou de disparar: a órbita começa onde a câmera do modo está (sem corte). */
+	bool bOrbitPending = false;
+	/** Para onde fica a batida, visto do carro [graus de guinada, no mundo]: a órbita gira para esse lado. */
+	float CrashImpactYawDeg = 0.0f;
+	/** Tempo real desde o disparo [s], para o log e as capturas. */
+	float CrashCamClockS = 0.0f;
+	/** Fração do caminho do carro até a órbita que a câmera usa (a esfera de parede encurta na hora e volta devagar). */
+	float ProbeFraction = 1.0f;
+	int32 ProbeLogs = 0;
+	/** Quanto o controle do destroço já mudou a velocidade nesta batida [m/s], e a posição do carro no disparo (para o log). */
+	float WreckSteerUsedMs = 0.0f;
+	FVector CrashStartLocation = FVector::ZeroVector;
+	/** Vista da última CalcCamera. */
+	FRotator LastViewRotation = FRotator::ZeroRotator;
+	/** A direita da tela na câmera do jogador no instante da batida: o lado do controle do destroço. A da órbita não serve: ela fica ao
+	 *  lado do carro, e a direita dela corre ao longo da velocidade (o lado da perpendicular ficaria indefinido). */
+	FVector CrashScreenRight = FVector::RightVector;
 
 	/** Rotação do osso de cada roda no pose de referência (espaço do componente): converte o curso da suspensão para o espaço do osso. */
 	TArray<FQuat> WheelBoneRotations;

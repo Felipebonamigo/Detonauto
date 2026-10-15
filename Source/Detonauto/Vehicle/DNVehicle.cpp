@@ -2,6 +2,7 @@
 #include "Vehicle/DNVehicleWheels.h"
 #include "Vehicle/DNTurboComponent.h"
 #include "Crash/DNBreakableProp.h"
+#include "Traffic/DNTrafficVehicle.h"
 #include "Core/DNBreakable.h"
 #include "Core/DNGameDataSubsystem.h"
 #include "Core/DNWheelVisual.h"
@@ -28,6 +29,9 @@
 #include "Engine/StaticMesh.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "Engine/OverlapResult.h"
+#include "Misc/App.h"
+#include "Kismet/GameplayStatics.h"
+#include "Camera/CameraTypes.h"
 
 namespace
 {
@@ -39,6 +43,26 @@ namespace
 	const TCHAR* GlassMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Glass.SM_SportsCar_Glass");
 	const TCHAR* WheelMeshPath = TEXT("/Game/Detonauto/Vehicle/SportsCar/SM_SportsCar_Wheel.SM_SportsCar_Wheel");
 	const TCHAR* DentParentPath = TEXT("/Game/Detonauto/Vehicle/M_DNDentParent.M_DNDentParent");
+	/** Desfoque nas bordas (lote 18): Tools/Unreal/create_edge_blur_material.ps1. */
+	const TCHAR* EdgeBlurPath = TEXT("/Game/Detonauto/Camera/M_DNEdgeBlur.M_DNEdgeBlur");
+
+	const TCHAR* CrashPhaseName(EDNCrashCamPhase Phase)
+	{
+		switch (Phase)
+		{
+		case EDNCrashCamPhase::Entering: return TEXT("entrando");
+		case EDNCrashCamPhase::Holding: return TEXT("segurando");
+		case EDNCrashCamPhase::Exiting: return TEXT("saindo");
+		case EDNCrashCamPhase::Cooldown: return TEXT("espera");
+		default: return TEXT("parada");
+		}
+	}
+
+	/** Altura do ponto que a câmera de batida olha, sobre a origem do carro [cm]. */
+	constexpr float CrashCamAimUpCm = 60.0f;
+	/** Quanto do caminho a câmera de batida recupera por segundo real depois que a esfera deixa de bater (ver CalcCamera). Detalhe do
+	 *  suavizado da colisão, não ajuste de jogo: fica aqui. Se precisar de ajuste por cena, vai para CameraFx.csv. */
+	constexpr float CrashCamProbeRecoverPerS = 1.5f;
 
 	const FName WheelBones[4] = { FName("Phys_Wheel_FL"), FName("Phys_Wheel_FR"), FName("Phys_Wheel_BL"), FName("Phys_Wheel_BR") };
 
@@ -362,6 +386,34 @@ void ADNVehicle::BeginPlay()
 	bDriftAssist = !FParse::Param(FCommandLine::Get(), TEXT("DNNoAssist"));
 	SetCameraMode(StartCamera);
 
+	// lote 18: câmera de velocidade e de batida (Data/CameraFx.csv). Só o carro do jogador: os estacionados das ferramentas de medição
+	// não mexem na escala de tempo nem pagam o desfoque
+	if (const UDNGameDataSubsystem* Data = DataSubsystemOf(this))
+	{
+		CameraFx = Data->GetCameraFxSettings();
+	}
+	{
+		const TCHAR* Cmd = FCommandLine::Get();
+		bEdgeBlurOn = !FParse::Param(Cmd, TEXT("DNNoEdgeBlur"));
+		ShakeGlobalScale = FParse::Param(Cmd, TEXT("DNNoShake")) ? 0.0f : 1.0f;
+		bCrashCamOn = !FParse::Param(Cmd, TEXT("DNNoCrashCam"));
+		FParse::Value(Cmd, TEXT("DNEdgeBlurForce="), EdgeBlurForce);
+		if (UMaterialInterface* Blur = LoadObject<UMaterialInterface>(nullptr, EdgeBlurPath))
+		{
+			EdgeBlurMaterial = UMaterialInstanceDynamic::Create(Blur, this);
+			EdgeBlurMaterial->SetScalarParameterValue(TEXT("Strength"), 0.0f);
+			EdgeBlurMaterial->SetScalarParameterValue(TEXT("InnerRadius"), CameraFx.EdgeBlurInnerRadius);
+			Camera->PostProcessSettings.AddBlendable(EdgeBlurMaterial, 0.0f); // peso 0: a engine nem roda o passe parado ou devagar
+		}
+		else
+		{
+			UE_LOG(LogDetonauto, Warning, TEXT("ADNVehicle: sem o material do desfoque nas bordas (%s). Rode Tools/Unreal/create_edge_blur_material.ps1"), EdgeBlurPath);
+		}
+		UE_LOG(LogDetonauto, Display, TEXT("ADNVehicle: câmera de velocidade e de batida: desfoque nas bordas %s, tremor %s, câmera de batida %s (dispara a %.1f m/s, escala %.2f)"),
+			EdgeBlurMaterial && bEdgeBlurOn ? TEXT("ligado") : TEXT("desligado"), ShakeGlobalScale > 0.0f ? TEXT("ligado") : TEXT("desligado"),
+			bCrashCamOn ? TEXT("ligada") : TEXT("desligada"), CameraFx.CrashCamMinDeltaVMs, CameraFx.CrashCamTimeScale);
+	}
+
 	// os ossos das rodas no pose de referência (sem Anim Blueprint, é o pose em que o esqueleto fica)
 	WheelBoneRotations.Reset();
 	if (const USkeletalMesh* Skeletal = GetMesh()->GetSkeletalMeshAsset())
@@ -459,6 +511,13 @@ void ADNVehicle::UpdateHud() const
 		GEngine->AddOnScreenDebugMessage(9105, 0.0f, FColor::Silver, Lines[4], false, Scale);
 		GEngine->AddOnScreenDebugMessage(9104, 0.0f, FColor::Orange, Lines[3], false, Scale);
 	}
+	// câmera de velocidade e de batida (lote 18): abaixo do turbo; a escala de tempo fica escrita em cada captura da câmera lenta
+	{
+		const bool bCrash = CrashCam.Phase != EDNCrashCamPhase::Idle;
+		const FString CameraLine = FString::Printf(TEXT("Câmera: FOV %.1f   desfoque %.2f   |   câmera de batida: %s   escala de tempo %.2f   (%.2f s reais)"),
+			DisplayedFovDeg, AppliedEdgeBlur, CrashPhaseName(CrashCam.Phase), AppliedTimeScale, bCrash ? CrashCamClockS : 0.0f);
+		GEngine->AddOnScreenDebugMessage(9106, 0.0f, bCrash ? FColor::Red : FColor::Silver, CameraLine, false, Scale);
+	}
 	GEngine->AddOnScreenDebugMessage(9101, 0.0f, Turbo->IsActive() ? FColor::Cyan : FColor::White, Lines[2], false, Scale);
 	GEngine->AddOnScreenDebugMessage(9102, 0.0f, FColor::White, Lines[1], false, Scale);
 	GEngine->AddOnScreenDebugMessage(9103, 0.0f, FColor::Yellow, Lines[0], false, Scale);
@@ -552,19 +611,13 @@ void ADNVehicle::Tick(float DeltaSeconds)
 		TurboEmptySeconds = 0.0f;
 	}
 
-	// o turbo abre o campo de visão (sensação de velocidade): o empurrão é grande (medido: +59 a +70% de velocidade em 3 s), mas só
-	// aparece na tela se a câmera ajudar; no playtest 1 o Felipe disse que "quase não dá diferença"
+	// lote 18: câmera de velocidade e de batida em TEMPO REAL (o delta do quadro sem a escala de tempo): a câmera lenta muda a escala do
+	// jogo, e se a câmera andasse no tempo do jogo a câmera lenta prolongaria a si mesma
+	if (IsLocallyControlled())
 	{
-		const float KickTarget = Turbo->IsActive() ? 1.0f : 0.0f;
-		TurboFovBlend = FMath::FInterpTo(TurboFovBlend, KickTarget, DeltaSeconds, TurboFovBlendSpeed);
-		if (bShotView)
-		{
-			Camera->SetFieldOfView(ShotFovDegrees); // vista de foto: o FOV do modo de jogo (95) deixava o carro pequeno no quadro
-		}
-		else if (CameraModes.IsValidIndex(CameraIndex))
-		{
-			Camera->SetFieldOfView(CameraModes[CameraIndex].Config.Fov + TurboFovKickDegrees * TurboFovBlend);
-		}
+		const float RealDt = static_cast<float>(FApp::GetDeltaTime());
+		UpdateCrashCam(RealDt);
+		UpdateSpeedCamera(RealDt);
 	}
 
 	if (DentViewSecondsLeft > 0.0f)
@@ -691,6 +744,7 @@ void ADNVehicle::Brake(const FInputActionValue& Value)
 
 void ADNVehicle::Steering(const FInputActionValue& Value)
 {
+	SteerInputRaw = FMath::Clamp(Value.Get<float>(), -1.0f, 1.0f); // também é o controle do destroço na câmera de batida
 	Chaos()->SetSteeringInput(FMath::Clamp(Value.Get<float>() * AppliedSteeringGain, -1.0f, 1.0f));
 }
 
@@ -1027,22 +1081,29 @@ void ADNVehicle::OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 {
 	// peça de rua destrutível (lote 17c): ela decide se quebra e já devolve o carro com a velocidade de antes menos a perda. Peça
 	// já quebrada não conta de novo (vários contatos no mesmo passo). Abaixo do limiar ela é sólida e segue como batida comum.
+	const ADNBreakableProp* SolidProp = nullptr;
 	if (ADNBreakableProp* Prop = Cast<ADNBreakableProp>(OtherActor))
 	{
 		if (Prop->IsBroken() || Prop->HandleCarHit(*this, VelocityBeforeStepCmS, AngularBeforeStepDegS, Hit.ImpactPoint))
 		{
 			return;
 		}
+		SolidProp = Prop;
 	}
+
+	// Variação de velocidade medida no corpo: velocidade no início do quadro (antes do passo de física) menos a de agora.
+	const float DeltaV = FDNDentParams::DeltaVMsBetween(VelocityBeforeStepCmS, GetMesh()->GetPhysicsLinearVelocity());
+	// câmera de batida (lote 18): no contato, sem esperar a janela do dano fechar; vale também com o dano desligado. Peça de rua (mesmo
+	// a que ficou sólida, abaixo do limiar) nunca dispara (FDNImpactPolicy)
+	const EDNImpactSource Source = SolidProp ? EDNImpactSource::Prop : (Cast<ADNTrafficVehicle>(OtherActor) ? EDNImpactSource::Traffic : EDNImpactSource::World);
+	TryCrashCam(DeltaV, Source, Hit.ImpactPoint);
+
 	if (!BodyComp || !bRealHitDamage)
 	{
 		return;
 	}
 	const double Now = GetWorld()->GetTimeSeconds();
 	FlushImpacts(Now); // uma janela vencida sai antes de este contato abrir outra
-
-	// Variação de velocidade medida no corpo: velocidade no início do quadro (antes do passo de física) menos a de agora.
-	const float DeltaV = FDNDentParams::DeltaVMsBetween(VelocityBeforeStepCmS, GetMesh()->GetPhysicsLinearVelocity());
 	if (DeltaV <= 0.0f)
 	{
 		return;
@@ -1139,6 +1200,7 @@ void ADNVehicle::SetCameraMode(int32 Index)
 		CameraBoom->bInheritRoll = true;
 	}
 	Camera->SetFieldOfView(C.Fov);
+	DisplayedFovDeg = C.Fov; // troca de modo é corte: a velocidade e o turbo voltam a somar a partir da base nova
 }
 
 float ADNVehicle::SlipAngleDegNow() const
@@ -1157,4 +1219,202 @@ void ADNVehicle::SetShotCamera(float YawDegrees)
 	CameraBoom->TargetArmLength = 560.0f;
 	CameraBoom->SocketOffset.Z = 60.0f;
 	bShotView = true;
+}
+
+// =====================================================================================================================
+// Câmera de velocidade e de batida (lote 18, docs/regras-camera.md)
+// =====================================================================================================================
+
+void ADNVehicle::UpdateSpeedCamera(float RealDt)
+{
+	// o turbo abre o campo de visão (sensação de velocidade): o empurrão é grande (medido: +59 a +70% de velocidade em 3 s), mas só
+	// aparece na tela se a câmera ajudar; no playtest 1 o Felipe disse que "quase não dá diferença"
+	TurboFovBlend = FMath::FInterpTo(TurboFovBlend, Turbo->IsActive() ? 1.0f : 0.0f, RealDt, TurboFovBlendSpeed);
+	float Blur = 0.0f;
+	if (bShotView)
+	{
+		Camera->SetFieldOfView(ShotFovDegrees); // vista de foto: o FOV do modo de jogo (95) deixava o carro pequeno no quadro
+		Camera->SetRelativeRotation(FRotator::ZeroRotator);
+	}
+	else if (CameraModes.IsValidIndex(CameraIndex))
+	{
+		const FDNCameraConfig& C = CameraModes[CameraIndex].Config;
+		const float Speed = SpeedKmh();
+		DisplayedFovDeg = FDNSpeedFov::Step(CameraFx, DisplayedFovDeg, FDNSpeedFov::Target(CameraFx, C.Fov, Speed, C.SpeedFovScale, TurboFovBlend), RealDt);
+		Camera->SetFieldOfView(DisplayedFovDeg);
+		// tremor: giro pequeno da lente sobre o braço (o braço continua mirando o carro)
+		ShakeTimeS += RealDt;
+		const FVector2D Shake = FDNSpeedShake::Offset(CameraFx, Speed, C.ShakeScale, ShakeGlobalScale, ShakeTimeS);
+		Camera->SetRelativeRotation(FRotator(Shake.X, Shake.Y, 0.0f));
+		Blur = bEdgeBlurOn ? FDNEdgeBlur::Strength(CameraFx, Speed) : 0.0f;
+		if (EdgeBlurForce >= 0.0f)
+		{
+			Blur = EdgeBlurForce; // medição de custo: força fixa, mesmo parado
+		}
+	}
+	if (EdgeBlurMaterial && Blur != AppliedEdgeBlur)
+	{
+		EdgeBlurMaterial->SetScalarParameterValue(TEXT("Strength"), Blur);
+		Camera->PostProcessSettings.AddBlendable(EdgeBlurMaterial, Blur > 0.0f ? 1.0f : 0.0f); // peso 0: o passe nem roda
+	}
+	AppliedEdgeBlur = EdgeBlurMaterial ? Blur : 0.0f;
+}
+
+void ADNVehicle::TryCrashCam(float DeltaVMs, EDNImpactSource Source, const FVector& WorldPoint)
+{
+	if (!bCrashCamOn || bShotView || !IsLocallyControlled() || !FDNCrashCam::TryTrigger(CameraFx, CrashCam, DeltaVMs, Source))
+	{
+		return;
+	}
+	bOrbitPending = true;
+	WreckSteerUsedMs = 0.0f;
+	CrashCamClockS = 0.0f;
+	CrashStartLocation = GetActorLocation();
+	CrashImpactYawDeg = static_cast<float>((WorldPoint - CrashStartLocation).Rotation().Yaw);
+	CrashScreenRight = FRotationMatrix(LastViewRotation).GetScaledAxis(EAxis::Y).GetSafeNormal2D(); // ainda a câmera do modo (peso 0)
+	UE_LOG(LogDetonauto, Display, TEXT("DNCrashCam: dispara com %.1f m/s (%s) a %.0f km/h, batida a %.0f graus de guinada; t do jogo %.2f s"),
+		DeltaVMs, Source == EDNImpactSource::Traffic ? TEXT("tráfego") : TEXT("parede"), VelocityBeforeStepCmS.Size() * 0.036f, CrashImpactYawDeg,
+		GetWorld()->GetTimeSeconds());
+}
+
+void ADNVehicle::UpdateCrashCam(float RealDt)
+{
+	const EDNCrashCamPhase Before = CrashCam.Phase;
+	if (Before == EDNCrashCamPhase::Idle && AppliedTimeScale == 1.0f)
+	{
+		return;
+	}
+	FDNCrashCam::Step(CameraFx, CrashCam, RealDt);
+	CrashCamClockS += RealDt;
+	if (!bOrbitPending && CrashCam.Phase != EDNCrashCamPhase::Idle && CrashCam.Phase != EDNCrashCamPhase::Cooldown)
+	{
+		OrbitYawDeg = FRotator::NormalizeAxis(OrbitYawDeg + OrbitSign * CameraFx.CrashCamOrbitDegPerS * RealDt);
+	}
+
+	// controle do destroço: a entrada esquerda e direita empurra o carro para o lado da tela, como aceleração (sem depender da massa)
+	if (FDNCrashCam::SteerActive(CrashCam))
+	{
+		const FVector Delta = FDNWreckSteer::DeltaVelocity(CameraFx, true, SteerInputRaw, GetMesh()->GetPhysicsLinearVelocity(), CrashScreenRight, RealDt, WreckSteerUsedMs);
+		if (!Delta.IsNearlyZero())
+		{
+			GetMesh()->SetPhysicsLinearVelocity(Delta, true);
+		}
+	}
+	else if (FDNCrashCam::SteerActive(FDNCrashCamState{ Before, 0.0f }))
+	{
+		const float SideM = static_cast<float>(FVector::DotProduct(GetActorLocation() - CrashStartLocation, CrashScreenRight)) / 100.0f;
+		UE_LOG(LogDetonauto, Display, TEXT("DNCrashCam: controle do destroço usou %.2f de %.2f m/s; o carro andou %.2f m para a direita da tela (a da câmera do jogador na batida) desde o disparo"),
+			WreckSteerUsedMs, CameraFx.WreckSteerMaxDeltaVMs, SideM);
+	}
+
+	const float Scale = FDNCrashCam::TimeScale(CameraFx, CrashCam);
+	if (Scale != AppliedTimeScale)
+	{
+		UGameplayStatics::SetGlobalTimeDilation(this, Scale);
+		AppliedTimeScale = Scale;
+	}
+	if (CrashCam.Phase != Before)
+	{
+		UE_LOG(LogDetonauto, Display, TEXT("DNCrashCam: %s -> %s em %.2f s reais (escala de tempo %.2f, %.0f km/h)"),
+			CrashPhaseName(Before), CrashPhaseName(CrashCam.Phase), CrashCamClockS, AppliedTimeScale, SpeedKmh());
+	}
+}
+
+void ADNVehicle::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
+{
+	Super::CalcCamera(DeltaTime, OutResult); // a câmera do modo (componente Camera, com o campo de visão e o tremor)
+	const float Weight = FDNCrashCam::BlendWeight(CameraFx, CrashCam);
+	if (Weight > 0.0f)
+	{
+		// órbita em volta do CARRO (ele sai girando), não do ponto da batida
+		const FVector Aim = GetActorLocation() + FVector(0.0f, 0.0f, CrashCamAimUpCm);
+		const FVector FromAim = OutResult.Location - Aim;
+		const float ModeYaw = static_cast<float>(FromAim.Rotation().Yaw);
+		const FCollisionQueryParams Params(SCENE_QUERY_STAT(DNCrashCam), false, this);
+		const FCollisionShape Probe = FCollisionShape::MakeSphere(CameraFx.CrashCamProbeCm);
+		const float Radius = CameraFx.CrashCamOrbitRadiusM * 100.0f;
+		const FVector OrbitUp(0.0f, 0.0f, CameraFx.CrashCamOrbitHeightM * 100.0f - CrashCamAimUpCm);
+		if (bOrbitPending)
+		{
+			// a órbita começa CrashCamLeadDeg antes do lado da batida e gira para ele: mostra o amassado de três quartos. Dos dois lados,
+			// o que tem mais espaço livre até a esfera bater (encostado num prédio, o outro); empate: o mais perto da câmera do modo.
+			// Câmera já mais perto da batida que isso: começa onde ela está
+			bOrbitPending = false;
+			const float Lead = FMath::Clamp(CameraFx.CrashCamLeadDeg, 0.0f, 180.0f);
+			const float ToImpact = FMath::FindDeltaAngleDegrees(ModeYaw, CrashImpactYawDeg);
+			OrbitSign = ToImpact < 0.0f ? -1.0f : 1.0f;
+			OrbitYawDeg = ModeYaw;
+			if (FMath::Abs(ToImpact) > Lead)
+			{
+				auto Room = [&](float Sign)
+				{
+					const FVector End = Aim + FRotator(0.0f, CrashImpactYawDeg - Sign * Lead, 0.0f).Vector() * Radius + OrbitUp;
+					FHitResult SideHit;
+					return GetWorld()->SweepSingleByChannel(SideHit, Aim, End, FQuat::Identity, ECC_Camera, Probe, Params) && !SideHit.bStartPenetrating ? SideHit.Time : 1.0f;
+				};
+				const float Near = Room(OrbitSign);
+				const float Far = Room(-OrbitSign);
+				if (Far > Near + 0.05f)
+				{
+					OrbitSign = -OrbitSign;
+				}
+				OrbitYawDeg = FRotator::NormalizeAxis(CrashImpactYawDeg - OrbitSign * Lead);
+				UE_LOG(LogDetonauto, Display, TEXT("DNCrashCam: órbita começa em %.0f graus (espaço livre: %.0f%% de um lado, %.0f%% do outro)"),
+					OrbitYawDeg, Near * 100.0f, Far * 100.0f);
+			}
+		}
+		// mistura em coordenadas polares em volta do carro (ângulo, distância e altura): sem corte e a câmera faz um arco, nunca atravessa
+		// o carro como faria uma reta entre a câmera do modo e a órbita
+		const float Yaw = ModeYaw + FMath::FindDeltaAngleDegrees(ModeYaw, OrbitYawDeg) * Weight;
+		const float Distance = FMath::Lerp(static_cast<float>(FromAim.Size2D()), Radius, Weight);
+		const float Up = FMath::Lerp(static_cast<float>(FromAim.Z), static_cast<float>(OrbitUp.Z), Weight);
+		const FVector Wanted = Aim + FRotator(0.0f, Yaw, 0.0f).Vector() * Distance + FVector(0.0f, 0.0f, Up);
+		// parede: esfera do carro até a posição; se bater, a câmera fica antes do contato (nunca dentro de prédio, poste ou destroço).
+		// Entra na hora, mas volta devagar (CrashCamProbeRecoverPerS do caminho por segundo real): passar por trás de um poste não dá
+		// tranco na saída
+		float Fraction = 1.0f;
+		FHitResult Hit;
+		if (GetWorld()->SweepSingleByChannel(Hit, Aim, Wanted, FQuat::Identity, ECC_Camera, Probe, Params) && !Hit.bStartPenetrating)
+		{
+			Fraction = Hit.Time;
+			if (ProbeLogs < 6)
+			{
+				++ProbeLogs;
+				UE_LOG(LogDetonauto, Display, TEXT("DNCrashCam: a esfera parou em '%s' (%s) a %.0f%% do caminho, %.2f s reais"),
+					*GetNameSafe(Hit.GetActor()), *GetNameSafe(Hit.GetComponent()), Hit.Time * 100.0f, CrashCamClockS);
+			}
+		}
+		ProbeFraction = FMath::Min(Fraction, ProbeFraction + CrashCamProbeRecoverPerS * static_cast<float>(FApp::GetDeltaTime()));
+		const FVector Location = FMath::Lerp(Aim, Wanted, ProbeFraction);
+		OutResult.Rotation = FQuat::Slerp(OutResult.Rotation.Quaternion(), (Aim - Location).ToOrientationQuat(), Weight).Rotator();
+		OutResult.Location = Location;
+	}
+	else
+	{
+		ProbeFraction = 1.0f;
+		ProbeLogs = 0;
+	}
+	LastViewRotation = OutResult.Rotation;
+}
+
+void ADNVehicle::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (AppliedTimeScale != 1.0f)
+	{
+		UGameplayStatics::SetGlobalTimeDilation(this, 1.0f); // não deixa o mundo em câmera lenta sem o carro
+		AppliedTimeScale = 1.0f;
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void ADNVehicle::DNEdgeBlur(int32 bOn)
+{
+	bEdgeBlurOn = bOn != 0;
+	UE_LOG(LogDetonauto, Display, TEXT("DNEdgeBlur: desfoque nas bordas %s"), bEdgeBlurOn ? TEXT("ligado") : TEXT("desligado"));
+}
+
+void ADNVehicle::DNShake(int32 bOn)
+{
+	ShakeGlobalScale = bOn != 0 ? 1.0f : 0.0f;
+	UE_LOG(LogDetonauto, Display, TEXT("DNShake: tremor de velocidade %s"), bOn != 0 ? TEXT("ligado") : TEXT("desligado"));
 }
