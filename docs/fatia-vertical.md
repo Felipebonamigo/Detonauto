@@ -14,7 +14,8 @@ continua sendo a fonte, ou o passo a passo fica registrado no documento do lote.
 
 ## Lote 18: sensação de velocidade e câmera de batida
 
-O que mais vende um jogo de batida é a câmera.
+O que mais vende um jogo de batida é a câmera. Contrato com os números e os
+testes: `docs/regras-camera.md`.
 
 - **Velocidade:** campo de visão que abre com a velocidade (curva em
   `Cameras.csv`), tremor leve acima de ~150 km/h, desfoque de movimento só da
