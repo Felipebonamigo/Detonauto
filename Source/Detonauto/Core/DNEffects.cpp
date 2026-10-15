@@ -120,3 +120,77 @@ int32 FDNEffects::FitBudget(int32 Requested, int32 Active, int32 Max)
 	// E8: o que cabe até o teto
 	return FMath::Clamp(Max - Active, 0, FMath::Max(0, Requested));
 }
+
+float FDNEffects::SmokeScale(float RequestedSprites, int32 MaxSprites)
+{
+	// E11: todas as taxas caem na mesma proporção até caber
+	if (MaxSprites <= 0)
+	{
+		return 0.0f;
+	}
+	if (!FMath::IsFinite(RequestedSprites) || RequestedSprites <= static_cast<float>(MaxSprites))
+	{
+		return 1.0f;
+	}
+	return static_cast<float>(MaxSprites) / RequestedSprites;
+}
+
+int32 FDNEffectPool::Acquire(int32 Max, double Now, double LifeS, bool& bRecycled)
+{
+	// E9: vaga livre (o fim já passou) ou, cheio, a que termina primeiro
+	const int32 Slots = FMath::Max(1, Max);
+	const double End = Now + (FMath::IsFinite(LifeS) && LifeS > 0.0 ? LifeS : 0.0);
+	bRecycled = false;
+	for (int32 i = 0; i < Ends.Num() && i < Slots; ++i)
+	{
+		if (Ends[i] <= Now)
+		{
+			Ends[i] = End;
+			return i;
+		}
+	}
+	if (Ends.Num() < Slots)
+	{
+		return Ends.Add(End);
+	}
+	int32 First = 0;
+	for (int32 i = 1; i < Slots; ++i)
+	{
+		First = Ends[i] < Ends[First] ? i : First;
+	}
+	Ends[First] = End;
+	bRecycled = true;
+	return First;
+}
+
+int32 FDNEffectPool::ActiveCount(double Now) const
+{
+	int32 Count = 0;
+	for (const double End : Ends)
+	{
+		Count += End > Now ? 1 : 0;
+	}
+	return Count;
+}
+
+int32 FDNParticleBudget::Request(int32 Count, int32 Max, double Now, double LifeS)
+{
+	// E10: o que cabe, contado até o fim da vida do disparo
+	Live.RemoveAll([Now](const TPair<double, int32>& L) { return L.Key <= Now; });
+	const int32 Granted = FDNEffects::FitBudget(Count, Active(Now), Max);
+	if (Granted > 0)
+	{
+		Live.Add(TPair<double, int32>(Now + (FMath::IsFinite(LifeS) && LifeS > 0.0 ? LifeS : 0.0), Granted));
+	}
+	return Granted;
+}
+
+int32 FDNParticleBudget::Active(double Now) const
+{
+	int32 Count = 0;
+	for (const TPair<double, int32>& L : Live)
+	{
+		Count += L.Key > Now ? L.Value : 0;
+	}
+	return Count;
+}

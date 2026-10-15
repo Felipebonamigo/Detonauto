@@ -16,7 +16,13 @@
 //  E6 fumaça de pneu: taxa = deslizamento / 25 graus (até 1) a partir de 8 graus; roda patinando garante 0,6; abaixo de 20 km/h, nada;
 //  E7 fumaça do motor: intensidade de 0 (dano 0,6) a 1 (dano 0,8) e fica 1 (escura) daí em diante. Fogo em 0,9, ou com o carro
 //     destruído e a frente em 0,7 ou mais;
-//  E8 orçamento: um disparo pede N partículas; recebe o que cabe até o teto (FitBudget); nunca negativo.
+//  E8 orçamento: um disparo pede N partículas; recebe o que cabe até o teto (FitBudget); nunca negativo;
+//  E9 pool por efeito (FDNEffectPool): uma vaga livre ou, cheio, a que termina primeiro; o efeito novo sempre aparece. PoolMax < 1
+//     vale 1;
+//  E10 partículas vivas por grupo (FDNParticleBudget): cada disparo conta até o fim da vida dele (LifeMaxS);
+//  E11 fumaça contínua (pneu e motor): sprites estimados = soma de taxa x vida; acima do teto, todas as taxas caem na mesma proporção;
+//  E12 nos efeitos contínuos (TireSmoke, EngineSmoke, EngineFire) CountMax é a taxa em sprites por segundo com a taxa normalizada em 1
+//      (o Niagara recebe os dois: Rate de 0 a 1 e SpawnPerS); sprites estimados de um emissor = Rate x CountMax x LifeMaxS.
 
 #pragma once
 
@@ -45,9 +51,9 @@ enum class EDNEffect : uint8
  *  | SparkScrape  | velocidade mín [m/s]| -                    | -           | - .. taxa máxima [1/s]   | (1/s) por m/s        | -                  |
  *  | GlassShards  | -                   | -                    | -           | cubos                    | cubos por m² de vidro| brilhos            |
  *  | PlasticChips | Δv mínimo [m/s]     | Δv do máximo [m/s]   | -           | pedaços                  | -                    | -                  |
- *  | TireSmoke    | deslizamento [graus]| deslizamento da taxa 1| velocidade | -                        | -                    | taxa da roda patinando |
- *  | EngineSmoke  | dano da clara       | dano da escura       | -           | -                        | -                    | -                  |
- *  | EngineFire   | dano do fogo        | -                    | -           | -                        | -                    | dano com o carro destruído |
+ *  | TireSmoke    | deslizamento [graus]| deslizamento da taxa 1| velocidade | - .. sprites/s na taxa 1 | -                    | taxa da roda patinando |
+ *  | EngineSmoke  | dano da clara       | dano da escura       | -           | - .. sprites/s na taxa 1 | -                    | -                  |
+ *  | EngineFire   | dano do fogo        | -                    | -           | - .. sprites/s           | -                    | dano com o carro destruído |
  *  | PropDust/Leaves | -                | -                    | -           | partículas               | -                    | -                  |
  *
  * Vida, velocidade e o teto de sistemas ativos (PoolMax) vão para o Niagara e para o pool do motor.
@@ -121,4 +127,34 @@ struct FDNEffects
 
 	/** E8: quantas das Requested partículas cabem no teto, com Active já em uso. */
 	static int32 FitBudget(int32 Requested, int32 Active, int32 Max);
+
+	/** E11: fator de 0 a 1 para as taxas de fumaça caberem no teto. Pedido <= 0 ou não finito: 1. */
+	static float SmokeScale(float RequestedSprites, int32 MaxSprites);
+};
+
+/** E9: os sistemas de um efeito ativos ao mesmo tempo, no máximo PoolMax. Os tempos são do jogo [s]. */
+struct FDNEffectPool
+{
+	/** Ocupa uma vaga até Now + LifeS e devolve o índice dela; bRecycled diz se tomou uma ainda ativa (a que terminaria primeiro). */
+	int32 Acquire(int32 Max, double Now, double LifeS, bool& bRecycled);
+	/** Vagas ainda ativas em Now. */
+	int32 ActiveCount(double Now) const;
+	void Reset() { Ends.Reset(); }
+
+private:
+	TArray<double> Ends;
+};
+
+/** E10: as partículas vivas de um grupo (faísca, cacos, lascas e mobiliário na GPU) contra o teto. */
+struct FDNParticleBudget
+{
+	/** Concede o que cabe de Count (FitBudget), guarda até Now + LifeS e devolve quantas. */
+	int32 Request(int32 Count, int32 Max, double Now, double LifeS);
+	/** Partículas ainda vivas em Now. */
+	int32 Active(double Now) const;
+	void Reset() { Live.Reset(); }
+
+private:
+	/** (fim, quantidade) de cada disparo. */
+	TArray<TPair<double, int32>> Live;
 };

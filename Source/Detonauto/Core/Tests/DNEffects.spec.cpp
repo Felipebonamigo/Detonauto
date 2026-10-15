@@ -198,6 +198,71 @@ void FDNEffectsSpec::Define()
 			TestEqual("pedido negativo", FDNEffects::FitBudget(-5, 0, 2000), 0);
 		});
 	});
+
+	Describe("Pool por efeito (E9)", [this]()
+	{
+		It("vagas livres primeiro; cheio, toma a que termina primeiro", [this]()
+		{
+			FDNEffectPool Pool;
+			bool bRecycled = true;
+			TestEqual("1a: vaga 0", Pool.Acquire(2, 0.0, 1.0, bRecycled), 0);
+			TestFalse("1a: livre", bRecycled);
+			TestEqual("2a (termina em 0,8): vaga 1", Pool.Acquire(2, 0.3, 0.5, bRecycled), 1);
+			TestFalse("2a: livre", bRecycled);
+			TestEqual("duas ativas", Pool.ActiveCount(0.4), 2);
+			TestEqual("3a, cheio: a vaga 1 termina primeiro (0,8 < 1,0)", Pool.Acquire(2, 0.4, 1.0, bRecycled), 1);
+			TestTrue("3a: reaproveitou", bRecycled);
+			TestEqual("em 1,2 so a vaga 1 segue (ate 1,4)", Pool.ActiveCount(1.2), 1);
+			TestEqual("4a em 1,2: a vaga 0 ja terminou", Pool.Acquire(2, 1.2, 1.0, bRecycled), 0);
+			TestFalse("4a: livre", bRecycled);
+			TestEqual("5a em 1,4, o fim exato da vaga 1: livre (inclusivo)", Pool.Acquire(2, 1.4, 1.0, bRecycled), 1);
+			TestFalse("5a: nao reaproveitou", bRecycled);
+		});
+
+		It("teto menor que 1 vale 1; vida nao finita ou negativa vale 0; Reset libera tudo", [this]()
+		{
+			FDNEffectPool Pool;
+			bool bRecycled = false;
+			TestEqual("teto 0: vaga 0", Pool.Acquire(0, 0.0, 1.0, bRecycled), 0);
+			TestEqual("teto 0 de novo: a mesma vaga", Pool.Acquire(0, 0.1, 1.0, bRecycled), 0);
+			TestTrue("reaproveitou", bRecycled);
+			FDNEffectPool Other;
+			Other.Acquire(4, 0.0, std::numeric_limits<double>::quiet_NaN(), bRecycled);
+			TestEqual("vida NaN: termina na hora", Other.ActiveCount(0.0), 0);
+			Pool.Reset();
+			TestEqual("Reset", Pool.ActiveCount(0.1), 0);
+		});
+	});
+
+	Describe("Particulas vivas (E10)", [this]()
+	{
+		It("concede ate o teto e libera no fim da vida", [this]()
+		{
+			FDNParticleBudget Budget;
+			TestEqual("120 de 2000", Budget.Request(120, 2000, 0.0, 0.8), 120);
+			TestEqual("1950 com 120 vivas: 1880", Budget.Request(1950, 2000, 0.1, 1.5), 1880);
+			TestEqual("cheio", Budget.Request(50, 2000, 0.2, 1.0), 0);
+			TestEqual("vivas em 0,5", Budget.Active(0.5), 2000);
+			TestEqual("em 1,0 as primeiras 120 acabaram", Budget.Active(1.0), 1880);
+			TestEqual("cabe de novo", Budget.Request(50, 2000, 1.0, 1.0), 50);
+			TestEqual("pedido negativo", Budget.Request(-3, 2000, 1.0, 1.0), 0);
+			Budget.Reset();
+			TestEqual("Reset", Budget.Active(1.0), 0);
+		});
+	});
+
+	Describe("Fumaca continua (E11)", [this]()
+	{
+		It("abaixo do teto 1; acima, cai na proporcao; pedido invalido 1", [this]()
+		{
+			TestEqual("200 de 400", FDNEffects::SmokeScale(200.f, 400), 1.f);
+			TestEqual("400 de 400", FDNEffects::SmokeScale(400.f, 400), 1.f);
+			TestEqual("800 de 400", FDNEffects::SmokeScale(800.f, 400), 0.5f);
+			TestEqual("nada pedido", FDNEffects::SmokeScale(0.f, 400), 1.f);
+			TestEqual("NaN", FDNEffects::SmokeScale(NaNf, 400), 1.f);
+			TestEqual("teto 0: nada", FDNEffects::SmokeScale(100.f, 0), 0.f);
+		});
+	});
 }
 
 #endif

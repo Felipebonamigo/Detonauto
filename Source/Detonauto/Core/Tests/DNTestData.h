@@ -272,9 +272,9 @@ namespace DNTest
 			Entry<FDNEffectEntry>(EffectRow(TEXT("SparkScrape"), 3.f, 0.f, 0.f, 0, 300, 15.f, 0.f, 0.2f, 0.5f, 2.f, 8.f, 8), TEXT("faisca-raspao")),
 			Entry<FDNEffectEntry>(EffectRow(TEXT("GlassShards"), 0.f, 0.f, 0.f, 60, 150, 250.f, 20.f, 1.5f, 1.5f, 1.f, 4.f, 4), TEXT("cacos-vidro")),
 			Entry<FDNEffectEntry>(EffectRow(TEXT("PlasticChips"), 12.f, 30.f, 0.f, 10, 30, 0.f, 0.f, 1.f, 2.f, 3.f, 9.f, 4), TEXT("lascas-plastico")),
-			Entry<FDNEffectEntry>(EffectRow(TEXT("TireSmoke"), 8.f, 25.f, 20.f, 0, 0, 0.f, 0.6f, 2.f, 4.f, 0.5f, 1.5f, 4), TEXT("fumaca-pneu")),
-			Entry<FDNEffectEntry>(EffectRow(TEXT("EngineSmoke"), 0.6f, 0.8f, 0.f, 0, 0, 0.f, 0.f, 3.f, 5.f, 0.5f, 1.5f, 6), TEXT("fumaca-motor")),
-			Entry<FDNEffectEntry>(EffectRow(TEXT("EngineFire"), 0.9f, 0.f, 0.f, 0, 0, 0.f, 0.7f, 0.4f, 0.8f, 1.f, 3.f, 6), TEXT("fogo")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("TireSmoke"), 8.f, 25.f, 20.f, 0, 30, 0.f, 0.6f, 2.f, 4.f, 0.5f, 1.5f, 4), TEXT("fumaca-pneu")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("EngineSmoke"), 0.6f, 0.8f, 0.f, 0, 20, 0.f, 0.f, 3.f, 5.f, 0.5f, 1.5f, 6), TEXT("fumaca-motor")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("EngineFire"), 0.9f, 0.f, 0.f, 0, 30, 0.f, 0.7f, 0.4f, 0.8f, 1.f, 3.f, 6), TEXT("fogo")),
 			Entry<FDNEffectEntry>(EffectRow(TEXT("PropDust"), 0.f, 0.f, 0.f, 20, 40, 0.f, 0.f, 1.f, 2.f, 0.5f, 2.f, 4, TEXT("poste;arvore")), TEXT("po-mobiliario")),
 			Entry<FDNEffectEntry>(EffectRow(TEXT("PropLeaves"), 0.f, 0.f, 0.f, 30, 40, 0.f, 0.f, 3.f, 5.f, 0.5f, 2.f, 4, TEXT("arvore")), TEXT("folhas")) };
 	}
