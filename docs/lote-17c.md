@@ -106,8 +106,15 @@ No `vehicle-probe.ps1 -Map /Game/Detonauto/Maps/L_Lookdev -Keys ... -ExtraArgs .
    0,3 s. Sem o passo fixo, o tempo de jogo andava 0,3 s e a física só o passo máximo, então os quadros de "+0,15 s" até "+1,2 s"
    saíam quase iguais. `-DNPropShotDelays=0.12,0.25,0.4` escolhe os instantes.
 
-Visto nas capturas, para a nuvem decidir: o poste caindo atravessa o capô por um instante, porque o destroço não segura mais o
-carro. O varrer empurra o centro de massa, mas o poste gira por cima do carro.
+6. **Poste atravessando o capô (decisão da nuvem):** o varrer também dá ao destroço um giro que leva o topo para a frente (B9,
+   `PlowSpin`, teto de 8 rad/s). Antes e depois, mesmas câmeras e instantes:
+   [`poste-giro-de-frente.jpg`](img/mobiliario-17c/poste-giro-de-frente.jpg) e
+   [`poste-giro-de-lado.jpg`](img/mobiliario-17c/poste-giro-de-lado.jpg). O poste tomba para a frente, longe do carro; não foi
+   preciso mudar o `LaunchFactor`. A `poste-caindo.jpg` agora é o quadro de +0,12 s com o giro.
+7. **Folhas creme:** não era regressão de asset (material e textura iguais aos do 16b, que só mostrava a folhagem na sombra). A
+   textura do Poly Haven tem albedo linear (0,18; 0,21; 0,05), amarelado e claro. O material-pai dos modelos ganhou um tom
+   (`Tint`), e a folha vai a (0,044; 0,096; 0,024), luminância 0,08, sem reimportar a malha:
+   [`folha-16b-antes-depois.jpg`](img/mobiliario-17c/folha-16b-antes-depois.jpg) e [`folha-tons.jpg`](img/mobiliario-17c/folha-tons.jpg).
 
 ## Ficou para depois
 

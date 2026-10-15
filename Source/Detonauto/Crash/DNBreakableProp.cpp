@@ -164,8 +164,11 @@ void ADNBreakableProp::Plow(const FVector& CarVelocityCmS)
 	}
 	const bool bWasSimulating = IsSimulating();
 	const FVector Before = bWasSimulating ? Body->GetPhysicsLinearVelocity() : FVector::ZeroVector;
+	const FVector SpinBefore = bWasSimulating ? Body->GetPhysicsAngularVelocityInRadians() : FVector::ZeroVector;
 	const FVector After = FDNBreakable::Plow(Settings, CarVelocityCmS, Before);
-	if (After.Equals(Before, 1.0))
+	// o giro leva o topo para a frente: sem ele, o poste que caía por cima do carro atravessava o capô
+	const FVector SpinAfter = FDNBreakable::PlowSpin(Settings, CarVelocityCmS, SpinBefore);
+	if (After.Equals(Before, 1.0) && SpinAfter.Equals(SpinBefore, 0.01))
 	{
 		return;
 	}
@@ -182,6 +185,7 @@ void ADNBreakableProp::Plow(const FVector& CarVelocityCmS)
 	}
 	Body->SetUseCCD(After.Size() / 100.0 >= CcdSpeedMs);
 	Body->SetPhysicsLinearVelocity(After);
+	Body->SetPhysicsAngularVelocityInRadians(SpinAfter);
 }
 
 FDNFreezeCandidate ADNBreakableProp::FreezeCandidate() const

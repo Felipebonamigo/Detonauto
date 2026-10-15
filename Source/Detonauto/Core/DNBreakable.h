@@ -93,6 +93,13 @@ struct FDNBreakable
 	static FVector Plow(const FDNBreakableSettings& Settings, const FVector& CarVelocityCmS, const FVector& DebrisVelocityCmS);
 
 	/**
+	 *  B9, o giro (revisão do 17c: o poste caindo por cima atravessava o capô): o destroço varrido gira em volta do eixo horizontal
+	 *  perpendicular ao carro (cima x direção do carro), no sentido que leva o topo para a frente, a pelo menos
+	 *  |v_h| x PlowFactor / ToppleArmM, no máximo MaxToppleRadS. O resto do giro fica. Carro abaixo de 1 m/s ou inválido: não muda.
+	 */
+	static FVector PlowSpin(const FDNBreakableSettings& Settings, const FVector& CarVelocityCmS, const FVector& DebrisAngularRadS);
+
+	/**
 	 *  B10: qual peça congelar quando o orçamento de peças simulando estoura (índice na lista, da mais antiga para a mais nova). A mais
 	 *  LENTA, e nunca uma no ar se houver outra no chão; empate fica com a mais antiga; velocidade inválida conta como a mais rápida.
 	 *  Lista vazia: INDEX_NONE.

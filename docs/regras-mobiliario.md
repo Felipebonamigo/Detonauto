@@ -59,7 +59,11 @@ a que sobra depois que a física já freou), massa do carro (do preset em
    1,1). O lado fica, e ele sobe a pelo menos `PlowUpMs`, tudo limitado a
    `MaxLaunchMs`. **O carro não muda.** Abaixo de 1 m/s o carro não varre. O
    destroço que já dormiu acorda e volta ao orçamento de peças simulando. Sem
-   isso, o banco caído atravessava o capô quando o carro o alcançava.
+   isso, o banco caído atravessava o capô quando o carro o alcançava. **O
+   destroço varrido também gira** (revisão do 17c), em volta do eixo horizontal
+   perpendicular ao carro e no sentido que leva o topo para a frente, a pelo
+   menos `|v_h| · PlowFactor / 2 m`, no máximo 8 rad/s; o resto do giro fica.
+   Sem isso, o poste que caía por cima do carro atravessava o capô.
 
 Exemplos com o carro de 1.500 kg, `k = 1` e batida de frente:
 

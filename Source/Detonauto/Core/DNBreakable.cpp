@@ -115,6 +115,21 @@ int32 FDNBreakable::PickToFreeze(TConstArrayView<FDNFreezeCandidate> Candidates)
 	return Best;
 }
 
+FVector FDNBreakable::PlowSpin(const FDNBreakableSettings& Settings, const FVector& CarVelocityCmS, const FVector& DebrisAngularRadS)
+{
+	const FVector Spin = (DebrisAngularRadS.ContainsNaN() || !FMath::IsFinite(DebrisAngularRadS.SizeSquared())) ? FVector::ZeroVector : DebrisAngularRadS;
+	const FVector Car = Flat(CarVelocityCmS);
+	if (Car.ContainsNaN() || !FMath::IsFinite(Car.SizeSquared()) || Car.Size() < 100.0)
+	{
+		return Spin; // carro parado (abaixo de 1 m/s) ou inválido não varre
+	}
+	const float Factor = (FMath::IsFinite(Settings.PlowFactor) && Settings.PlowFactor >= 1.0f) ? Settings.PlowFactor : FDNBreakableSettings().PlowFactor;
+	const FVector Axis = FVector::CrossProduct(FVector::UpVector, Car.GetSafeNormal()); // girar em volta dele leva o topo para a frente
+	const double Target = FMath::Min(Car.Size() / 100.0 * Factor / ToppleArmM, static_cast<double>(MaxToppleRadS));
+	const double Along = FVector::DotProduct(Spin, Axis);
+	return Along >= Target ? Spin : Spin + Axis * (Target - Along); // só o giro em volta do eixo muda; o resto fica
+}
+
 bool FDNBreakable::StepSleep(const FDNBreakableSettings& Settings, float SpeedMs, float DeltaSeconds, float& InOutStillSeconds)
 {
 	if (!FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f)

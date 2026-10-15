@@ -225,6 +225,23 @@ void FDNBreakableSpec::Define()
 		TestEqual("pulo NaN vale o padrao", WithBad.Z, 150.0, 0.01);
 	});
 
+	It("B9: o destroco varrido gira levando o topo para a frente, no teto do tombo; o resto do giro fica", [this]()
+	{
+		// cima (Z) x frente (X) = +Y: girar em torno de +Y leva o topo para a frente
+		const FVector Car20(20.f / 0.036f, 0.f, 0.f); // 5,56 m/s x 1,1 / 2 m = 3,06 rad/s
+		const float Target = 20.f / 3.6f * 1.1f / 2.f;
+		TestEqual("parado: ganha o giro", FDNBreakable::PlowSpin(Settings, Car20, FVector::ZeroVector), FVector(0.f, Target, 0.f), 1e-3f);
+		TestEqual("girando ao contrario: vai ao alvo", FDNBreakable::PlowSpin(Settings, Car20, FVector(0.f, -3.f, 0.f)), FVector(0.f, Target, 0.f), 1e-3f);
+		TestEqual("o resto do giro fica", FDNBreakable::PlowSpin(Settings, Car20, FVector(1.f, 0.f, 2.f)), FVector(1.f, Target, 2.f), 1e-3f);
+		TestEqual("ja girando mais rapido para a frente: nao muda", FDNBreakable::PlowSpin(Settings, Car20, FVector(0.f, 6.f, 0.f)), FVector(0.f, 6.f, 0.f), 1e-3f);
+		TestEqual("a 60 km/h, no teto de 8 rad/s", FDNBreakable::PlowSpin(Settings, FVector(60.f / 0.036f, 0.f, 0.f), FVector::ZeroVector).Y, 8.0, 1e-3);
+		const FVector Side = FDNBreakable::PlowSpin(Settings, FVector(0.f, 20.f / 0.036f, 0.f), FVector::ZeroVector);
+		TestEqual("carro para +Y: eixo cima x Y = -X", Side, FVector(-Target, 0.f, 0.f), 1e-3f);
+		TestEqual("carro a 0,9 m/s: nao muda", FDNBreakable::PlowSpin(Settings, FVector(90.f, 0.f, 0.f), FVector(0.f, -3.f, 0.f)), FVector(0.f, -3.f, 0.f));
+		TestEqual("carro NaN: nao muda", FDNBreakable::PlowSpin(Settings, FVector(NaNf, 0.f, 0.f), FVector(0.f, -3.f, 0.f)), FVector(0.f, -3.f, 0.f));
+		TestFalse("giro NaN vale parado", FDNBreakable::PlowSpin(Settings, Car20, FVector(NaNf, 0.f, 0.f)).ContainsNaN());
+	});
+
 	It("B10: o orcamento congela a peca mais lenta, nunca uma no ar se houver outra no chao", [this]()
 	{
 		auto C = [](float SpeedMs, bool bGrounded) { FDNFreezeCandidate X; X.SpeedMs = SpeedMs; X.bGrounded = bGrounded; return X; };
