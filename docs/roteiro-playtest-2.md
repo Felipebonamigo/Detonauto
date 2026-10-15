@@ -9,7 +9,8 @@ Responda em frases curtas; o que não conseguir testar, pule. Referências: Burn
 1. Feche o editor do Unreal **e os outros projetos Unreal** (TDFende, Age of
    Earth). Eles pesam no PC e mudam a sensação.
 2. No PowerShell, na pasta do projeto:
-   `.\Tools\Unreal\vehicle-probe.ps1 -Uproject Detonauto.uproject -Map /Game/Detonauto/Maps/L_Lookdev -AlvoPS5 -Play`
+   `.\Tools\Unreal\vehicle-probe.ps1 -Uproject Detonauto.uproject -Map /Game/Detonauto/Maps/L_Lookdev -AlvoPS5 -Play -ResX 1920 -ResY 1080 -ExtraArgs '-DNWallAheadM=600'`
+   (abre no preset arcade-3, com o mobiliário que quebra, as peças do carro e um muro a 600 m da largada)
 3. Se pedir para recompilar, aceite.
 
 **Teclas:**
@@ -22,10 +23,11 @@ Responda em frases curtas; o que não conseguir testar, pule. Referências: Burn
 | Shift | turbo |
 | C | troca a câmera |
 | 1 2 3 0 | presets de carro |
-| R | coloca o carro inteiro de novo na largada (a sessão local confirma) |
+| R | recomeça: o carro volta para a largada parado, sem amassado, com as peças, os vidros e o turbo repostos, e o mobiliário quebrado volta inteiro |
 
 A rua da cena de aparência tem postes, árvores, bancos, lixeiras e hidrantes que
-quebram, e um muro no fim.
+quebram, e um muro atravessado a 600 m da largada. Dá para chegar a 200 km/h
+antes dele; para bater a ~100 km/h, segure a velocidade.
 
 ## 1. Dirigir (4 min), no preset padrão (arcade-3)
 
