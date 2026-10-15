@@ -43,6 +43,7 @@ Valores globais em `Data/CameraFx.csv`, uma linha de configuração como em
 | `CrashCamOrbitHeightM` | 2,5 | altura da câmera |
 | `CrashCamOrbitDegPerS` | 25 | velocidade da órbita |
 | `CrashCamProbeCm` | 20 | raio da esfera que impede a câmera de entrar em parede |
+| `CrashCamLeadDeg` | 90 | a órbita começa tantos graus antes do lado da batida (entrou no fim do lote 18, aprovado por captura) |
 | `WreckSteerAccelMs2` | 6 | aceleração lateral do controle do destroço |
 | `WreckSteerMaxDeltaVMs` | 6 | quanto o controle pode mudar a velocidade, no total, por batida |
 
@@ -138,6 +139,14 @@ direita do jogador vira uma aceleração horizontal de até `WreckSteerAccelMs2`
   prédio, poste ou destroço.
 - **Fim:** volta para o modo de câmera do jogador, misturando em `CrashCamExitS`.
 - **Som:** o som com a escala de tempo é do lote 21; aqui só a imagem.
+- **Escolhas da implementação (lote 18, medidas em [`lote-18.md`](lote-18.md)):**
+  - dispara no contato, sem esperar a janela de 0,15 s do dano, e vale com o dano desligado;
+  - a órbita começa `CrashCamLeadDeg` antes do lado da batida, no lado com mais espaço livre até a esfera bater (empate: o mais perto
+    da câmera do modo). Começando onde a câmera do modo estava, numa batida de frente ela nunca mostrava o amassado;
+  - a mistura é em coordenadas polares em volta do carro (ângulo, distância, altura): a câmera faz um arco e nunca atravessa o carro;
+  - a esfera encurta o caminho na hora e devolve 1,5 do caminho por segundo real (sem tranco atrás de poste);
+  - o controle do destroço usa a direita da tela da câmera do jogador **no instante da batida**. A da órbita fica ao lado do carro e
+    corre ao longo da velocidade, e o lado da perpendicular ficava indefinido.
 
 ## Desfoque
 

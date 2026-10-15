@@ -4,7 +4,7 @@ Documento de passagem. Uma sessão nova do Claude (local ou na nuvem) lê este
 arquivo, o `CLAUDE.md` e o `docs/plano-visual.md` e consegue continuar sem o
 histórico das conversas. Atualizar a cada lote fechado.
 
-Última revisão: 14 out 2026.
+Última revisão: 15 out 2026.
 
 ## Como o trabalho está dividido
 
@@ -21,12 +21,12 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível) | `Source/Detonauto/Core/` | Testadas; 662 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível, câmera de velocidade e de batida) | `Source/Detonauto/Core/` | Testadas; 677 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros, mobiliário |
 | Subsistemas de dados e de save | `Core/DNGameDataSubsystem`, `Core/DNRecordsSubsystem` | Testados sem mundo |
-| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, HUD de depuração |
+| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, câmera de velocidade (FOV, tremor, desfoque nas bordas) e de batida (câmera lenta, órbita, controle do destroço), HUD de depuração |
 | Mobiliário destrutível | `Crash/ADNBreakableProp`, `Crash/UDNBreakableSubsystem` | Poste, árvore, banco, lixeira e hidrante da `L_Lookdev` caem quando o carro bate; o carro segue perdendo de 2% a 23% da velocidade; destroço nunca segura o carro e é varrido da frente (`docs/lote-17c.md`) |
 | Tráfego e rodada de Crash | `Traffic/`, `Vehicle/DNCrashTestGameMode` | Lote 13 parcial: código na main, medição ainda não rodou |
 | Mapa de teste | `ADNVehicleArena`, criado por código no `/Engine/Maps/Entry` | Feio de propósito; **não serve para julgar visual** |
@@ -51,6 +51,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 16b | Polimento visual: pintura, poste moderno, folhagem, vitrines | Na main, aguardando revisão (`docs/lookdev.md`, seção 16b) |
 | 17b | Desgaste da pintura por zona e vincos mais duros | Na main, aguardando revisão (`docs/lote-17b.md`): capturas dos níveis nos 4 ângulos com o sol por trás, batida real a 100 km/h na `L_Lookdev`, lado a lado com o 17, frente em 1,0 mais destruída (recuo em rampa e capô em tenda). Custo com 37,8 mil vértices pendente (PC ocupado por outras sessões) |
 | 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
+| 18 | Câmera de velocidade e de batida | Na main, aguardando revisão (`docs/lote-18.md`): FOV, tremor e desfoque nas bordas pela velocidade; câmera de batida com câmera lenta, órbita que mostra o amassado e não entra em prédio; controle do destroço medido (−1,24 m / +1,28 m). Passe do desfoque 0,038 ms. Pendentes: quadro inteiro com e sem desfoque com o PC livre, e o Felipe jogar |
 
 ## Primeiro playtest (14 out)
 
@@ -186,6 +187,17 @@ melhor e ele quer cinco modos.
 - O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
   o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
   poste) ele diz REPROVADO de propósito.
+- Câmera lenta (`SetGlobalTimeDilation`): o `DeltaSeconds` do tick e o `GetTimeSeconds`
+  andam no tempo do jogo. Câmera e capturas usam `FApp::GetDeltaTime()` (tempo real); o
+  roteiro `-DNKeys` continua no tempo do jogo e estica durante a câmera lenta.
+- Custo de um passe só: `EXEC:profilegpu` no roteiro grava o tempo de GPU de cada passe
+  no log (`PostProcessMaterial ... Material=M_...`). Com outra sessão usando a GPU, o
+  passe varia pouco e o quadro inteiro varia muito.
+- Material de pós-processamento com nó Custom: ligar um nó `SceneTexture`
+  (`PostProcessInput0`) numa entrada do Custom e amostrar com
+  `SceneTextureLookup(Parameters, UV, 14, true)` (a versão com `Parameters` desfaz a
+  pré-exposição, como o nó); UV por `ViewportUVToSceneTextureUV` e
+  `ClampSceneTextureUV` (`create_edge_blur_material.py`).
 
 ## Pendências do Felipe
 
@@ -203,12 +215,14 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 18: câmera de velocidade e de batida (`docs/regras-camera.md`).
-2. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
+1. Lote 18b: peças do carro que soltam e vidros (`docs/regras-pecas.md`), com o primer
+   das lascas a ~0,35 e mais metal nu no miolo.
+2. Com o PC livre: quadro inteiro do lote 18 com e sem desfoque, custo do 17b com 37,8
+   mil vértices e o lote 13 (`crash-measure.ps1`).
 3. Lotes 19 a 21 (`docs/fatia-vertical.md`): efeitos Niagara, primeiro
    cruzamento e som base. Antes do 20: árvore leve (20 MB ou menos) e texturas de
    modelo em 2k.
-5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
+4. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
 

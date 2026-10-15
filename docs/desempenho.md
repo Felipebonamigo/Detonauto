@@ -337,6 +337,22 @@ da fileira deu 16 de 16 nas duas execuções. Física: `Exclusive/GameThread/Phy
 soltas, o varrer e a quebra em si), e a física nos trabalhadores sobe 0,11 ms. As duas execuções de cada cenário ficaram a menos de
 0,04 ms uma da outra. Longe dos 8 ms de orçamento da linha do jogo.
 
+## Lote 18: desfoque nas bordas (15 out 2026)
+
+O passe do material `M_DNEdgeBlur` medido sozinho, por `profilegpu` (tempo de GPU de cada passe), com a força máxima do CSV (0,5)
+fixada parado (`-DNEdgeBlurForce=0.5`), perfil `DN_AlvoPS5`, 1920x1080, 12 amostras de 16 a 27 s:
+
+| Passe | Mediana | Pior das 12 |
+|---|---|---|
+| `PostProcessMaterial 1920x1080 Material=M_DNEdgeBlur` | 0,038 ms | 0,041 ms |
+
+**Leitura:** 12 amostras bilineares por pixel fora do raio interno; cabe com folga. Abaixo de 100 km/h o peso do material é 0 e o passe
+nem roda. O TDFende estava aberto: o quadro inteiro oscilou de 4,9 a 14,6 ms entre as amostras, mas o passe ficou entre 0,035 e
+0,041 ms (a disputa pela GPU só pode aumentar o tempo do passe, então o número é um teto). **Pendente:** quadro inteiro com e sem o
+desfoque (média e p95 pelo `lookdev-measure.ps1`, `-ExtraArgs '-DNEdgeBlurForce=0.5'` contra `'-DNNoEdgeBlur'`) com o PC livre. Das
+cinco tentativas de 15 out, quatro foram descartadas por outro Unreal aberto (as três com o desfoque entre elas); a que valeu, sem o
+desfoque, deu Frame 4,74 / 5,29 ms e GPU 4,45 / 4,94 ms (média / p95).
+
 ## Para o Felipe testar na Sprint 6
 
 1. Abra o carro do template, jogue com Alt+P e digite `stat unit`.
