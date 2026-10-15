@@ -139,7 +139,7 @@ void FDNDataBreakablesSpec::Define()
 			TestTrue(FString::Printf(TEXT("validacao: %s"), *JoinErrors(FDNDataValidation::ValidateBreakables(Rows))), FDNDataValidation::ValidateBreakables(Rows).IsEmpty());
 			const struct { const TCHAR* Id; float Mass; float MinKmh; float Launch; float Up; bool bTopples; float Height; int32 Points; } Contract[] = {
 				{ TEXT("poste"), 250.f, 20.f, 0.7f, 2.f, true, 10.f, 50 },
-				{ TEXT("arvore"), 400.f, 25.f, 0.5f, 1.f, true, 40.f, 50 },
+				{ TEXT("arvore"), 400.f, 25.f, 0.5f, 1.f, true, 15.f, 50 }, // 15 cm (revisão do 17c): abaixo da altura livre do carro
 				{ TEXT("banco"), 60.f, 8.f, 1.1f, 3.f, false, 0.f, 20 },
 				{ TEXT("lixeira"), 25.f, 5.f, 1.3f, 4.f, false, 0.f, 10 },
 				{ TEXT("hidrante"), 120.f, 10.f, 0.9f, 2.f, false, 0.f, 30 },

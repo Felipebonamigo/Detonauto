@@ -13,8 +13,14 @@ Uso:
     blender -b --python-exit-code 1 -P Tools/Blender/split_prop.py -- --input <modelo.fbx> --height-m 0.10 ^
         --below Sandbox/modelos_cc0/dn_street_light_base --above Sandbox/modelos_cc0/dn_street_light_top
 
---height-m é a altura do corte no espaço do modelo, em metros (para o jacarandá, que a cena põe com escala 0,6, 40 cm na cena
-são 0,667 m no modelo).
+--height-m é a altura do corte no espaço do modelo, em metros (para o jacarandá, que a cena põe com escala 0,6, 15 cm na cena
+são 0,25 m no modelo).
+
+--trunk-top-m (opcional, só a parte de cima): em vez da colisão automática (um convexo único do tamanho da árvore, que ao cair
+encostava nos prédios e travava no ar), grava collision.json ao lado do .fbx com duas cápsulas: uma no tronco (do corte até
+--trunk-top-m) e uma fina na copa, no mesmo eixo, com raio --canopy-radius-m (padrão 1,7 m no modelo, 1 m na cena). Caixa na
+copa não serve: deitada, a árvore ficava apoiada no canto dela, inclinada e com o pé no ar. O create_lookdev.py aplica as duas
+formas na malha importada. (Malhas UCX_ no FBX não servem: a importação da 5.8 gera convexos a mais.)
 """
 
 import os
@@ -32,6 +38,8 @@ def parse(argv):
     parser.add_argument("--height-m", type=float, required=True)
     parser.add_argument("--below", required=True, help="pasta da parte de baixo (dentro de Sandbox/)")
     parser.add_argument("--above", required=True, help="pasta da parte de cima (dentro de Sandbox/)")
+    parser.add_argument("--trunk-top-m", type=float, default=0.0, help="colisão tronco + copa na parte de cima (topo do tronco, m)")
+    parser.add_argument("--canopy-radius-m", type=float, default=1.7)
     parsed = parser.parse_args(args)
     for folder in (parsed.below, parsed.above):
         full = os.path.normcase(os.path.abspath(folder))
@@ -77,6 +85,33 @@ def cut(obj, height, keep_below):
     return len(obj.data.vertices), len(obj.data.polygons)
 
 
+def trunk_canopy_collision(obj, cut_m, trunk_top_m, canopy_radius):
+    """Tronco e copa (duas cápsulas no eixo do tronco), em metros no espaço do Blender. Devolve o dicionário e uma linha de relatório."""
+    import numpy as np
+    co = np.empty(len(obj.data.vertices) * 3, dtype=np.float64)
+    obj.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    band = co[(co[:, 2] >= cut_m) & (co[:, 2] <= cut_m + 0.6)]  # o tronco logo acima do corte
+    if len(band) < 8:
+        raise SystemExit("[split_prop] poucos vértices no tronco logo acima do corte; confira --height-m")
+    cx, cy = float(np.median(band[:, 0])), float(np.median(band[:, 1]))
+    radius = float(np.percentile(np.hypot(band[:, 0] - cx, band[:, 1] - cy), 75))
+    canopy = co[co[:, 2] > trunk_top_m]
+    if len(canopy) < 8:
+        raise SystemExit("[split_prop] nada acima de --trunk-top-m; confira o valor")
+    top = float(canopy[:, 2].max())
+    all_lo, all_hi = co.min(axis=0), co.max(axis=0)
+    data = {
+        "espaco": "Blender, metros (a Unreal inverte o Y)",
+        "tronco": {"centro": [cx, cy, (cut_m + trunk_top_m) / 2.0], "raio": radius, "altura": trunk_top_m - cut_m},
+        "copa": {"centro": [cx, cy, (trunk_top_m + top) / 2.0], "raio": canopy_radius, "altura": top - trunk_top_m},
+        "centro_da_malha": [float(v) for v in (all_lo + all_hi) / 2.0],
+    }
+    line = ("colisão: tronco raio %.2f m de %.2f a %.2f m em (%.2f, %.2f); copa raio %.2f m de %.2f a %.2f m"
+            % (radius, cut_m, trunk_top_m, cx, cy, canopy_radius, trunk_top_m, top))
+    return data, line
+
+
 def export(obj, folder, name):
     import bpy
     os.makedirs(folder, exist_ok=True)
@@ -102,6 +137,13 @@ def main(argv):
         before = len(obj.data.vertices)
         verts, faces = cut(obj, args.height_m, keep_below)
         name = os.path.basename(os.path.normpath(folder))
+        if not keep_below and args.trunk_top_m > args.height_m:
+            import json
+            data, line = trunk_canopy_collision(obj, args.height_m, args.trunk_top_m, args.canopy_radius_m)
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, "collision.json"), "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            report.append(line)
         path = export(obj, folder, name)
         report.append("%s: %s (%d de %d vértices, %d faces)" % ("de baixo" if keep_below else "de cima", path, verts, before, faces))
     for line in report:

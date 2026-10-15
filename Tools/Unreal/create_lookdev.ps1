@@ -14,6 +14,7 @@ param(
     [Parameter(Mandatory)][string]$Uproject,
     [string]$Textures,
     [string]$Models,           # modelos CC0 do mobiliário de rua (padrão: Sandbox\modelos_cc0; sem a pasta, a cena sai sem eles)
+    [string[]]$Reimport = @(), # ids do mobiliário para importar de novo por cima (ex.: jacaranda_tree_stump,jacaranda_tree_top)
     [string]$EngineVersion,
     [int]$TimeoutSeconds = 1200
 )
@@ -35,6 +36,7 @@ if (Test-Path -LiteralPath $report) { Remove-Item -LiteralPath $report -Force }
 if (-not $Models) { $Models = Join-Path $projDir 'Sandbox\modelos_cc0' }
 $pyArgs = "`"$($script.Replace('\', '/'))`" --textures `"$($Textures.Replace('\', '/'))`""
 if (Test-Path -LiteralPath $Models) { $pyArgs += " --models `"$($Models.Replace('\', '/'))`"" }
+if ($Reimport.Count -gt 0) { $pyArgs += " --reimport $($Reimport -join ',')" }
 
 # Python embutido não pode gravar .pyc na instalação da engine (também travado dentro do .py).
 $env:PYTHONDONTWRITEBYTECODE = '1'

@@ -98,6 +98,7 @@ def parse_args(argv):
     parser.add_argument("--textures", required=True)
     parser.add_argument("--models", default=None)
     parser.add_argument("--report", default=None)
+    parser.add_argument("--reimport", default="", help="ids do mobiliário para importar de novo por cima (separados por vírgula)")
     try:
         return parser.parse_args(argv)
     except SystemExit:
@@ -728,7 +729,38 @@ def import_prop_mesh(fbx, name):
     return mesh
 
 
-def import_props(models_root, report):
+def apply_simple_collision(mesh, json_path, report):
+    """collision.json do Tools/Blender/split_prop.py: duas cápsulas no eixo do tronco (tronco e copa) no lugar da colisão automática
+    (um convexo do tamanho da árvore, que ao cair encostava nos prédios e travava no ar). Formas analíticas: sem cozimento."""
+    import json
+    with open(json_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    def ue(p):  # Blender (metros) para Unreal (centímetros, Y invertido)
+        return unreal.Vector(p[0] * 100.0, -p[1] * 100.0, p[2] * 100.0)
+
+    unreal.EditorStaticMeshLibrary.remove_collisions(mesh)
+    body = mesh.get_editor_property("body_setup")
+    agg = body.get_editor_property("agg_geom")
+    capsules = []
+    for part in (data["tronco"], data["copa"]):
+        radius = part["raio"] * 100.0
+        capsule = unreal.KSphylElem()
+        capsule.set_editor_property("center", ue(part["centro"]))
+        capsule.set_editor_property("radius", radius)
+        capsule.set_editor_property("length", max(part["altura"] * 100.0 - 2.0 * radius, 0.0))  # o cilindro, sem as pontas
+        capsules.append(capsule)
+    agg.set_editor_property("convex_elems", [])
+    agg.set_editor_property("box_elems", [])
+    agg.set_editor_property("sphyl_elems", capsules)
+    body.set_editor_property("agg_geom", agg)
+    origin = mesh.get_bounds().origin
+    report.append("colisão de %s: cápsulas no tronco (raio %.0f cm) e na copa (raio %.0f cm); centro da malha %s, no Blender %s"
+                  % (mesh.get_name(), data["tronco"]["raio"] * 100.0, data["copa"]["raio"] * 100.0,
+                     "(%.0f, %.0f)" % (origin.x, origin.y), "(%.0f, %.0f)" % tuple(v * 100.0 for v in data["centro_da_malha"][:2])))
+
+
+def import_props(models_root, report, reimport=()):
     """Importa os modelos que estiverem em models_root/<id>/ e devolve {id: StaticMesh}. Sem a pasta: nenhum (a cena sai sem eles)."""
     if not models_root or not os.path.isdir(models_root):
         report.append("mobiliário de rua: pasta de modelos ausente, cena sem ele")
@@ -745,11 +777,15 @@ def import_props(models_root, report):
         if not fbx:
             report.append("mobiliário: %s não encontrado, ficou de fora" % ph_id)
             continue
-        if unreal.EditorAssetLibrary.does_asset_exist(PROP_DIR + "/SM_" + ph_id):
-            # já importado: reaproveita (a importação do jacarandá leva minutos); para reimportar, apague a pasta Props
+        if ph_id not in reimport and unreal.EditorAssetLibrary.does_asset_exist(PROP_DIR + "/SM_" + ph_id):
+            # já importado: reaproveita (a importação do jacarandá leva minutos); para importar de novo por cima, -Reimport <id>
             meshes[ph_id] = unreal.load_asset(PROP_DIR + "/SM_" + ph_id)
             report.append("mobiliário %s: reaproveitado" % ph_id)
             continue
+        if ph_id in reimport and unreal.EditorAssetLibrary.does_asset_exist(PROP_DIR + "/SM_" + ph_id):
+            # por cima, a importação SOMA a colisão nova (UCX_) à antiga e a engine reclama ao sobrescrever o convexo: tira antes
+            old = unreal.load_asset(PROP_DIR + "/SM_" + ph_id)
+            unreal.EditorStaticMeshLibrary.remove_collisions(old)  # o subsistema de malha estática não existe no commandlet
         mesh = import_prop_mesh(os.path.join(folder, fbx[0]), "SM_" + ph_id)
         instances = {}
         source = MATERIAL_SOURCE.get(ph_id, ph_id)  # parte cortada: as texturas e o casamento dos slots são os do modelo inteiro
@@ -769,6 +805,8 @@ def import_props(models_root, report):
             if best:
                 mesh.set_material(i, instances[best])
             chosen.append("%s->%s" % (slot, best))
+        if os.path.isfile(os.path.join(folder, "collision.json")):
+            apply_simple_collision(mesh, os.path.join(folder, "collision.json"), report)
         unreal.EditorAssetLibrary.save_asset(PROP_DIR + "/SM_" + ph_id)
         bounds = mesh.get_bounds()
         report.append("mobiliário %s: extensão %s cm, slots %s" % (ph_id, bounds.box_extent, ", ".join(chosen)))
@@ -877,7 +915,8 @@ def main():
         source = os.path.abspath(args.textures)
         textures = import_textures(source, report)
         mats = build_materials(textures, report)
-        props = import_props(os.path.abspath(args.models) if args.models else None, report)
+        props = import_props(os.path.abspath(args.models) if args.models else None, report,
+                             tuple(x.strip() for x in args.reimport.split(",") if x.strip()))
         build_map(mats, report, props)
     except LookdevError as exc:
         error = str(exc)
