@@ -77,6 +77,27 @@ TArray<FDNPartChange> FDNCarParts::Evaluate(TConstArrayView<FDNCarPartSpec> Spec
 	return Changes;
 }
 
+FVector2D FDNCarParts::LaunchHeading(const FVector2D& Out, const FVector2D& ImpactDir, float SideSign)
+{
+	// P5: para fora do carro pelo lado da peça (o destroço ignora o carro: empurrada para dentro, ela some na carroceria), sem a parte
+	// que entra no obstáculo. Peça no eixo da batida (sobra menos de MinOffAxis): de lado, para SideSign. Entrada não finita vale zero
+	constexpr double MinOffAxis = 0.1;
+	auto Finite = [](const FVector2D& V) { return FMath::IsFinite(V.X) && FMath::IsFinite(V.Y) ? V : FVector2D::ZeroVector; };
+	const FVector2D Into = Finite(ImpactDir).GetSafeNormal();
+	FVector2D Heading = Finite(Out).GetSafeNormal();
+	const double Toward = FVector2D::DotProduct(Heading, Into);
+	if (Toward > 0.0)
+	{
+		Heading -= Into * Toward;
+	}
+	if (Heading.Size() >= MinOffAxis)
+	{
+		return Heading.GetSafeNormal();
+	}
+	const FVector2D Across = Into.IsNearlyZero() ? FVector2D(0.0, 1.0) : FVector2D(-Into.Y, Into.X);
+	return Across * (SideSign < 0.0f ? -1.0 : 1.0);
+}
+
 float FDNGlass::Crack(const FDNGlassSpec& Spec, const FDNDamageState& Damage)
 {
 	const float D = FDNCarParts::ZoneDamage(Spec.Zone, Spec.bHasSecondaryZone, Spec.SecondaryZone, Damage);

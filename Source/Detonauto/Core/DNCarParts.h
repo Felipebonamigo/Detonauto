@@ -12,7 +12,10 @@
 //  P2 o vetor de estágios é paralelo ao de peças; tamanho diferente é refeito com todas presas (não quebra);
 //  P3 uma peça com dobradiça que passa dos dois limiares no mesmo impacto vai direto para Solta: a mudança sai uma vez, de Presa
 //     para Solta;
-//  P4 vidro com trinca a partir de 1,0 ou mais: trinca 0 abaixo de 1,0 e 1 em 1,0 (sem divisão por zero).
+//  P4 vidro com trinca a partir de 1,0 ou mais: trinca 0 abaixo de 1,0 e 1 em 1,0 (sem divisão por zero);
+//  P5 o empurrão da peça que solta vai para fora do carro pelo lado dela, sem a parte que entra no obstáculo; a peça no eixo da batida
+//     (para-choque, capô, tampa) sai de lado. Empurrada para longe do obstáculo, a peça da frente atravessava a carroceria (o destroço
+//     ignora o carro) e sumia dentro dela (batida na parede a 100 km/h). Sem direção: de lado; entrada não finita vale zero.
 
 #pragma once
 
@@ -56,7 +59,7 @@ struct FDNCarPartSpec
 	float HingeMaxDeg = 0.0f;
 	/** Amortecimento angular da peça pendurada. */
 	float HingeDamping = 2.0f;
-	/** Empurrão na direção da batida quando solta [m/s]. */
+	/** Empurrão quando solta [m/s]: para fora do carro (P5) e para cima. */
 	float LaunchMs = 4.0f;
 
 	bool HasHinge() const { return HingeMaxDeg > 0.0f; }
@@ -91,6 +94,10 @@ struct FDNCarParts
 	/** Avalia todas as peças, em ordem, depois de um impacto já aplicado ao dano. Devolve as mudanças deste impacto. */
 	static TArray<FDNPartChange> Evaluate(TConstArrayView<FDNCarPartSpec> Specs, TArray<EDNPartStage>& Stages, const FDNDamageState& Damage,
 		const FDNImpact* Impact);
+
+	/** P5 direção horizontal (unitária) do empurrão da peça que solta, antes da subida. Out: do centro do carro ao da peça; ImpactDir:
+	 *  do carro para a batida; SideSign: o lado (+1 ou -1) da peça no eixo da batida. */
+	static FVector2D LaunchHeading(const FVector2D& Out, const FVector2D& ImpactDir, float SideSign);
 };
 
 /** Vidros e lentes. O para-brisa nunca estoura (vidro laminado): trinca e afunda com o teto. */

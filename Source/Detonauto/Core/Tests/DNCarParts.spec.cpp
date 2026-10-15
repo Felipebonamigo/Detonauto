@@ -1,6 +1,6 @@
 // Testes das peças que soltam e dos vidros que quebram (lote 18b, docs/regras-pecas.md): Presa → Pendurada → Solta pelo dano da peça
 // (o maior entre a zona e a secundária) ou pelo Δv na zona, limiares inclusivos, sem volta; trinca e estouro dos vidros. Os números
-// são os da tabela do contrato. Decisões P1 a P4: Core/DNCarParts.h.
+// são os da tabela do contrato. Decisões P1 a P5: Core/DNCarParts.h.
 
 #include <limits>
 #include "Misc/AutomationTest.h"
@@ -318,6 +318,57 @@ void FDNCarPartsSpec::Define()
 			TestTrue("marcado", Burst[1]);
 			TestEqual("2a vez: nada", FDNGlass::Evaluate(Specs, Burst, S, nullptr).Num(), 0);
 			TestTrue("continua estourado", Burst[1]);
+		});
+	});
+
+	// P5: espaço do carro, X para a frente, Y para a direita. Out: do centro do carro ao centro da peça; ImpactDir: do carro para a batida
+	Describe("Empurrao da peca que solta (P5)", [this]()
+	{
+		const FVector2D Front(1.0, 0.0);
+		auto Near = [this](const TCHAR* What, const FVector2D& Got, const FVector2D& Want)
+		{
+			TestTrue(FString::Printf(TEXT("%s: %s, esperado %s"), What, *Got.ToString(), *Want.ToString()), Got.Equals(Want, 1e-3));
+		};
+
+		It("para-lama numa batida de frente sai para o lado dele, sem atravessar o carro nem entrar na parede", [this, Front, Near]()
+		{
+			Near(TEXT("esquerdo"), FDNCarParts::LaunchHeading(FVector2D(150.0, -80.0), Front, 1.0f), FVector2D(0.0, -1.0));
+			Near(TEXT("direito"), FDNCarParts::LaunchHeading(FVector2D(150.0, 80.0), Front, -1.0f), FVector2D(0.0, 1.0));
+		});
+
+		It("peca no eixo da batida (para-choque, capo) sai de lado, para o lado de SideSign", [this, Front, Near]()
+		{
+			Near(TEXT("+1"), FDNCarParts::LaunchHeading(FVector2D(220.0, 0.0), Front, 1.0f), FVector2D(0.0, 1.0));
+			Near(TEXT("-1"), FDNCarParts::LaunchHeading(FVector2D(220.0, 0.0), Front, -1.0f), FVector2D(0.0, -1.0));
+			Near(TEXT("quase no eixo"), FDNCarParts::LaunchHeading(FVector2D(220.0, 3.0), Front, -1.0f), FVector2D(0.0, -1.0));
+		});
+
+		It("porta numa batida do lado dela desliza ao longo do obstaculo", [this, Near]()
+		{
+			Near(TEXT("porta esquerda"), FDNCarParts::LaunchHeading(FVector2D(10.0, -80.0), FVector2D(0.0, -1.0), -1.0f), FVector2D(1.0, 0.0));
+		});
+
+		It("peca do lado oposto a batida sai para fora do carro, longe do obstaculo", [this, Front, Near]()
+		{
+			Near(TEXT("para-choque traseiro"), FDNCarParts::LaunchHeading(FVector2D(-220.0, 0.0), Front, 1.0f), FVector2D(-1.0, 0.0));
+		});
+
+		It("nunca aponta para dentro do obstaculo e sai sempre unitario", [this]()
+		{
+			const FVector2D Corner = FVector2D(1.0, -1.0).GetSafeNormal();
+			for (const FVector2D& Out : { FVector2D(150.0, -80.0), FVector2D(-150.0, 80.0), FVector2D(0.0, 90.0), FVector2D(220.0, 0.0) })
+			{
+				const FVector2D H = FDNCarParts::LaunchHeading(Out, Corner, 1.0f);
+				TestTrue(FString::Printf(TEXT("%s: entra %.3f"), *Out.ToString(), FVector2D::DotProduct(H, Corner)), FVector2D::DotProduct(H, Corner) <= 1e-3);
+				TestTrue(FString::Printf(TEXT("%s: unitario"), *Out.ToString()), FMath::IsNearlyEqual(H.Size(), 1.0, 1e-3));
+			}
+		});
+
+		It("sem direcao da batida: sai para fora do carro; sem nada (ou NaN): de lado, para SideSign", [this, Near]()
+		{
+			Near(TEXT("sem batida"), FDNCarParts::LaunchHeading(FVector2D(0.0, -80.0), FVector2D::ZeroVector, 1.0f), FVector2D(0.0, -1.0));
+			Near(TEXT("nada"), FDNCarParts::LaunchHeading(FVector2D::ZeroVector, FVector2D::ZeroVector, -1.0f), FVector2D(0.0, -1.0));
+			Near(TEXT("NaN"), FDNCarParts::LaunchHeading(FVector2D(NaNf, 0.0), FVector2D(NaNf, NaNf), 1.0f), FVector2D(0.0, 1.0));
 		});
 	});
 }
