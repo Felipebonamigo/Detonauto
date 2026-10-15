@@ -20,6 +20,8 @@ param(
     [int]$Warmup = 15,
     [int]$Measure = 10,
     [string[]]$ExtraArgs = @(),         # argumentos extras para o jogo (ex.: -DNParkedCars=6, os 6 carros amassados do lote 17)
+    [int]$MeasureFrom = 0,              # andando: janela de medição própria [s] (padrão 6 a 14; o lote 17c mede de 8 a 18 com as peças caindo)
+    [int]$MeasureTo = 0,
     [string]$EngineVersion
 )
 $ErrorActionPreference = 'Stop'
@@ -44,6 +46,7 @@ $rows = @()
 foreach ($name in $Scenario) {
     # andando: o carro sai da largada aos 2 s e a medição vai de 6 a 14 s, antes de ele passar do fim da rua (a ~200 km/h)
     $start, $stop = if ($name -eq 'andando') { 6, 14 } else { $Warmup, ($Warmup + $Measure) }
+    if ($name -eq 'andando' -and $MeasureTo -gt $MeasureFrom -and $MeasureFrom -gt 0) { $start, $stop = $MeasureFrom, $MeasureTo }
     $keys = "EXEC:csvprofile start@$start;EXEC:csvprofile stop@$stop;QUIT@$($stop + 2)"
     if ($name -eq 'andando') { $keys = "W@2-$($stop + 1);" + $keys }
     $before = @(Get-ChildItem $csvDir -Filter *.csv -ErrorAction SilentlyContinue | ForEach-Object FullName)
@@ -64,6 +67,10 @@ foreach ($name in $Scenario) {
     $rows += $r
     Write-Host ("[{0}] Frame {1:N2} / {2:N2} | Game {3:N2} / {4:N2} | Draw {5:N2} / {6:N2} | GPU {7:N2} / {8:N2} ms (média / p95, {9} quadros) | {10}" -f `
         $name, $r.Frame.Mean, $r.Frame.P95, $r.Game.Mean, $r.Game.P95, $r.Draw.Mean, $r.Draw.P95, $r.Gpu.Mean, $r.Gpu.P95, $r.Frame.N, $csv.Name)
+    # física (lote 17c, peças de rua soltas): o tempo de física na linha do jogo e somado nos trabalhadores, quando o CSV tem
+    foreach ($col in 'Exclusive/GameThread/Physics', 'Exclusive/AllWorkers/Physics') {
+        if ([array]::IndexOf($head, $col) -ge 0) { $p = Get-Stats (& $num $col); Write-Host ("[{0}]   {1}: {2:N2} / {3:N2} ms (média / p95)" -f $name, $col, $p.Mean, $p.P95) }
+    }
     # Janela sem foco: o driver ou o Windows limitam o jogo a 60 fps mesmo com t.MaxFPS 0, a placa baixa o clock e o tempo de GPU
     # parece maior. Medição assim não vale (medido em 14 out 2026: o mesmo cenário deu 5,1 ms com foco e 16,9 ms travado em 60).
     $fps = $r.Frame.N / ($stop - $start)

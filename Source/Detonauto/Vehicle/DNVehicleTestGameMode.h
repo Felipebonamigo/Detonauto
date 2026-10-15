@@ -23,6 +23,7 @@
 class ADNVehicle;
 class ADNTestArena;
 class APlayerStart;
+class ADNBreakableProp;
 
 UCLASS()
 class DETONAUTO_API ADNVehicleTestGameMode : public AGameModeBase
@@ -58,6 +59,30 @@ protected:
 
 	/** Batida real na cena de aparência (lote 17b, -DNWallAheadM=M): barreira de concreto atravessando a rua a M metros da largada. */
 	void SpawnWallAhead(float DistanceM);
+
+	/** Lote 17c: peças de rua na faixa do carro (-DNPropLine=poste,arvore,banco,lixeira; -DNPropStartM, padrão 60; -DNPropSpacingM,
+	 *  padrão 45), cópias das peças daquele tipo que já estão no mapa. */
+	void SpawnPropLine(const FString& Kinds, float StartM, float SpacingM);
+
+	/** Resumo da fileira no QUIT, com veredito: todas quebradas, o carro nunca abaixo de 60% do cruzeiro depois da 1a quebra e
+	 *  nunca a mais de 1,5 m da faixa ("bater e seguir"). */
+	void LogPropLineSummary() const;
+	TArray<TWeakObjectPtr<ADNBreakableProp>> LineProps;
+	float LineMinKmh = TNumericLimits<float>::Max();
+	float LineMaxOffsetM = 0.0f;
+
+	/** -DNPropShots: captura antes (a 12 m), no contato e 0,8 s depois de cada peça quebrada (dn-prop-<n>-<tipo>-...). */
+	void HandlePropBroken(ADNBreakableProp& Prop);
+	void PropShotTick(ADNVehicle& Vehicle, float DeltaSeconds);
+	bool bPropShots = false;
+	int32 PropShots = 0;
+	float PendingAfterLeft = 0.0f;
+	FString PendingAfterName;
+	TSet<TWeakObjectPtr<ADNBreakableProp>> PropsShotBefore;
+
+	/** -DNCruiseKmh=N: piloto automático segura N km/h na reta (o log diz que o acelerador vem dele). */
+	float CruiseKmh = 0.0f;
+	float CruiseLogLeft = 0.0f;
 
 	/** Roteiro de teclas (-DNKeys): pressiona e solta teclas REAIS pelo PlayerController, o mesmo caminho do teclado do jogador. */
 	void KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds);

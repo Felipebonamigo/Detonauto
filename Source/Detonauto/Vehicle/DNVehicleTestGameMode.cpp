@@ -1,6 +1,8 @@
 #include "Vehicle/DNVehicleTestGameMode.h"
 #include "Vehicle/DNVehicle.h"
 #include "Vehicle/DNVehicleArena.h"
+#include "Crash/DNBreakableProp.h"
+#include "Crash/DNBreakableSubsystem.h"
 #include "Vehicle/DNTurboComponent.h"
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -111,6 +113,28 @@ void ADNVehicleTestGameMode::StartPlay()
 	{
 		SpawnWallAhead(WallAheadM);
 	}
+	// lote 17c: peças de rua na faixa do carro, piloto automático de velocidade e capturas de cada quebra
+	FString PropLine;
+	if (FParse::Value(Cmd, TEXT("DNPropLine="), PropLine, false) && !PropLine.IsEmpty())
+	{
+		float StartM = 60.0f;
+		float SpacingM = 45.0f;
+		FParse::Value(Cmd, TEXT("DNPropStartM="), StartM);
+		FParse::Value(Cmd, TEXT("DNPropSpacingM="), SpacingM);
+		SpawnPropLine(PropLine, StartM, SpacingM);
+	}
+	if (FParse::Value(Cmd, TEXT("DNCruiseKmh="), CruiseKmh) && CruiseKmh > 0.0f)
+	{
+		UE_LOG(LogDetonauto, Display, TEXT("DNCruise: piloto automático segurando %.0f km/h (o acelerador vem dele, não de tecla)"), CruiseKmh);
+	}
+	bPropShots = FParse::Param(Cmd, TEXT("DNPropShots"));
+	if (bPropShots)
+	{
+		if (UDNBreakableSubsystem* Props = GetWorld()->GetSubsystem<UDNBreakableSubsystem>())
+		{
+			Props->OnBroken.AddUObject(this, &ADNVehicleTestGameMode::HandlePropBroken);
+		}
+	}
 	bProbe = FParse::Param(Cmd, TEXT("DNCarProbe"));
 	if (bProbe)
 	{
@@ -155,6 +179,101 @@ void ADNVehicleTestGameMode::SpawnParkedCars(int32 Count)
 	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: %d de %d carro(s) estacionado(s) com dano %.2f nas 5 zonas"), Spawned, Count, Damage);
 }
 
+void ADNVehicleTestGameMode::SpawnPropLine(const FString& Kinds, float StartM, float SpacingM)
+{
+	// cada peça é cópia (malhas e escala) de uma peça daquele tipo que já está no mapa: a cena de aparência tem todos os tipos
+	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+	const FTransform Base = Spot ? Spot->GetActorTransform() : FTransform(FVector(0.0f, 0.0f, 120.0f));
+	TArray<FString> List;
+	Kinds.ParseIntoArray(List, TEXT(","));
+	int32 Spawned = 0;
+	for (int32 i = 0; i < List.Num(); ++i)
+	{
+		const FName Kind(*List[i].TrimStartAndEnd());
+		const ADNBreakableProp* Model = nullptr;
+		for (TActorIterator<ADNBreakableProp> It(GetWorld()); It; ++It)
+		{
+			if (It->Kind == Kind && It->BreakMesh)
+			{
+				Model = *It;
+				break;
+			}
+		}
+		if (!Model)
+		{
+			UE_LOG(LogDetonauto, Warning, TEXT("DNPropLine: nenhuma peça '%s' no mapa para copiar"), *Kind.ToString());
+			continue;
+		}
+		FVector Location = Base.TransformPosition(FVector((StartM + SpacingM * i) * 100.0f, 0.0f, 0.0f));
+		Location.Z = 0.0f; // no asfalto (a cena tem o chão da rua em z = 0)
+		const FTransform At(Base.Rotator() + FRotator(0.0f, 90.0f, 0.0f), Location, Model->GetActorScale3D());
+		ADNBreakableProp* Prop = GetWorld()->SpawnActorDeferred<ADNBreakableProp>(ADNBreakableProp::StaticClass(), At);
+		if (!Prop)
+		{
+			continue;
+		}
+		Prop->Kind = Kind;
+		Prop->BaseMesh = Model->BaseMesh;
+		Prop->BreakMesh = Model->BreakMesh;
+		Prop->FinishSpawning(At);
+		LineProps.Add(Prop);
+		++Spawned;
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("DNPropLine: %d peça(s) na faixa do carro, a partir de %.0f m, a cada %.0f m"), Spawned, StartM, SpacingM);
+}
+
+void ADNVehicleTestGameMode::LogPropLineSummary() const
+{
+	if (LineProps.IsEmpty() || CruiseKmh <= 0.0f)
+	{
+		return;
+	}
+	int32 Broken = 0;
+	for (const TWeakObjectPtr<ADNBreakableProp>& Prop : LineProps)
+	{
+		Broken += Prop.IsValid() && Prop->IsBroken() ? 1 : 0;
+	}
+	const float MinKmh = Broken > 0 ? LineMinKmh : 0.0f;
+	const bool bPass = Broken == LineProps.Num() && MinKmh >= 0.6f * CruiseKmh && LineMaxOffsetM <= 1.5f;
+	UE_LOG(LogDetonauto, Display, TEXT("DNPropLine: resumo %d de %d quebrada(s) | menor velocidade depois da 1a quebra %.0f km/h (mínimo %.0f) | maior desvio %.2f m (máximo 1,5) | %s"),
+		Broken, LineProps.Num(), MinKmh, 0.6f * CruiseKmh, LineMaxOffsetM, bPass ? TEXT("APROVADO") : TEXT("REPROVADO"));
+}
+
+void ADNVehicleTestGameMode::HandlePropBroken(ADNBreakableProp& Prop)
+{
+	// captura no contato e outra 0,8 s depois (a de antes sai em PropShotTick, a 12 m da peça)
+	++PropShots;
+	FScreenshotRequest::RequestScreenshot(FString::Printf(TEXT("dn-prop-%d-%s-contato"), PropShots, *Prop.Kind.ToString()), false, false);
+	PendingAfterName = FString::Printf(TEXT("dn-prop-%d-%s-depois"), PropShots, *Prop.Kind.ToString());
+	PendingAfterLeft = 0.8f;
+}
+
+void ADNVehicleTestGameMode::PropShotTick(ADNVehicle& Vehicle, float DeltaSeconds)
+{
+	if (PendingAfterLeft > 0.0f)
+	{
+		PendingAfterLeft -= DeltaSeconds;
+		if (PendingAfterLeft <= 0.0f)
+		{
+			FScreenshotRequest::RequestScreenshot(PendingAfterName, false, false);
+		}
+	}
+	const FVector Car = Vehicle.GetActorLocation();
+	const FVector Forward = Vehicle.GetActorForwardVector();
+	for (TActorIterator<ADNBreakableProp> It(GetWorld()); It; ++It)
+	{
+		const FVector To = It->GetActorLocation() - Car;
+		const double Ahead = FVector::DotProduct(To, Forward);
+		const double Side = (To - Forward * Ahead).Size2D();
+		if (!It->IsBroken() && Ahead > 0.0 && Ahead < 1200.0 && Side < 300.0 && !PropsShotBefore.Contains(*It))
+		{
+			PropsShotBefore.Add(*It);
+			FScreenshotRequest::RequestScreenshot(FString::Printf(TEXT("dn-prop-%d-%s-antes"), PropShots + 1, *It->Kind.ToString()), false, false);
+			UE_LOG(LogDetonauto, Display, TEXT("DNPropShots: %s a %.1f m, carro a %.1f km/h"), *It->Kind.ToString(), Ahead / 100.0, Vehicle.SpeedKmh());
+		}
+	}
+}
+
 void ADNVehicleTestGameMode::SpawnWallAhead(float DistanceM)
 {
 	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
@@ -196,7 +315,7 @@ ADNVehicle* ADNVehicleTestGameMode::FindVehicle() const
 void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!bProbe && !bShot && ScriptEvents.IsEmpty())
+	if (!bProbe && !bShot && ScriptEvents.IsEmpty() && CruiseKmh <= 0.0f && !bPropShots)
 	{
 		return;
 	}
@@ -208,6 +327,44 @@ void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 	if (!ScriptEvents.IsEmpty())
 	{
 		KeyScriptTick(*Vehicle, DeltaSeconds);
+	}
+	if (CruiseKmh > 0.0f)
+	{
+		// piloto automático do teste (-DNCruiseKmh): mesmo controle do cenário Wall; o log de início diz que o acelerador vem dele
+		if (UChaosWheeledVehicleMovementComponent* Move = Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovement()))
+		{
+			Move->SetThrottleInput(FMath::Clamp(0.4f + (CruiseKmh - Vehicle->SpeedKmh()) * 0.08f, 0.0f, 1.0f));
+			Move->SetBrakeInput(0.0f);
+			// mantém a faixa da largada: depois de uma batida o carro sai um pouco torto, e sem volante ia parar na calçada
+			const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+			if (Spot)
+			{
+				const FVector Right = Spot->GetActorRightVector();
+				const float OffsetM = static_cast<float>(FVector::DotProduct(Vehicle->GetActorLocation() - Spot->GetActorLocation(), Right)) / 100.0f;
+				const float HeadingRad = FMath::Asin(FMath::Clamp(static_cast<float>(FVector::DotProduct(Vehicle->GetActorForwardVector(), Right)), -1.0f, 1.0f));
+				const float YawRateRadS = static_cast<float>(Vehicle->GetMesh()->GetPhysicsAngularVelocityInRadians().Z);
+				// ganho menor em alta (a 100 km/h o volante cheio fazia o carro oscilar e sair da faixa) e amortecido pelo giro
+				const float Gain = FMath::Clamp(15.0f / FMath::Max(Vehicle->SpeedKmh() / 3.6f, 1.0f), 0.2f, 1.0f);
+				const float Steer = FMath::Clamp(Gain * (-0.25f * OffsetM - 1.2f * HeadingRad) - 0.3f * YawRateRadS, -1.0f, 1.0f);
+				Move->SetSteeringInput(Steer);
+				if (LineProps.ContainsByPredicate([](const TWeakObjectPtr<ADNBreakableProp>& P) { return P.IsValid() && P->IsBroken(); }))
+				{
+					LineMinKmh = FMath::Min(LineMinKmh, Vehicle->SpeedKmh());
+					LineMaxOffsetM = FMath::Max(LineMaxOffsetM, FMath::Abs(OffsetM));
+				}
+				CruiseLogLeft -= DeltaSeconds;
+				if (CruiseLogLeft <= 0.0f)
+				{
+					CruiseLogLeft = 0.5f;
+					UE_LOG(LogDetonauto, Display, TEXT("DNCruise: %.0f km/h | desvio %.2f m | rumo %.1f graus | giro %.2f rad/s | volante %.2f"),
+						Vehicle->SpeedKmh(), OffsetM, FMath::RadiansToDegrees(HeadingRad), YawRateRadS, Steer);
+				}
+			}
+		}
+	}
+	if (bPropShots)
+	{
+		PropShotTick(*Vehicle, DeltaSeconds);
 	}
 	if (!bProbe && !bShot)
 	{
@@ -238,8 +395,21 @@ void ADNVehicleTestGameMode::KeyScriptTick(ADNVehicle& Vehicle, float DeltaSecon
 	{
 		return;
 	}
-	ScriptTime += DeltaSeconds;
 	auto Send = [PC](const FKey& Key, EInputEvent Event) { PC->InputKey(FInputKeyEventArgs::CreateSimulated(Key, Event, Event == IE_Released ? 0.0f : 1.0f, 1)); };
+	// soltar as teclas de direção no começo e no fim do roteiro: cobre tecla presa de uma execução interrompida (17b)
+	auto ReleaseDriveKeys = [&Send]()
+	{
+		for (const FKey& Key : { EKeys::W, EKeys::A, EKeys::S, EKeys::D, EKeys::Up, EKeys::Down, EKeys::Left, EKeys::Right, EKeys::LeftShift, EKeys::SpaceBar })
+		{
+			Send(Key, IE_Released);
+		}
+	};
+	if (ScriptTime == 0.0f)
+	{
+		ReleaseDriveKeys();
+		UE_LOG(LogDetonauto, Display, TEXT("DNKeys: teclas de direção soltas no começo do roteiro"));
+	}
+	ScriptTime += DeltaSeconds;
 	for (FScriptEvent& E : ScriptEvents)
 	{
 		if (E.bDone || ScriptTime < E.Start)
@@ -254,6 +424,8 @@ void ADNVehicleTestGameMode::KeyScriptTick(ADNVehicle& Vehicle, float DeltaSecon
 		else if (E.What == TEXT("QUIT"))
 		{
 			E.bDone = true;
+			ReleaseDriveKeys();
+			LogPropLineSummary();
 			FPlatformMisc::RequestExit(false);
 		}
 		else if (E.What.StartsWith(TEXT("DENT")))
@@ -292,6 +464,7 @@ void ADNVehicleTestGameMode::KeyScriptTick(ADNVehicle& Vehicle, float DeltaSecon
 			{
 				E.bPressed = true;
 				Send(Key, IE_Pressed);
+				UE_LOG(LogDetonauto, Display, TEXT("DNKeys: t=%.2f s o roteiro apertou %s"), ScriptTime, *E.What);
 			}
 			if (ScriptTime >= End)
 			{
