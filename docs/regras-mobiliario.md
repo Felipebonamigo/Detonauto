@@ -35,7 +35,13 @@ a que sobra depois que a física já freou), massa do carro (do preset em
 3. **Lançamento da peça:** velocidade inicial `v · LaunchFactor` na direção do
    carro, mais `LaunchUpMs` para cima, tudo limitado a `MaxLaunchMs`. Os tipos
    com `TopplesAtBase` recebem também um giro em torno da base, num eixo
-   horizontal perpendicular ao carro: eles tombam em vez de voar.
+   horizontal perpendicular ao carro: eles tombam em vez de voar. **O giro é em
+   volta do pé** (o corte, a `BreakHeightCm` do chão): com o braço `r` do pé ao
+   centro de massa conhecido, o giro é `lançamento horizontal / |r|` (no máximo
+   8 rad/s) e o centro de massa sai com `lançamento + giro × r`, então o pé sai
+   com o lançamento. Sem o braço, vale o de 2 m. (Revisão do 17c: a física gira a
+   peça em volta do centro de massa; sem isso o pé da árvore voltava para trás e
+   o tronco flutuava sobre o carro.)
 4. **Dano no carro:** passa pelo `FDNDamage` de sempre, com a variação de
    velocidade `v − v'` na zona do contato, sem parâmetro novo. A batida em
    mobiliário **nunca** dispara a câmera de batida do lote 18 nem conta como a
@@ -71,7 +77,7 @@ Exemplos com o carro de 1.500 kg, `k = 1` e batida de frente:
 | Id | MassKg | MinBreakSpeedKmh | LaunchFactor | LaunchUpMs | TopplesAtBase | BreakHeightCm | Points |
 |---|---|---|---|---|---|---|---|
 | poste | 250 | 20 | 0,7 | 2 | sim | 10 | 50 |
-| arvore | 400 | 25 | 0,5 | 1 | sim | 40 | 50 |
+| arvore | 400 | 25 | 0,5 | 1 | sim | 15 | 50 |
 | banco | 60 | 8 | 1,1 | 3 | não | 0 | 20 |
 | lixeira | 25 | 5 | 1,3 | 4 | não | 0 | 10 |
 | hidrante | 120 | 10 | 0,9 | 2 | não | 0 | 30 |
@@ -138,7 +144,11 @@ mapa.
 
 - **Poste:** parte na base e fica o flange. O `make_street_light.py` gera a
   base como malha separada. Se a luz estiver acesa, ela apaga quando o poste cai.
-- **Árvore:** o tronco parte a 40 cm e o toco fica. Tronco e copa caem juntos,
+- **Árvore:** o tronco parte a 15 cm, abaixo da altura livre do carro, e o toco
+  fica (revisão do 17c: com 40 cm o toco atravessava o para-choque). A colisão
+  da parte que cai são duas cápsulas no eixo do tronco, uma no tronco e uma fina
+  na copa (1 m de raio na cena), e não o convexo automático do tamanho da árvore,
+  que encostava nos prédios e travava no ar. Tronco e copa caem juntos,
   girando. O corte do jacarandá do Poly Haven é feito por script do Blender: CC0
   permite modificar, e a modificação é anotada em `licencas.csv`. Folhas e
   galhos soltos ficam para o lote 19 (Niagara).

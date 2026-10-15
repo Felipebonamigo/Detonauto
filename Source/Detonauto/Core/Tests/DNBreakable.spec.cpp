@@ -112,6 +112,29 @@ void FDNBreakableSpec::Define()
 		TestEqual("teto do lancamento (35 m/s)", static_cast<float>(FDNBreakable::Hit(Fast, Settings, Ahead(200.f)).PropVelocityCmS.Size()), 3500.f, 0.5f);
 	});
 
+	It("B3: quem tomba gira em volta do pe: o braco e o do centro de massa, e o pe sai com o lancamento", [this]()
+	{
+		FDNBreakInput In = Ahead(60.f);
+		In.PivotToComCm = FVector(0.f, 0.f, 400.f);
+		const float Launch = 60.f / 3.6f * 0.7f; // 11,67 m/s
+		const FDNBreakResult T = FDNBreakable::Hit(Kind(250.f, 5.f, true), Settings, In);
+		TestEqual("giro = lancamento / braco de 4 m", T.PropAngularRadS, FVector(0.f, Launch / 4.f, 0.f), 1e-3f);
+		// a velocidade devolvida e a do centro de massa; a do pe e ela menos giro x braco
+		const FVector Foot = T.PropVelocityCmS - FVector::CrossProduct(T.PropAngularRadS, In.PivotToComCm);
+		TestEqual("o pe sai com o lancamento", Foot, FVector(Launch * 100.f, 0.f, 200.f), 0.5f);
+		TestEqual("o centro de massa vai para a frente com o dobro", T.PropVelocityCmS.X, 2.0 * Launch * 100.0, 0.5);
+		In.PivotToComCm = FVector(0.f, 0.f, 5.f);
+		TestEqual("braco abaixo de 10 cm vale 2 m", FDNBreakable::Hit(Kind(250.f, 5.f, true), Settings, In).PropAngularRadS.Y, static_cast<double>(Launch / 2.f), 1e-3);
+		In.PivotToComCm = FVector(NaNf, 0.f, 400.f);
+		TestFalse("braco NaN nao vira NaN", FDNBreakable::Hit(Kind(250.f, 5.f, true), Settings, In).PropVelocityCmS.ContainsNaN());
+		In.PivotToComCm = FVector(0.f, 0.f, 400.f);
+		TestEqual("sem tombo, o braco nao muda o lancamento", FDNBreakable::Hit(Kind(250.f, 5.f, false), Settings, In).PropVelocityCmS,
+			FVector(Launch * 100.f, 0.f, 200.f), 0.5f);
+		FDNBreakInput Fast = Ahead(150.f);
+		Fast.PivotToComCm = FVector(0.f, 0.f, 400.f);
+		TestEqual("centro de massa no teto de 35 m/s", FDNBreakable::Hit(Kind(250.f, 5.f, true), Settings, Fast).PropVelocityCmS.Size(), 3500.0, 0.5);
+	});
+
 	It("B4 e B5: variacao de velocidade para o dano, e pontos so quando quebra", [this]()
 	{
 		const FDNBreakResult R = FDNBreakable::Hit(Kind(250.f, 5.f), Settings, Ahead(100.f));

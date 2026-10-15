@@ -57,7 +57,16 @@ FDNBreakResult FDNBreakable::Hit(const FDNBreakableKind& Kind, const FDNBreakabl
 	{
 		const float LaunchHorizontalMs = static_cast<float>(Flat(R.PropVelocityCmS).Size()) / 100.0f;
 		const FVector Axis = FVector::CrossProduct(FVector::UpVector, Horizontal.GetSafeNormal());
-		R.PropAngularRadS = Axis * FMath::Min(LaunchHorizontalMs / ToppleArmM, MaxToppleRadS);
+		// gira em volta do pé: com o braço até o centro de massa conhecido, o centro de massa sai com o lançamento mais giro x braço
+		// (a física gira a peça em volta do centro de massa; sem isso o pé voltava para trás e o tronco flutuava sobre o carro)
+		const FVector Arm = Input.PivotToComCm;
+		const bool bKnownArm = !Arm.ContainsNaN() && Arm.Size() >= 10.0;
+		const float ArmM = bKnownArm ? static_cast<float>(Arm.Size()) / 100.0f : ToppleArmM;
+		R.PropAngularRadS = Axis * FMath::Min(LaunchHorizontalMs / ArmM, MaxToppleRadS);
+		if (bKnownArm)
+		{
+			R.PropVelocityCmS = (R.PropVelocityCmS + FVector::CrossProduct(R.PropAngularRadS, Arm)).GetClampedToMaxSize(MaxLaunch);
+		}
 	}
 	return R;
 }

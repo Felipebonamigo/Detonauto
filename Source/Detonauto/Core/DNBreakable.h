@@ -51,6 +51,8 @@ struct FDNBreakInput
 	float CarMassKg = 0.0f;
 	/** Direção do centro do carro ao centro da peça (só a parte horizontal conta; não precisa ser unitária). */
 	FVector CarToProp = FVector::ZeroVector;
+	/** Do pé da parte que quebra (o corte) ao centro de massa dela [cm]. Zero ou desconhecido: braço de tombo de ToppleArmM. */
+	FVector PivotToComCm = FVector::ZeroVector;
 };
 
 struct FDNBreakResult

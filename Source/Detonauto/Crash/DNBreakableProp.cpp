@@ -97,6 +97,10 @@ bool ADNBreakableProp::HandleCarHit(ADNVehicle& Car, const FVector& CarVelocityB
 	Input.CarVelocityCmS = CarVelocityBeforeCmS;
 	Input.CarMassKg = Car.GetCarConfig().MassKg;
 	Input.CarToProp = Body->GetComponentLocation() - Car.GetActorLocation();
+	// o pé da parte que quebra fica no corte (o pivô das malhas cortadas é o chão); o tombo gira em volta dele (B3)
+	const FVector Foot = Body->GetComponentLocation() + FVector::UpVector * (KindConfig.BreakHeightCm * Body->GetComponentScale().Z);
+	const FVector Com = Body->GetCenterOfMass();
+	Input.PivotToComCm = (Com - Body->GetComponentLocation()).IsNearlyZero() ? Body->Bounds.Origin - Foot : Com - Foot;
 	const FDNBreakResult R = FDNBreakable::Hit(KindConfig, Settings, Input);
 	if (!R.bBreaks)
 	{
@@ -127,9 +131,9 @@ bool ADNBreakableProp::HandleCarHit(ADNVehicle& Car, const FVector& CarVelocityB
 	}
 
 	Car.ApplyPropImpact(R.CarDeltaVMs, ImpactPoint);
-	UE_LOG(LogDetonauto, Display, TEXT("DNProp: %s (%s) quebrou: carro %.1f -> %.1f km/h (variação %.2f m/s), peça lançada a %.1f m/s, giro %.2f rad/s, %d ponto(s)"),
+	UE_LOG(LogDetonauto, Display, TEXT("DNProp: %s (%s) quebrou: carro %.1f -> %.1f km/h (variação %.2f m/s), peça lançada a %.1f m/s, giro %.2f rad/s, braço %.2f m, %d ponto(s)"),
 		*Kind.ToString(), *GetName(), CarVelocityBeforeCmS.Size() * 0.036, R.CarVelocityCmS.Size() * 0.036, R.CarDeltaVMs,
-		R.PropVelocityCmS.Size() / 100.0, R.PropAngularRadS.Size(), R.Points);
+		R.PropVelocityCmS.Size() / 100.0, R.PropAngularRadS.Size(), Input.PivotToComCm.Size() / 100.0, R.Points);
 	return true;
 }
 
