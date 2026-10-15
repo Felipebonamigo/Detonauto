@@ -127,8 +127,8 @@ float3 Q = P + warp * 18.0;
 float field = n.fbm(Q / 28.0) * 0.55 + n.fbm(Q / max(Size, 1.0)) * 0.45;
 float th = 0.77 - 0.30 * saturate(Cov * 5.0) * k * (0.35 + 0.65 * cluster);
 float chip = smoothstep(th, th + 0.015, field) * step(0.05, k) * Paint;
-// no miolo das lascas grandes, metal nu
-float metal = smoothstep(th + 0.075, th + 0.09, field) * step(0.05, k) * Paint;
+// no miolo das lascas, metal nu (18b: o miolo cresceu e a borda de primer ficou mais estreita; revisão do 17b)
+float metal = smoothstep(th + 0.045, th + 0.06, field) * step(0.05, k) * Paint;
 float primer = saturate(chip - metal);
 // riscos compridos ao longo do carro (raspão), finos na altura, só onde amassou e só nas faces que correm ao longo do carro
 float s = n.v(float3(P.x / 120.0, P.y / 2.5, P.z / 2.5));
@@ -139,13 +139,57 @@ float soot = Soot * d * (0.6 + 0.4 * n.v(P / 40.0));
 return float4(primer, metal, scratch, soot);
 """
 
-# Cor em camadas (fim do 17b): primer cinza-claro (albedo 0,5), metal nu cinza-aço; o risco mostra primer (antes clareava a tinta e
-# saía rosa); a fuligem escurece
+# Cor em camadas (fim do 17b): primer cinza (albedo 0,35; era 0,5 e saltava na foto, revisão do 17b feita no 18b), metal nu
+# cinza-aço; o risco mostra primer (antes clareava a tinta e saía rosa); a fuligem escurece
 WEAR_COLOR_HLSL = """
-float3 c = lerp(Col, float3(0.50, 0.50, 0.49), M.x);
+float3 c = lerp(Col, float3(0.35, 0.35, 0.34), M.x);
 c = lerp(c, float3(0.56, 0.57, 0.58), M.y);
 c = lerp(c, float3(0.45, 0.45, 0.44), 0.8 * M.z);
 return c * (1.0 - 0.8 * M.w);
+"""
+
+# Trinca de vidro (lote 18b, docs/regras-pecas.md): só nos vidros (GlassCrack > 0; a carroceria fica com 0). Em volta do centro GC
+# (o ponto da batida mais perto do vidro, no espaço do carro), linhas radiais que serpenteiam e pedaços de anel em polígono (cordas
+# entre duas radiais, como na teia de um para-brisa), num alcance que cresce com a trinca,
+# uma teia densa perto do centro e o miolo esmagado. As linhas são medidas em cm no plano do vidro (base tirada da normal local NL),
+# com ~0,8 cm de largura: visíveis a 3 m em 1080p sem engrossar de longe.
+GLASS_CRACK_HLSL = """
+if (Cr <= 0.001)
+{
+    return Col;
+}
+float3 d = P - GC;
+float r = length(d);
+float reach = 20.0 + 140.0 * Cr;
+float fade = 1.0 - smoothstep(0.55 * reach, reach, r);
+if (fade <= 0.0)
+{
+    return Col;
+}
+float3 n = normalize(NL);
+float3 t1 = normalize(cross(n, abs(n.z) < 0.9 ? float3(0, 0, 1) : float3(1, 0, 0)));
+float3 t2 = cross(n, t1);
+float2 q = float2(dot(d, t1), dot(d, t2));
+float turn = atan2(q.y, q.x) / 6.2831853 + 0.5;
+float s = turn * 16.0;
+float sector = floor(s);
+float seed = frac(sin(sector * 37.719 + 4.1) * 43758.5453);
+float wobble = 0.12 * sin(r * (0.06 + 0.06 * seed) + seed * 6.2831853);
+float radialCm = abs(frac(s) - 0.5 - wobble) * 6.2831853 * max(r, 0.5) / 16.0;
+float radial = 1.0 - smoothstep(0.22, 0.45, radialCm);
+float cell = fmod(floor(s + 0.5), 16.0);
+float cellSeed = frac(sin(cell * 91.137 + 2.3) * 43758.5453);
+float chord = r * cos((frac(s + 0.5) - 0.5) * 6.2831853 / 16.0) + cellSeed * 5.0;
+float ring = floor(chord / 8.0);
+float keep = step(0.40, frac(sin(ring * 78.233 + cell * 12.9898) * 43758.5453));
+float ringCm = abs(chord - (ring + 0.5) * 8.0);
+float rings = (1.0 - smoothstep(0.18, 0.38, ringCm)) * keep * step(4.0, r);
+float b = frac(turn * 48.0);
+float webCm = min(b, 1.0 - b) * 6.2831853 * max(r, 0.5) / 48.0;
+float web = (1.0 - smoothstep(0.15, 0.30, webCm)) * (1.0 - smoothstep(8.0, 18.0, r));
+float core = 1.0 - smoothstep(3.0, 6.0, r);
+float crack = saturate(max(max(radial, rings), max(web, core))) * fade * smoothstep(0.0, 0.3, Cr);
+return lerp(Col, float3(0.72, 0.75, 0.77), 0.9 * crack);
 """
 
 # (metálico, aspereza, verniz): primer fosco e sem verniz, metal nu sem verniz, risco tira metade do verniz, fuligem deixa fosco
@@ -481,6 +525,13 @@ def build(dest, report):
     worn_color = custom_node(mel, material, WEAR_COLOR_HLSL, "Cor com desgaste", ("Col", "M"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 450, 300)
     mel.connect_material_expressions(painted, "", worn_color, "Col")
     mel.connect_material_expressions(wear, "", worn_color, "M")
+    # lote 18b: a trinca dos vidros por cima (o carro manda GlassCrack e GlassCrackCenter nos materiais dos vidros)
+    cracked = custom_node(mel, material, GLASS_CRACK_HLSL, "Trinca de vidro", ("Col", "P", "GC", "Cr", "NL"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 650, 300)
+    mel.connect_material_expressions(worn_color, "", cracked, "Col")
+    mel.connect_material_expressions(local, "", cracked, "P")
+    mel.connect_material_expressions(vector_param(mel, material, "GlassCrackCenter", (0.0, 0.0, 0.0, 0.0), 450, 150), "", cracked, "GC")
+    mel.connect_material_expressions(scalar_param(mel, material, "GlassCrack", 0.0, 450, 220), "", cracked, "Cr")
+    mel.connect_material_expressions(local_n, "", cracked, "NL")
     surface = custom_node(mel, material, WEAR_SURFACE_HLSL, "Superfície com desgaste", ("Met", "Rgh", "Coat", "M"),
                           unreal.CustomMaterialOutputType.CMOT_FLOAT3, 450, 600)
     for src, pin in ((metallic, "Met"), (roughness, "Rgh"), (coat, "Coat"), (wear, "M")):
@@ -491,7 +542,7 @@ def build(dest, report):
 
     # --- tudo pelos atributos de material (é o único caminho do Python para o verniz) ---
     attrs = node(mel, material, unreal.MaterialExpressionMakeMaterialAttributes, 900, 0)
-    for src, out, pin in ((worn_color, "", "BaseColor"), (worn_metal, "", "Metallic"), (worn_rough, "", "Roughness"), (body_n, "RGB", "Normal"),
+    for src, out, pin in ((cracked, "", "BaseColor"), (worn_metal, "", "Metallic"), (worn_rough, "", "Roughness"), (body_n, "RGB", "Normal"),
                           (offset, "", "WorldPositionOffset"), (worn_coat, "", "ClearCoat"), (coat_rough, "", "ClearCoatRoughness"),
                           (mra_tex, "B", "AmbientOcclusion")):
         if not mel.connect_material_expressions(src, out, attrs, pin):
@@ -504,7 +555,7 @@ def build(dest, report):
     report.append("material criado: " + path)
     report.append("parâmetros: Paint Tint, Base Texture, MRA, Normal, MetalPaintMetallic, Roughness, ClearCoat, ClearCoatRoughness, FlakeTiling, "
                   "FlakeStrength, DentDarkening, D0P..D7P, D0R..D7R, D0D..D7D, BodyCenter, BodyExtent, ZoneWearA, ZoneWearB, "
-                  "WearChipCoverage, WearChipSizeCm, WearScratch, WearSoot, WearPaint")
+                  "WearChipCoverage, WearChipSizeCm, WearScratch, WearSoot, WearPaint, GlassCrack, GlassCrackCenter")
     dress_car(dest, material, report)
 
 
