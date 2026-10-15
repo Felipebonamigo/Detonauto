@@ -65,6 +65,25 @@ transparência), não a quantidade de partículas.
   para fazer por Python (criar a partir do modelo, ligar parâmetros de usuário)
   fica em script versionado.
 
+## Decisões da implementação (15 out 2026)
+
+Regra em `Core/DNEffects.h` (testes `Detonauto.Efeitos`, 14 de 14 mutantes pegos). Dados em `Data/Effects.csv` (uma linha por efeito)
+e `Data/EffectsSettings.csv` (os tetos globais), com validador e teste de deriva (`Detonauto.Dados.Efeitos`).
+
+- **E1, formato:** colunas genéricas por efeito (`TriggerMin`, `TriggerFull`, `MinSpeedKmh`, `CountMin`, `CountMax`, `CountPerUnit`,
+  `Extra`, vida, velocidade, `PoolMax` e `Props`), com o significado de cada uma por efeito na tabela de `FDNEffectSpec`. Os tetos
+  globais (2.000 partículas de GPU, 400 sprites de fumaça, a distância da câmera) ficam numa linha própria, `EffectsSettings.csv`, como
+  o `BreakableSettings.csv` do mobiliário. Cada efeito aparece exatamente uma vez.
+- **E2, faísca de impacto:** 6 partículas por m/s de Δv. O limiar de 4 m/s já dá 24, e o teto de 120 chega em 20 m/s.
+- **E3, faísca de raspão:** 15 partículas por segundo para cada m/s, no máximo 300 por segundo.
+- **E4, cacos:** 250 por m² de vidro, entre 60 e 150. A lente do farol dá 60, o lateral 88 e o traseiro 125. Brilhos: 20.
+- **E5, lascas de plástico:** de 10 (Δv 12) a 30 (Δv 30), linear.
+- **E6, fumaça de pneu:** taxa = deslizamento / 25° (até 1) a partir de 8°. Roda patinando garante 0,6. Abaixo de 20 km/h, nada.
+- **E7, motor:** a intensidade vai de 0 (dano 0,6) a 1 (dano 0,8) e fica 1, a fumaça escura. Fogo em 0,9, ou com o carro
+  destruído e a frente em 0,7. Nunca desce com o dano.
+- **E8, orçamento:** cada disparo recebe o que cabe até o teto, nunca negativo.
+- **Mobiliário:** `Props` lista os tipos de `Breakables.csv` que disparam o pó (poste e árvore) e as folhas (árvore).
+
 ## Aprovação
 
 Capturas com o sol por trás, em 1920 e sem HUD, na câmera de batida.

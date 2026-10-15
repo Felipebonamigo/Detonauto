@@ -194,6 +194,16 @@ melhor e ele quer cinco modos.
   (`split_car_parts.py`). A transferência pela face mais próxima pega a casca errada.
 - Importação FBX descarta o alvo de deformação que não desloca nenhum vértice: só a
   carroceria pode exigir os 5 alvos; peça longe de uma zona chega com menos.
+- HLSL de nó Custom: `line` é palavra reservada (tipo de primitiva). O material compila
+  no editor e cai para o material padrão no jogo; o log do jogo mostra `error X3000:
+  syntax error: unexpected token 'line'`. Confira o log depois de mexer no HLSL.
+- Python da 5.8: `set_material_instance_static_switch_parameter_value` devolve `False`
+  mesmo quando liga a chave. Confira lendo o valor de volta
+  (`get_material_instance_static_switch_parameter_value`).
+- Unreal MCP: o servidor `unreal-mcp-detonauto` está no escopo local do Claude Code
+  (`~/.claude.json`, pasta do projeto). A sessão do app do Claude (Code) não carrega esse
+  escopo, só os servidores de usuário e o `.mcp.json` do projeto: para usar o MCP, o
+  editor tem que estar aberto e a sessão tem que enxergar o servidor.
 - O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
   o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
   poste) ele diz REPROVADO de propósito.
