@@ -605,7 +605,16 @@ def open_empty_map(report):
 PROP_DIR = ROOT + "/Props"
 # 16b: o poste moderno (dn_street_light, feito por Tools/Blender/make_street_light.py, mesmo formato de pasta) entrou no lugar do
 # lampião (street_lamp_01), e as lanternas de parede antigas (street_lamp_02) saíram: destoavam de uma avenida de hoje
-PROPS = ("dn_street_light", "metal_trash_can", "modular_street_seating", "fire_hydrant", "jacaranda_tree")
+# 17c: o poste e o jacarandá entram cortados (Tools/Blender/split_prop.py): a base ou o toco fica, a parte de cima quebra
+PROPS = ("dn_street_light_base", "dn_street_light_top", "metal_trash_can", "modular_street_seating", "fire_hydrant",
+         "jacaranda_tree_stump", "jacaranda_tree_top")
+# as partes cortadas usam as texturas e as instâncias de material do modelo inteiro
+MATERIAL_SOURCE = {"dn_street_light_base": "dn_street_light", "dn_street_light_top": "dn_street_light",
+                   "jacaranda_tree_stump": "jacaranda_tree", "jacaranda_tree_top": "jacaranda_tree"}
+# peça de rua destrutível (lote 17c, docs/regras-mobiliario.md): tipo de Data/Breakables.csv, malha que fica e malha que quebra
+BREAKABLE_CLASS = "/Script/Detonauto.DNBreakableProp"
+BREAKABLES = {"poste": ("dn_street_light_base", "dn_street_light_top"), "arvore": ("jacaranda_tree_stump", "jacaranda_tree_top"),
+              "banco": (None, "modular_street_seating"), "lixeira": (None, "metal_trash_can"), "hidrante": (None, "fire_hydrant")}
 SKIP_SETS = ("_aged", "_rust")  # variações gastas ficam de fora: as limpas bastam e pesam menos
 
 
@@ -743,7 +752,8 @@ def import_props(models_root, report):
             continue
         mesh = import_prop_mesh(os.path.join(folder, fbx[0]), "SM_" + ph_id)
         instances = {}
-        for key, files in prop_texture_sets(folder).items():
+        source = MATERIAL_SOURCE.get(ph_id, ph_id)  # parte cortada: as texturas e o casamento dos slots são os do modelo inteiro
+        for key, files in prop_texture_sets(os.path.join(models_root, source)).items():
             tex = {kind: import_prop_texture(path, "T_%s_%s" % (key, kind), kind) for kind, path in files.items()}
             is_masked = "opacity" in tex or "alpha" in tex
             params = {"Cor": tex.get("diff"), "Normal": tex.get("nor_gl"), "Aspereza": tex.get("rough"), "Metal": tex.get("metal") or defaults["preto"],
@@ -754,8 +764,8 @@ def import_props(models_root, report):
         for i, slot in enumerate(slots):
             # o conjunto cujo sufixo aparece no nome do slot; senão o conjunto com o nome do modelo
             low = slot.lower()
-            best = next((k for k in instances if k != ph_id and k[len(ph_id) + 1:] and k[len(ph_id) + 1:] in low), None)
-            best = best or (ph_id if ph_id in instances else next(iter(instances), None))
+            best = next((k for k in instances if k != source and k[len(source) + 1:] and k[len(source) + 1:] in low), None)
+            best = best or (source if source in instances else next(iter(instances), None))
             if best:
                 mesh.set_material(i, instances[best])
             chosen.append("%s->%s" % (slot, best))
@@ -763,8 +773,8 @@ def import_props(models_root, report):
         bounds = mesh.get_bounds()
         report.append("mobiliário %s: extensão %s cm, slots %s" % (ph_id, bounds.box_extent, ", ".join(chosen)))
         meshes[ph_id] = mesh
-    if "jacaranda_tree" in meshes:
-        keep_foliage(meshes["jacaranda_tree"], "T_jacaranda_tree_leaves_alpha", report)
+    if "jacaranda_tree_top" in meshes:
+        keep_foliage(meshes["jacaranda_tree_top"], "T_jacaranda_tree_leaves_alpha", report)
     return meshes
 
 
@@ -803,37 +813,46 @@ def build_props(b, props, report):
     front = LANE_CM + CURB_W + SIDEWALK_W
     count = 0
 
-    def place(ph_id, x, y, yaw, z=SIDEWALK_TOP, scale=1.0):
+    breakable = unreal.load_class(None, BREAKABLE_CLASS)
+    if breakable is None:
+        raise LookdevError("Classe %s não encontrada: compile o projeto antes (Tools/Unreal/build.ps1)" % BREAKABLE_CLASS)
+
+    def place(kind, x, y, yaw, scale=1.0):
+        """Peça destrutível (17c): o tipo de Breakables.csv, a malha que fica (base, toco) e a que quebra."""
         nonlocal count
-        if ph_id not in props:
+        base_id, body_id = BREAKABLES[kind]
+        if body_id not in props:
             return
-        actor = b.spawn(unreal.StaticMeshActor, (x, y, z), unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw), "%s_%d" % (ph_id, count))
-        actor.static_mesh_component.set_static_mesh(props[ph_id])
-        actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+        actor = b.spawn(breakable, (x, y, SIDEWALK_TOP), unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw), "%s_%d" % (kind, count))
+        actor.set_editor_property("kind", kind)
+        actor.set_editor_property("break_mesh", props[body_id])
+        if base_id and base_id in props:
+            actor.set_editor_property("base_mesh", props[base_id])
+        actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))  # as malhas entram nos componentes no OnConstruction e no BeginPlay
         count += 1
 
     for side in (-1, 1):
         x = ROAD_X0 + 1000.0
         n = 0
         while x < ROAD_X1 - 500.0:
-            place("dn_street_light", x, side * (LANE_CM + CURB_W + 60.0), -90.0 * side)  # o braço (+X do modelo) vira para a pista
+            place("poste", x, side * (LANE_CM + CURB_W + 60.0), -90.0 * side)  # o braço (+X do modelo) vira para a pista
             n += 1
             x += 2500.0
         x = ROAD_X0 + 1500.0 + (700.0 if side > 0 else 0.0)
         while x < ROAD_X1 - 500.0:
-            place("modular_street_seating", x, side * (front - 90.0), 90.0 * side)
-            place("metal_trash_can", x + 300.0, side * (front - 70.0), 0.0)
+            place("banco", x, side * (front - 90.0), 90.0 * side)
+            place("lixeira", x + 300.0, side * (front - 70.0), 0.0)
             x += 6000.0
         x = ROAD_X0 + 3200.0 + (1800.0 if side > 0 else 0.0)
         while x < ROAD_X1 - 500.0:
-            place("fire_hydrant", x, side * (LANE_CM + CURB_W + 45.0), 0.0)
+            place("hidrante", x, side * (LANE_CM + CURB_W + 45.0), 0.0)
             x += 7000.0
     for z0, z1, side in LOW_ZONES:
         x = z0 + 600.0
         while x < z1 - 600.0:
-            place("jacaranda_tree", x, side * (front + 450.0), (x * 37.0) % 360.0, scale=0.6)  # o modelo tem 19 m de altura
+            place("arvore", x, side * (front + 450.0), (x * 37.0) % 360.0, scale=0.6)  # o modelo tem 19 m de altura
             x += 1200.0
-    report.append("mobiliário de rua colocado: %d atores" % count)
+    report.append("mobiliário de rua colocado: %d peças destrutíveis" % count)
 
 
 def build_map(mats, report, props=None):
