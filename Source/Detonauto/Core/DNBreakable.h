@@ -38,8 +38,10 @@ struct FDNBreakableSettings
 	/** A peça solta dorme depois de SleepAfterS seguidos abaixo desta velocidade [m/s]. */
 	float SleepSpeedMs = 0.2f;
 	float SleepAfterS = 1.0f;
-	/** A peça solta ignora o carro que a derrubou por este tempo [s]. */
-	float IgnoreCarS = 0.3f;
+	/** B9: destroço que o carro alcança sai da frente com a velocidade horizontal do carro vezes isto (>= 1). */
+	float PlowFactor = 1.1f;
+	/** B9: e com pelo menos esta velocidade para cima [m/s] (um pulo, para não sair arrastando no asfalto). */
+	float PlowUpMs = 1.5f;
 };
 
 struct FDNBreakInput
@@ -73,6 +75,12 @@ struct FDNBreakable
 
 	/** B8: soma o tempo parado (abaixo de SleepSpeedMs); verdadeiro quando chega a SleepAfterS. Mexeu, zera. */
 	static bool StepSleep(const FDNBreakableSettings& Settings, float SpeedMs, float DeltaSeconds, float& InOutStillSeconds);
+
+	/**
+	 *  B9: o carro varre o destroço que alcança (cm/s, no mundo). Devolve a velocidade nova do destroço; o carro não muda (destroço não
+	 *  segura carro). Carro parado ou velocidade inválida: o destroço segue como está.
+	 */
+	static FVector Plow(const FDNBreakableSettings& Settings, const FVector& CarVelocityCmS, const FVector& DebrisVelocityCmS);
 };
 
 /** De onde veio uma batida do carro do jogador. */

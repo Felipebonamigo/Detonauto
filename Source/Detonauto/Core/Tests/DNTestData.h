@@ -104,7 +104,8 @@ namespace DNTest
 		R.MaxActiveProps = S.MaxActiveProps;
 		R.SleepSpeedMs = S.SleepSpeedMs;
 		R.SleepAfterS = S.SleepAfterS;
-		R.IgnoreCarS = S.IgnoreCarS;
+		R.PlowFactor = S.PlowFactor;
+		R.PlowUpMs = S.PlowUpMs;
 		return R;
 	}
 

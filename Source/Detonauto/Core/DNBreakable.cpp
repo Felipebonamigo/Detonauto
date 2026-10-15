@@ -61,6 +61,29 @@ FDNBreakResult FDNBreakable::Hit(const FDNBreakableKind& Kind, const FDNBreakabl
 	return R;
 }
 
+FVector FDNBreakable::Plow(const FDNBreakableSettings& Settings, const FVector& CarVelocityCmS, const FVector& DebrisVelocityCmS)
+{
+	const FVector Debris = (DebrisVelocityCmS.ContainsNaN() || !FMath::IsFinite(DebrisVelocityCmS.SizeSquared())) ? FVector::ZeroVector : DebrisVelocityCmS;
+	const FVector Car = Flat(CarVelocityCmS);
+	if (Car.ContainsNaN() || !FMath::IsFinite(Car.SizeSquared()) || Car.Size() < 100.0)
+	{
+		return Debris; // carro parado (abaixo de 1 m/s) ou inválido não varre
+	}
+	const FDNBreakableSettings Def;
+	const float Factor = (FMath::IsFinite(Settings.PlowFactor) && Settings.PlowFactor >= 1.0f) ? Settings.PlowFactor : Def.PlowFactor;
+	const float UpMs = (FMath::IsFinite(Settings.PlowUpMs) && Settings.PlowUpMs >= 0.0f) ? Settings.PlowUpMs : Def.PlowUpMs;
+	const FVector Dir = Car.GetSafeNormal();
+	const double Along = FVector::DotProduct(Debris, Dir);
+	const double Target = Car.Size() * Factor;
+	if (Along >= Target && Debris.Z >= UpMs * 100.0f)
+	{
+		return Debris; // já sai da frente sozinho
+	}
+	FVector Out = Debris + Dir * FMath::Max(Target - Along, 0.0); // só a parte na direção do carro muda; o lado fica
+	Out.Z = FMath::Max(Out.Z, static_cast<double>(UpMs) * 100.0);
+	return Out.GetClampedToMaxSize(Positive(Settings.MaxLaunchMs, Def.MaxLaunchMs) * 100.0f);
+}
+
 bool FDNBreakable::StepSleep(const FDNBreakableSettings& Settings, float SpeedMs, float DeltaSeconds, float& InOutStillSeconds)
 {
 	if (!FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f)

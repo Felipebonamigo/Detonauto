@@ -47,6 +47,13 @@ a que sobra depois que a física já freou), massa do carro (do preset em
    volta ao lugar.
 7. Entradas NaN, negativas ou massa zero são tratadas como nos outros contratos
    (validação na carga do CSV e valor seguro na regra).
+8. **Varrer (B9, acrescentado no 17c depois de medir):** o destroço que o carro
+   alcança sai da frente. A parte da velocidade dele na direção do carro passa a
+   ser pelo menos `|v_h| · PlowFactor` (a velocidade horizontal do carro vezes
+   1,1). O lado fica, e ele sobe a pelo menos `PlowUpMs`, tudo limitado a
+   `MaxLaunchMs`. **O carro não muda.** Abaixo de 1 m/s o carro não varre. O
+   destroço que já dormiu acorda e volta ao orçamento de peças simulando. Sem
+   isso, o banco caído atravessava o capô quando o carro o alcançava.
 
 Exemplos com o carro de 1.500 kg, `k = 1` e batida de frente:
 
@@ -85,7 +92,10 @@ Os valores globais ficam numa linha de configuração, como em
 | `MaxActiveProps` | 16 |
 | `SleepSpeedMs` | 0,2 |
 | `SleepAfterS` | 1,0 |
-| `IgnoreCarS` | 0,3 |
+| `PlowFactor` | 1,1 |
+| `PlowUpMs` | 1,5 |
+
+`IgnoreCarS` (0,3 s) saiu no 17c. Ver "Colisão", abaixo.
 
 ## Física e custo
 
@@ -98,10 +108,19 @@ Os valores globais ficam numa linha de configuração, como em
   mesma regra do `FDNPartPool::Plan`, com um orçamento próprio, separado das 24
   peças do carro. Passando do limite, a peça mais antiga é congelada onde está.
   **Nada some à vista do jogador.**
-- **Colisão:** a peça solta ignora o carro que a derrubou por `IgnoreCarS`, para
-  não frear duas vezes nem prender embaixo do carro. Ela colide com o chão, com o
-  tráfego e com as outras peças. Ligue CCD só enquanto ela estiver rápida, para
-  não atravessar o chão.
+- **Colisão:** a peça solta vira **destroço**, um tipo de colisão próprio
+  (`DNDebris`, `ECC_GameTraceChannel1`). O destroço **nunca mais segura o carro**,
+  nem o chassi nem as rodas, e o carro o varre (regra 8). Ele colide com o chão,
+  com os prédios, com o tráfego, com as peças inteiras e com outro destroço. A
+  base do poste e o toco da árvore também são destroço desde o início. O CCD
+  fica ligado só enquanto a peça está rápida, para não atravessar o chão.
+  - *Por que mudou (medido no 17c):* o contrato pedia ignorar o carro só por
+    `IgnoreCarS` = 0,3 s. Não bastou. (1) O traço da suspensão das rodas da
+    Chaos corre no canal WorldDynamic: as rodas subiam no banco que voava à
+    frente, sem contato no chassi, e o carro saía lançado a 100 km/h girando. (2)
+    A lixeira lançada a 35 m/s caía à frente, voltava a segurar o chassi, o carro
+    a alcançava, e ela ficava presa no para-choque: de 101 para 6 km/h. "Bater e
+    seguir" pede o carro livre do que já derrubou.
 
 ## Escala: o desenho tem que servir à cidade
 
@@ -134,6 +153,8 @@ mapa.
 2. **A 10 km/h contra o poste:** o carro para e o poste fica.
 3. **Custo:** 16 peças derrubadas em sequência, num zigue-zague pela calçada,
    medidas no perfil `DN_AlvoPS5` (quadro e física, média e p95) e comparadas
-   com a rua intacta.
+   com a rua intacta. Na medição do 17c, as 16 peças ficaram em fila na faixa do
+   carro, e não em zigue-zague: o piloto automático do teste segue reto (ver
+   `docs/lote-17c.md`).
 4. **Nada atravessa o chão nem some à vista** nas capturas.
 5. **O Felipe joga** e diz se parece destruição.

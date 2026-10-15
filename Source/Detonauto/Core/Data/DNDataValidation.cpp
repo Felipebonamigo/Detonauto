@@ -692,7 +692,8 @@ TArray<FString> FDNDataValidation::ValidateBreakableSettings(const TArray<FDNBre
 		}
 		CheckRange(BreakableSettingsFile, E.Id, TEXT("SleepSpeedMs"), R.SleepSpeedMs, 0.0f, false, 10.0f, true, Errors);
 		CheckRange(BreakableSettingsFile, E.Id, TEXT("SleepAfterS"), R.SleepAfterS, 0.0f, false, 60.0f, true, Errors);
-		CheckRange(BreakableSettingsFile, E.Id, TEXT("IgnoreCarS"), R.IgnoreCarS, 0.0f, true, 5.0f, true, Errors);
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("PlowFactor"), R.PlowFactor, 1.0f, true, 3.0f, true, Errors);
+		CheckRange(BreakableSettingsFile, E.Id, TEXT("PlowUpMs"), R.PlowUpMs, 0.0f, true, 10.0f, true, Errors);
 	}
 	return Errors;
 }

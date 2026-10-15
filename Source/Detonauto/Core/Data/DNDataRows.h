@@ -504,7 +504,8 @@ struct FDNBreakableSettingsRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxActiveProps = 0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SleepSpeedMs = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SleepAfterS = 0.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite) float IgnoreCarS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PlowFactor = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PlowUpMs = 0.0f;
 
 	FDNBreakableSettings ToSettings() const
 	{
@@ -515,7 +516,8 @@ struct FDNBreakableSettingsRow : public FTableRowBase
 		S.MaxActiveProps = MaxActiveProps;
 		S.SleepSpeedMs = SleepSpeedMs;
 		S.SleepAfterS = SleepAfterS;
-		S.IgnoreCarS = IgnoreCarS;
+		S.PlowFactor = PlowFactor;
+		S.PlowUpMs = PlowUpMs;
 		return S;
 	}
 };

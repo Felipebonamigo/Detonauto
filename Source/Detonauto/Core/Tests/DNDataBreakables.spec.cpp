@@ -3,7 +3,8 @@
 //
 // Faixas: MassKg (0, 5000], MinBreakSpeedKmh [0, 200], LaunchFactor [0, 3], LaunchUpMs [0, 20], BreakHeightCm [0, 500], Points >= 0;
 // configuração com exatamente uma linha: ArcadeMassFactor (0, 10], MaxSpeedLossPct [0, 100], MaxLaunchMs (0, 100],
-// MaxActiveProps >= 1, SleepSpeedMs (0, 10], SleepAfterS (0, 60], IgnoreCarS [0, 5].
+// MaxActiveProps >= 1, SleepSpeedMs (0, 10], SleepAfterS (0, 60], PlowFactor [1, 3], PlowUpMs [0, 10]. (IgnoreCarS saiu no 17c:
+// destroço nunca mais segura o carro; o carro varre o destroço que alcança, B9.)
 
 #include <limits>
 #include "Misc/AutomationTest.h"
@@ -106,13 +107,16 @@ void FDNDataBreakablesSpec::Define()
 			BadSettings(TEXT("orcamento 0"), TEXT("MaxActiveProps"), [](FDNBreakableSettingsRow& R) { R.MaxActiveProps = 0; });
 			BadSettings(TEXT("sono 0"), TEXT("SleepSpeedMs"), [](FDNBreakableSettingsRow& R) { R.SleepSpeedMs = 0.f; });
 			BadSettings(TEXT("sono depois NaN"), TEXT("SleepAfterS"), [this](FDNBreakableSettingsRow& R) { R.SleepAfterS = NaNf; });
-			BadSettings(TEXT("ignorar 6 s"), TEXT("IgnoreCarS"), [](FDNBreakableSettingsRow& R) { R.IgnoreCarS = 6.f; });
+			BadSettings(TEXT("varrer a 0,9"), TEXT("PlowFactor"), [](FDNBreakableSettingsRow& R) { R.PlowFactor = 0.9f; });
+			BadSettings(TEXT("varrer a 3,1"), TEXT("PlowFactor"), [](FDNBreakableSettingsRow& R) { R.PlowFactor = 3.1f; });
+			BadSettings(TEXT("pulo de 11 m/s"), TEXT("PlowUpMs"), [](FDNBreakableSettingsRow& R) { R.PlowUpMs = 11.f; });
+			BadSettings(TEXT("pulo NaN"), TEXT("PlowUpMs"), [this](FDNBreakableSettingsRow& R) { R.PlowUpMs = NaNf; });
 		});
 
-		It("ToSettings copia os sete campos", [this]()
+		It("ToSettings copia os oito campos", [this]()
 		{
 			FDNBreakableSettingsRow R;
-			R.ArcadeMassFactor = 2.f; R.MaxSpeedLossPct = 30.f; R.MaxLaunchMs = 20.f; R.MaxActiveProps = 8; R.SleepSpeedMs = 0.3f; R.SleepAfterS = 2.f; R.IgnoreCarS = 0.5f;
+			R.ArcadeMassFactor = 2.f; R.MaxSpeedLossPct = 30.f; R.MaxLaunchMs = 20.f; R.MaxActiveProps = 8; R.SleepSpeedMs = 0.3f; R.SleepAfterS = 2.f; R.PlowFactor = 1.5f; R.PlowUpMs = 3.f;
 			const FDNBreakableSettings S = R.ToSettings();
 			TestEqual("ArcadeMassFactor", S.ArcadeMassFactor, 2.f);
 			TestEqual("MaxSpeedLossPct", S.MaxSpeedLossPct, 30.f);
@@ -120,7 +124,8 @@ void FDNDataBreakablesSpec::Define()
 			TestEqual("MaxActiveProps", S.MaxActiveProps, 8);
 			TestEqual("SleepSpeedMs", S.SleepSpeedMs, 0.3f);
 			TestEqual("SleepAfterS", S.SleepAfterS, 2.f);
-			TestEqual("IgnoreCarS", S.IgnoreCarS, 0.5f);
+			TestEqual("PlowFactor", S.PlowFactor, 1.5f);
+			TestEqual("PlowUpMs", S.PlowUpMs, 3.f);
 		});
 	});
 
@@ -177,14 +182,16 @@ void FDNDataBreakablesSpec::Define()
 			TestEqual("MaxActiveProps", Csv.MaxActiveProps, Def.MaxActiveProps);
 			TestEqual("SleepSpeedMs", Csv.SleepSpeedMs, Def.SleepSpeedMs);
 			TestEqual("SleepAfterS", Csv.SleepAfterS, Def.SleepAfterS);
-			TestEqual("IgnoreCarS", Csv.IgnoreCarS, Def.IgnoreCarS);
+			TestEqual("PlowFactor", Csv.PlowFactor, Def.PlowFactor);
+			TestEqual("PlowUpMs", Csv.PlowUpMs, Def.PlowUpMs);
 			TestEqual("contrato: k 1", Def.ArcadeMassFactor, 1.f);
 			TestEqual("contrato: teto 25%", Def.MaxSpeedLossPct, 25.f);
 			TestEqual("contrato: 35 m/s", Def.MaxLaunchMs, 35.f);
 			TestEqual("contrato: 16 pecas", Def.MaxActiveProps, 16);
 			TestEqual("contrato: 0,2 m/s", Def.SleepSpeedMs, 0.2f);
 			TestEqual("contrato: 1 s", Def.SleepAfterS, 1.f);
-			TestEqual("contrato: 0,3 s", Def.IgnoreCarS, 0.3f);
+			TestEqual("17c: varre a 1,1 x", Def.PlowFactor, 1.1f);
+			TestEqual("17c: pulo de 1,5 m/s", Def.PlowUpMs, 1.5f);
 		});
 	});
 

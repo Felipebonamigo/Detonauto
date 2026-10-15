@@ -10,7 +10,10 @@
 //  B6 entradas inválidas: velocidade NaN não quebra; massa do carro inválida vale a do carro padrão; massa da peça inválida vale o
 //     padrão do tipo; d^ nula ou NaN vale f = 1; k ou teto inválidos valem o padrão;
 //  B7 batida em peça nunca conta como a batida do jogador na rodada de Crash nem dispara a câmera de batida;
-//  B8 sono: a peça solta dorme depois de SleepAfterS seguidos abaixo de SleepSpeedMs.
+//  B8 sono: a peça solta dorme depois de SleepAfterS seguidos abaixo de SleepSpeedMs;
+//  B9 varrer (17c, depois de medir): destroço nunca segura o carro; o que o carro alcança sai da frente com a velocidade horizontal
+//     do carro x PlowFactor (o lado fica) e pelo menos PlowUpMs para cima, no máximo MaxLaunchMs. O carro não muda. Carro abaixo de
+//     1 m/s não varre; PlowFactor inválido ou abaixo de 1 e PlowUpMs inválido valem o padrão; destroço com NaN vale parado.
 
 #include <limits>
 #include "Misc/AutomationTest.h"
@@ -157,6 +160,44 @@ void FDNBreakableSpec::Define()
 		TestFalse("Dt invalido nao conta", FDNBreakable::StepSleep(Settings, 0.f, NaNf, Still));
 		TestEqual("Dt invalido nao estraga o tempo parado", Still, 0.9f);
 		TestTrue("e o proximo passo valido ainda dorme", FDNBreakable::StepSleep(Settings, 0.f, 0.1f, Still));
+	});
+
+	It("B9: o carro varre o destroco que alcanca: sai da frente a 1,1 x a velocidade do carro, com um pulo, e o lado fica", [this]()
+	{
+		const FVector Car(60.f / 0.036f, 0.f, 0.f);
+		const FVector Out = FDNBreakable::Plow(Settings, Car, FVector(300.f, 200.f, 0.f));
+		TestEqual("para a frente", Out.X, 1.1 * Car.X, 0.5);
+		TestEqual("o lado fica", Out.Y, 200.0, 0.01);
+		TestEqual("pulo de 1,5 m/s", Out.Z, 150.0, 0.01);
+		const FVector Diagonal = FDNBreakable::Plow(Settings, FVector(1000.f, 1000.f, -300.f), FVector::ZeroVector);
+		TestEqual("na direcao do carro (diagonal)", Diagonal.X, Diagonal.Y, 0.01);
+		TestEqual("so a velocidade horizontal do carro conta", FVector(Diagonal.X, Diagonal.Y, 0.0).Size(), 1.1 * FVector(1000.0, 1000.0, 0.0).Size(), 0.5);
+	});
+
+	It("B9: destroco ja mais rapido nao muda; carro parado nao varre; teto MaxLaunchMs", [this]()
+	{
+		const FVector Car(60.f / 0.036f, 0.f, 0.f);
+		const FVector Fast(2500.f, -50.f, 400.f);
+		TestEqual("ja mais rapido e subindo", FDNBreakable::Plow(Settings, Car, Fast), Fast);
+		const FVector Slow(100.f, 0.f, 0.f);
+		TestEqual("carro a 0,9 m/s", FDNBreakable::Plow(Settings, FVector(90.f, 0.f, 0.f), Slow), Slow);
+		TestEqual("a 200 km/h, varrido no teto de 35 m/s", FDNBreakable::Plow(Settings, FVector(200.f / 0.036f, 0.f, 0.f), Slow).Size(), 3500.0, 0.5);
+	});
+
+	It("B9: entradas invalidas usam valores seguros", [this]()
+	{
+		const FVector Car(60.f / 0.036f, 0.f, 0.f);
+		const FVector Debris(100.f, 0.f, 0.f);
+		TestEqual("carro NaN: destroco segue", FDNBreakable::Plow(Settings, FVector(NaNf, 0.f, 0.f), Debris), Debris);
+		const FVector FromNaN = FDNBreakable::Plow(Settings, Car, FVector(NaNf, 0.f, 0.f));
+		TestFalse("destroco NaN vale parado: nada de NaN", FromNaN.ContainsNaN());
+		TestEqual("destroco NaN vale parado: sai varrido", FromNaN.X, 1.1 * Car.X, 0.5);
+		FDNBreakableSettings Bad;
+		Bad.PlowFactor = 0.5f;
+		Bad.PlowUpMs = NaNf;
+		const FVector WithBad = FDNBreakable::Plow(Bad, Car, Debris);
+		TestEqual("fator abaixo de 1 vale o padrao (nunca freia o destroco para tras do carro)", WithBad.X, 1.1 * Car.X, 0.5);
+		TestEqual("pulo NaN vale o padrao", WithBad.Z, 150.0, 0.01);
 	});
 }
 
