@@ -21,16 +21,16 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível, câmera de velocidade e de batida) | `Source/Detonauto/Core/` | Testadas; 677 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível, câmera de velocidade e de batida, peças que soltam e vidros) | `Source/Detonauto/Core/` | Testadas; 710 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros, mobiliário |
 | Subsistemas de dados e de save | `Core/DNGameDataSubsystem`, `Core/DNRecordsSubsystem` | Testados sem mundo |
-| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, câmera de velocidade (FOV, tremor, desfoque nas bordas) e de batida (câmera lenta, órbita, controle do destroço), HUD de depuração |
+| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, câmera de velocidade (FOV, tremor, desfoque nas bordas) e de batida (câmera lenta, órbita, controle do destroço), peças que penduram e soltam e vidros que trincam e estouram (`Vehicle/ADNCarPart`, `Vehicle/ADNGlassShards`), HUD de depuração |
 | Mobiliário destrutível | `Crash/ADNBreakableProp`, `Crash/UDNBreakableSubsystem` | Poste, árvore, banco, lixeira e hidrante da `L_Lookdev` caem quando o carro bate; o carro segue perdendo de 2% a 23% da velocidade; destroço nunca segura o carro e é varrido da frente (`docs/lote-17c.md`) |
 | Tráfego e rodada de Crash | `Traffic/`, `Vehicle/DNCrashTestGameMode` | Lote 13 parcial: código na main, medição ainda não rodou |
 | Mapa de teste | `ADNVehicleArena`, criado por código no `/Engine/Maps/Entry` | Feio de propósito; **não serve para julgar visual** |
-| Arte | `Content/Detonauto/Vehicle/SportsCar` | Carro do template da Epic, provisório; `SK_DNSportsCarBody` é a carroceria dele com os 5 alvos, refeita por `Tools/Unreal/damage-body.ps1` |
+| Arte | `Content/Detonauto/Vehicle/SportsCar` | Carro do template da Epic, provisório; `SK_DNSportsCarBody` é a carroceria dele com os 5 alvos e os vãos, refeita por `Tools/Unreal/damage-body.ps1`; as 19 peças e vidros ficam em `SportsCar/Parts`, cortados por `Tools/Blender/split_car_parts.py` (`damage-body.ps1 -Parts`) |
 
 ## Lotes
 
@@ -52,6 +52,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 17b | Desgaste da pintura por zona e vincos mais duros | Na main, aguardando revisão (`docs/lote-17b.md`): capturas dos níveis nos 4 ângulos com o sol por trás, batida real a 100 km/h na `L_Lookdev`, lado a lado com o 17, frente em 1,0 mais destruída (recuo em rampa e capô em tenda). Custo com 37,8 mil vértices pendente (PC ocupado por outras sessões) |
 | 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
 | 18 | Câmera de velocidade e de batida | Aprovado (`docs/lote-18.md`, revisão de 15 out, com as três mudanças de contrato): FOV, tremor e desfoque nas bordas pela velocidade; câmera de batida com câmera lenta, órbita que mostra o amassado e não entra em prédio; controle do destroço medido (−1,24 m / +1,28 m). Passe do desfoque 0,038 ms. Pendentes: quadro inteiro com e sem desfoque com o PC livre, e o Felipe jogar |
+| 18b | Peças que soltam e vidros que quebram | Na main, aguardando revisão (`docs/lote-18b.md`, `docs/regras-pecas.md`): 11 peças (Presa → Pendurada → Solta) e 8 vidros e lentes, malhas cortadas no Blender por script; trinca procedural no para-brisa; cacos sem Niagara. Itens 1 a 7 com capturas e custo (+0,11 ms de Frame e +0,16 de Game por carro com as peças presas). Achados: P5 (o empurrão atravessava o carro) e a câmera entrando no carro. Falta o Felipe jogar |
 
 ## Primeiro playtest (14 out)
 
@@ -184,6 +185,15 @@ melhor e ele quer cinco modos.
   com a versão final, nunca um commit por tentativa. O histórico já tem ~870 MB; a copa do
   jacarandá (121 MB) entrou três vezes no 17c. Textura de modelo no máximo 2k. Antes do lote 20,
   fazer uma árvore leve (tronco decimado, folhas em cartões, alvo de 20 MB ou menos).
+- Destroço (`DNDebris`) ignora o carro: um empurrão que aponte para dentro do carro faz a peça
+  sumir dentro da carroceria. As peças soltas saem para fora pelo lado delas (P5 em
+  `Core/DNCarParts.h`), e a câmera atravessa as peças (canal `Camera` ignorado), senão a
+  esfera da câmera de batida para nelas e entra no carro.
+- Blender: a peça montada pelo bmesh perde as normais personalizadas. Grave as normais
+  num atributo de canto antes de cortar e reaplique com `normals_split_custom_set`
+  (`split_car_parts.py`). A transferência pela face mais próxima pega a casca errada.
+- Importação FBX descarta o alvo de deformação que não desloca nenhum vértice: só a
+  carroceria pode exigir os 5 alvos; peça longe de uma zona chega com menos.
 - O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
   o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
   poste) ele diz REPROVADO de propósito.
@@ -215,8 +225,7 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 18b: peças do carro que soltam e vidros (`docs/regras-pecas.md`), com o primer
-   das lascas a ~0,35 e mais metal nu no miolo.
+1. Revisão do lote 18b (`docs/lote-18b.md`) e o Felipe jogar os lotes 18 e 18b.
 2. Com o PC livre: quadro inteiro do lote 18 com e sem desfoque, custo do 17b com 37,8
    mil vértices e o lote 13 (`crash-measure.ps1`).
 3. Lotes 19 a 21 (`docs/fatia-vertical.md`): efeitos Niagara, primeiro

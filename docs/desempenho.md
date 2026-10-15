@@ -353,6 +353,40 @@ desfoque (média e p95 pelo `lookdev-measure.ps1`, `-ExtraArgs '-DNEdgeBlurForce
 cinco tentativas de 15 out, quatro foram descartadas por outro Unreal aberto (as três com o desfoque entre elas); a que valeu, sem o
 desfoque, deu Frame 4,74 / 5,29 ms e GPU 4,45 / 4,94 ms (média / p95).
 
+## Lote 18b: peças que soltam e vidros (15 out 2026)
+
+Mesmo protocolo (`lookdev-measure.ps1 -Scenario parado`, perfil `DN_AlvoPS5`, 1920x1080), **nenhum outro Unreal aberto**. Cada carro
+tem 19 malhas a mais, todas com esqueleto: 11 peças e 8 vidros e lentes, cada uma com os 5 alvos. A carroceria foi subdividida antes do
+corte. Os estacionados são `ADNVehicle` (`-DNParkedCars=6`) e também ganham peças.
+
+| Cenário | Frame média / p95 | Game média / p95 | GPU média / p95 | Física, linha do jogo | Física, trabalhadores | Quadros |
+|---|---|---|---|---|---|---|
+| só o jogador, sem peças (`-DNNoParts`) | 4,56 / 5,05 ms | 1,39 / 2,03 ms | 4,29 / 4,77 ms | 0,10 / 0,11 ms | 0,12 / 0,15 ms | 2193 em 10 s |
+| só o jogador, com peças | 4,81 / 5,30 ms | 1,59 / 2,32 ms | 4,53 / 5,01 ms | 0,10 / 0,11 ms | 0,12 / 0,15 ms | 2080 em 10 s |
+| + 6 intactos, sem peças (1) | 4,76 / 5,25 ms | 1,95 / 2,73 ms | 4,48 / 4,97 ms | 0,31 / 0,37 ms | 0,19 / 0,23 ms | 2100 em 10 s |
+| + 6 intactos, sem peças (2) | 4,76 / 5,24 ms | 1,94 / 2,70 ms | 4,49 / 4,97 ms | 0,31 / 0,36 ms | 0,18 / 0,22 ms | 2100 em 10 s |
+| + 6 intactos, com peças presas (1) | 5,54 / 6,20 ms | 3,00 / 3,85 ms | 5,11 / 5,63 ms | 0,36 / 0,83 ms | 0,19 / 0,25 ms | 1806 em 10 s |
+| + 6 intactos, com peças presas (2) | 5,55 / 6,24 ms | 3,05 / 3,89 ms | 5,11 / 5,62 ms | 0,38 / 0,94 ms | 0,19 / 0,24 ms | 1802 em 10 s |
+| + 6 com 36 peças penduradas (dano 0,45) | 5,63 / 6,35 ms | 3,46 / 4,21 ms | 5,18 / 5,68 ms | 0,39 / 0,75 ms | 0,31 / 0,58 ms | 1776 em 10 s |
+| + 6 em 1,0, 66 soltas já pousadas (24 dormindo, o resto congelado pelo orçamento) | 5,41 / 6,00 ms | 3,01 / 3,79 ms | 5,09 / 5,59 ms | 0,36 / 0,80 ms | 0,24 / 0,39 ms | 1848 em 10 s |
+| + 6 intactos, com peças, janela de 15 a 19 s | 5,53 / 6,20 ms | 3,02 / 3,81 ms | 5,12 / 5,64 ms | 0,37 / 0,83 ms | 0,20 / 0,29 ms | 724 em 4 s |
+| + 6 quebrados em 16 s (`-DNParkedDamageAtS=16`), 24 voando, mesma janela (1) | 5,51 / 6,14 ms | 3,48 / 5,11 ms | 5,13 / 5,61 ms | 0,35 / 0,61 ms | 0,32 / 0,61 ms | 726 em 4 s |
+| idem (2) | 5,54 / 6,19 ms | 3,52 / 5,02 ms | 5,17 / 5,66 ms | 0,34 / 0,54 ms | 0,35 / 0,63 ms | 722 em 4 s |
+
+Na janela de 15 a 19 s, o dano entra a 1 s do começo e as 24 peças que o orçamento deixa simular voam até ~4,2 s (log).
+
+**Leitura:**
+
+- **Peças presas, 7 carros:** +0,79 ms de Frame, +0,63 de GPU e +1,1 de Game, ou seja, +0,11 / +0,09 / +0,16 ms por carro. As duas
+  execuções de cada lado ficaram a 0,05 ms uma da outra. O Game sobe porque cada carro tem 27 componentes de malha com esqueleto presos
+  ao chassi (19 novos e os 8 de antes), e cada um faz tick e atualiza a posição a cada quadro. É a alavanca se o tráfego ganhar peças:
+  tick desligado com a peça presa, ou a pose do chassi como líder (`SetLeaderPoseComponent`).
+- **36 penduradas:** +0,46 ms de Game e +0,12 ms na física dos trabalhadores (36 restrições), contra os intactos com peças.
+- **24 voando ao mesmo tempo:** +0,5 ms de Game na média e +1,2 no p95. O p95 inclui o quadro em que 66 peças soltam de uma vez
+  (6 carros × 5 zonas por `DNZone`). A física dos trabalhadores sobe 0,15 ms e a GPU não muda.
+- Tudo longe do orçamento (Game 8 ms; GPU ~5 ms na 4070 Ti, ~10 ms estimados no PS5). O p95 da física na linha do jogo subiu com
+  as peças presas (0,37 → 0,83–0,94 ms) sem a média mudar: picos, não custo fixo. Medir de novo quando o tráfego ganhar peças.
+
 ## Para o Felipe testar na Sprint 6
 
 1. Abra o carro do template, jogue com Alt+P e digite `stat unit`.

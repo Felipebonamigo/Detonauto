@@ -166,3 +166,21 @@ Todas as capturas com o sol por trás e em 1920.
 6. **Nenhum vão transparente:** captura de perto, sem a porta e sem o capô.
 7. **Custo** acima.
 8. **O Felipe joga** e diz se os pedaços saindo "vendem" a batida.
+
+## Decisões da implementação (15 out 2026)
+
+Detalhes, capturas e números em `docs/lote-18b.md`.
+
+- **P5, empurrão da peça solta:** vai para fora do carro, pelo lado da peça, sem a parte que entraria no obstáculo. A peça no eixo da
+  batida (para-choque, capô, tampa) sai de lado. Isso substitui "na direção da batida": na direção da batida a peça ia contra a parede,
+  e para longe dela atravessava o próprio carro (o destroço ignora o carro).
+- **A câmera atravessa a peça** pendurada ou solta. A esfera da câmera de batida parava nela, ao lado do carro, e entrava no carro.
+- **Dobradiça:** a restrição de física deixa girar de um lado só. Capô e tampa têm uma mola no meio da faixa e abrem 27 graus; sem ela,
+  a gravidade fechava. A peça pendurada não colide com destroço e só raspa contra o chão estático.
+- **Cacos** por `ADNGlassShards` (cubos instanciados, sem física e sem Niagara) até o lote 19.
+- **Farol e lanterna:** a lente do template não tem luz. "A luz apaga" virou lente fosca com a trinca, e depois estouro com cacos.
+- **Trinca procedural** no material do amassado: radiais, anéis em polígono, teia no centro. O centro fica recuado para dentro do vidro,
+  longe da borda escondida sob o capô.
+- **Vão:** casca escura feita da malha grossa, sem bloco de motor.
+- **Quem tem peças:** todo `ADNVehicle`. O tráfego (caixa provisória) segue com a regra 4 do `regras-dano.md` até ter carro preparado.
+- **Retrovisor:** o template não tem. **Roda solta:** não entrou.
