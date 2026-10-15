@@ -45,8 +45,13 @@ if SCRIPT_DIR not in sys.path:
 
 import make_damage_morphs as mdm  # noqa: E402  (o mesmo campo dos alvos da carroceria)
 
-# material escuro do lado de dentro das peças e dos vãos (o slot do chassi do carro: plástico preto e vidro fumê)
+# material escuro do lado de dentro das peças (o slot do chassi do carro: plástico preto e vidro fumê)
 DARK_MATERIAL_HINT = "Chassi"
+# lote 19: o vão ganha slot próprio (metal escuro com ruído, MI_DNVao em create_dent_material.py); com o do chassi, sem UV, ele saía
+# preto chapado
+VAO_MATERIAL = "MI_DNVao"
+# normais do vão e das faces de dentro (não têm normal do arquivo): suaves entre faces a menos deste ângulo
+SMOOTH_ANGLE_DEG = 60.0
 # atributo de canto com a normal do arquivo (store_corner_normals; sai antes de exportar)
 NORMAL_ATTR = "dn_normal"
 
@@ -323,16 +328,35 @@ def store_corner_normals(obj):
 
 
 def apply_saved_normals(obj):
-    """As normais guardadas viram as normais personalizadas; canto sem normal guardada (vão, parede, face de dentro): a da face."""
+    """
+    As normais guardadas viram as normais personalizadas. Canto sem normal guardada (vão, parede, face de dentro): a média das faces do
+    mesmo vértice a menos de SMOOTH_ANGLE_DEG da face (lote 19: com a normal da face o vão saía facetado). As paredes do vão são de
+    dois lados (faces opostas no mesmo vértice) e ficam de fora uma da outra pelo ângulo.
+    """
+    import math
+    from mathutils import Vector
     me = obj.data
     attr = me.attributes.get(NORMAL_ATTR)
     if attr is None:
         return
+    limit = math.cos(math.radians(SMOOTH_ANGLE_DEG))
+    faces_of = {}
+    for poly in me.polygons:
+        for vi in poly.vertices:
+            faces_of.setdefault(vi, []).append(poly)
     normals = []
     for poly in me.polygons:
         for li in range(poly.loop_start, poly.loop_start + poly.loop_total):
             n = attr.data[li].vector
-            normals.append(tuple(n) if n.length > 0.5 else tuple(poly.normal))
+            if n.length > 0.5:
+                normals.append(tuple(n))
+                continue
+            vi = me.loops[li].vertex_index
+            acc = Vector((0.0, 0.0, 0.0))
+            for other in faces_of[vi]:
+                if other.normal.dot(poly.normal) >= limit:
+                    acc += other.normal * other.area
+            normals.append(tuple(acc.normalized()) if acc.length > 1e-9 else tuple(poly.normal))
     me.normals_split_custom_set(normals)
     me.attributes.remove(me.attributes[NORMAL_ATTR])
 
@@ -342,6 +366,17 @@ def dark_index(body):
     if dark is None:
         raise SplitError("Não achei o material escuro ('%s') entre %s" % (DARK_MATERIAL_HINT, [m.name for m in body.data.materials]))
     return dark
+
+
+def vao_index(body):
+    """O slot do vão (VAO_MATERIAL), criado no fim da lista se ainda não existe; o Unreal o liga ao MI_DNVao pelo nome."""
+    import bpy
+    found = material_index(body, VAO_MATERIAL)
+    if found is not None:
+        return found
+    material = bpy.data.materials.get(VAO_MATERIAL) or bpy.data.materials.new(VAO_MATERIAL)
+    body.data.materials.append(material)
+    return len(body.data.materials) - 1
 
 
 def take_parts(bm, body, parts, on_part):
@@ -368,16 +403,16 @@ def coarse_pockets(body, parts):
     na malha subdividida, eles dobravam a carroceria (de 37,8 mil para 71 mil vértices).
     """
     import bmesh
+    vao = vao_index(body)
     bm = bmesh.new()
     bm.from_mesh(body.data)
     bm.faces.ensure_lookup_table()
-    dark = dark_index(body)
     pockets = []
 
     def on_part(part, faces):
         depth = float(part.get("pocket", 0.0))
         if depth > 0.0:
-            pockets.append(build_shell(faces, depth, dark, keep_outer=False))
+            pockets.append(build_shell(faces, depth, vao, keep_outer=False))
 
     take_parts(bm, body, parts, on_part)
     bm.free()

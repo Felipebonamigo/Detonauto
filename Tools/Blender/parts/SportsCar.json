@@ -1,11 +1,12 @@
 {
   "car": "SportsCar",
-  "notes": "Carro esportivo do template da Epic (lote 18b). Metros, eixos do Blender: frente +X, ESQUERDA +Y, cima +Z. Ordem importa: a face levada por uma peça não entra na seguinte. Nomes: o do enum EDNDamagePart, ou Glass_ mais o do EDNGlass.",
+  "notes": "Carro esportivo do template da Epic (lote 18b). Metros, eixos do Blender: frente +X, ESQUERDA +Y, cima +Z. Ordem importa: a face levada por uma peça não entra na seguinte. Nomes: o do enum EDNDamagePart, ou Glass_ mais o do EDNGlass. Para-brisa (lote 19): os dois planos em V deixam na carroceria a faixa quase plana da grade (base do vidro em x 1,00 no meio e 0,85 nas pontas, medida no Blender); com ela, o vidro opaco cobria a grade e a trinca passava por cima.",
   "parts": [
     { "name": "Spoiler", "take": "islands", "box": [-2.30, -1.50, -1.20, 1.20, 0.80, 1.30], "thickness": 0.0, "pocket": 0.0 },
     { "name": "Glass_HeadlightLeft", "take": "islands", "material": "Lights", "box": [1.50, 2.60, 0.30, 1.20, 0.20, 0.90], "thickness": 0.0, "pocket": 0.0, "mirror": "Glass_HeadlightRight" },
     { "name": "Glass_TaillightLeft", "take": "islands", "material": "Lights", "box": [-2.50, -1.50, 0.30, 1.20, -0.10, 0.90], "thickness": 0.0, "pocket": 0.0, "mirror": "Glass_TaillightRight" },
-    { "name": "Glass_Windshield", "box": [0.55, 1.45, -0.62, 0.62, 0.74, 1.18], "normal": [0.45, 0.0, 0.9, 0.35], "thickness": 0.006, "pocket": 0.35 },
+    { "name": "Glass_Windshield", "box": [0.55, 1.45, -0.62, 0.62, 0.74, 1.18], "normal": [0.45, 0.0, 0.9, 0.35],
+      "planes": [[1.0, 0.0, 0.0, 0.970, 0.243, 0.0], [1.0, 0.0, 0.0, 0.970, -0.243, 0.0]], "thickness": 0.006, "pocket": 0.35 },
     { "name": "Glass_Rear", "box": [-1.35, -0.45, -0.56, 0.56, 0.82, 1.20], "normal": [-0.45, 0.0, 0.9, 0.35], "thickness": 0.006, "pocket": 0.35 },
     { "name": "Glass_SideLeft", "box": [-0.50, 1.02, 0.40, 1.20, 0.77, 1.15], "normal": [0.0, 1.0, 0.0, 0.35],
       "planes": [[0.60, 0.0, 1.15, 0.43, 0.0, 0.90]], "thickness": 0.006, "pocket": 0.35, "mirror": "Glass_SideRight" },

@@ -233,6 +233,8 @@ def import_body(fbx, report):
 
 PARTS_DIR = CAR_DIR + "/Parts"
 PARTS_PREFIX = "SK_DNSportsCar_"
+# lote 19: o slot dos vãos (split_car_parts.py) e a instância dele (create_dent_material.py, rodado antes)
+VAO_MATERIAL = "/Game/Detonauto/Vehicle/MI_DNVao"
 
 
 def source_materials():
@@ -302,6 +304,10 @@ def import_parts(work_dir, report):
     work_dir = inside_project(work_dir)
     skeleton = load(SKELETON, unreal.Skeleton)
     by_name = source_materials()
+    vao = unreal.load_asset(VAO_MATERIAL)
+    if not isinstance(vao, unreal.MaterialInterface):
+        raise BodyError("Falta %s: rode antes Tools/Unreal/create_dent_material.ps1 -Dest /Game/Detonauto/Vehicle" % VAO_MATERIAL)
+    by_name[vao.get_name()] = vao
     files = sorted(f for f in os.listdir(work_dir) if f.startswith(PARTS_PREFIX) and f.endswith(".fbx"))
     if not files:
         raise BodyError("Nenhuma peça (%s*.fbx) em %s" % (PARTS_PREFIX, work_dir))
