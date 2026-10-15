@@ -192,6 +192,13 @@ public:
 	/** Tira todos os amassados (e desamassa a carroceria: os alvos de deformação voltam a 0). */
 	void ClearDents();
 
+	/** Batida em peça de rua que quebrou (lote 17c): o dano de sempre com a variação de velocidade da regra, sem contar como batida
+	 *  do jogador na rodada de Crash nem para a câmera de batida. */
+	void ApplyPropImpact(float DeltaVMs, const FVector& WorldPoint);
+
+	/** B9 (lote 17c): o destroço de peça de rua dentro da caixa da carroceria sai da frente (FDNBreakable::Plow); o carro não muda. */
+	void PlowDebris();
+
 	/** Ferramenta de captura (console ou EXEC: do -DNKeys): leva a zona (0 frente, 1 traseira, 2 esquerda, 3 direita, 4 teto) a
 	 *  pelo menos Damage (0 a 1), sem batida. Os alvos de deformação seguem a regra de sempre (FDNDamageMorph). */
 	UFUNCTION(Exec)
@@ -298,6 +305,12 @@ protected:
 
 	// batida real: velocidade do corpo no início do quadro (antes do passo de física) e a janela de contatos
 	FVector VelocityBeforeStepCmS = FVector::ZeroVector;
+	/** Giro do corpo no início do quadro: a peça de rua devolve o carro com o giro de antes do contato (sem guinada). */
+	FVector AngularBeforeStepDegS = FVector::ZeroVector;
+	/** Batida real vira dano (EnableDentMaterial com bBindRealHits). O aviso de contato fica sempre ligado, por causa das peças. */
+	bool bRealHitDamage = false;
+	/** Acelerador apertado pela entrada do jogador (para registrar no log quando liga). */
+	bool bThrottleHeld = false;
 	FVector GroupVelocityBeforeCmS = FVector::ZeroVector;
 	FDNImpactGrouper ImpactGrouper;
 	int32 GroupContacts = 0;

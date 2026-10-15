@@ -1,6 +1,8 @@
 #include "Vehicle/DNVehicle.h"
 #include "Vehicle/DNVehicleWheels.h"
 #include "Vehicle/DNTurboComponent.h"
+#include "Crash/DNBreakableProp.h"
+#include "Core/DNBreakable.h"
 #include "Core/DNGameDataSubsystem.h"
 #include "Core/DNWheelVisual.h"
 #include "Detonauto.h"
@@ -25,6 +27,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
 #include "PhysicsEngine/BodyInstance.h"
+#include "Engine/OverlapResult.h"
 
 namespace
 {
@@ -120,6 +123,8 @@ ADNVehicle::ADNVehicle()
 	// --- Chaos: chassi, rodas, motor, transmissão e direção, tudo em C++ ---
 	UChaosWheeledVehicleMovementComponent* Move = Chaos();
 
+	// as rodas não sobem em destroço de peça de rua (o traço da suspensão corre no canal WorldDynamic; ver ECC_DNDebris)
+	Move->SetWheelTraceResponseToChannel(ECC_DNDebris, ECR_Ignore);
 	Move->ChassisHeight = 144.0f;
 	Move->DragCoefficient = 0.31f;
 	Move->bLegacyWheelFrictionPosition = true;
@@ -378,6 +383,10 @@ void ADNVehicle::BeginPlay()
 		Turbo->Step(Fill);
 	}
 
+	// contato do corpo físico sempre avisado: as peças de rua quebram mesmo com o dano desligado (lote 17c)
+	GetMesh()->SetNotifyRigidBodyCollision(true);
+	GetMesh()->OnComponentHit.AddUniqueDynamic(this, &ADNVehicle::OnCarHit);
+
 	// Dano e amassado visual: ligado por padrão para o Felipe testar jogando; -DNNoDents desliga (medição de referência);
 	// -DNDentMaterial liga só o material, sem amassados; -DNDents=N liga o material e aplica N amassados de demonstração.
 	{
@@ -488,6 +497,8 @@ void ADNVehicle::Tick(float DeltaSeconds)
 	// chega depois do passo, com a velocidade já alterada; a diferença entre as duas é a variação de velocidade da batida.
 	FlushImpacts(GetWorld()->GetTimeSeconds());
 	VelocityBeforeStepCmS = GetMesh()->GetPhysicsLinearVelocity();
+	AngularBeforeStepDegS = GetMesh()->GetPhysicsAngularVelocityInDegrees();
+	PlowDebris();
 
 	// dano visual, camada 1: a carroceria amassa por zona (o dano da batida que acabou de fechar já entra neste quadro)
 	UpdateDamageMorphs(DeltaSeconds);
@@ -658,7 +669,15 @@ void ADNVehicle::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 
 void ADNVehicle::Throttle(const FInputActionValue& Value)
 {
-	Chaos()->SetThrottleInput(Value.Get<float>());
+	const float Input = Value.Get<float>();
+	// de onde vem o acelerador (17b: um -Play andou sozinho a 142 km/h): cada vez que ele liga pela entrada do jogador fica no log;
+	// o roteiro -DNKeys registra as teclas que ele mesmo aperta, então tecla de fora aparece aqui sem linha do roteiro
+	if (Input > 0.0f && !bThrottleHeld)
+	{
+		UE_LOG(LogDetonauto, Display, TEXT("ADNVehicle: acelerador ligado pela entrada do jogador (tecla ou controle) em t=%.2f s"), GetWorld()->GetTimeSeconds());
+	}
+	bThrottleHeld = Input > 0.0f;
+	Chaos()->SetThrottleInput(Input);
 }
 
 void ADNVehicle::Brake(const FInputActionValue& Value)
@@ -812,12 +831,28 @@ bool ADNVehicle::EnableDentMaterial(bool bBindRealHits)
 	}
 
 	// batida real: o corpo físico avisa cada contato (paredes, outros carros)
-	if (bBindRealHits)
-	{
-		GetMesh()->SetNotifyRigidBodyCollision(true);
-		GetMesh()->OnComponentHit.AddUniqueDynamic(this, &ADNVehicle::OnCarHit);
-	}
+	// batida real (dano): o aviso de contato está sempre ligado (BeginPlay, para as peças de rua); aqui só liga o dano
+	bRealHitDamage = bBindRealHits;
 	return true;
+}
+
+void ADNVehicle::ApplyPropImpact(float DeltaVMs, const FVector& WorldPoint)
+{
+	// batida em peça de rua (lote 17c): o dano de sempre, com a variação de velocidade que a regra tirou do carro. Não entra na conta
+	// das batidas reais nem abre a rodada de Crash nem a câmera de batida (FDNImpactPolicy)
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FVector Local = BodyComp ? BodyComp->GetComponentTransform().InverseTransformPosition(WorldPoint) : FVector::ZeroVector;
+	FDNImpact Impact;
+	Impact.DeltaVMs = DeltaVMs;
+	Impact.LocalPositionCm = FDNDentParams::ProjectToBody(Local, Center, Extent, 20.0f);
+	Impact.Zone = FDNDentParams::ZoneOfLocalPoint(Impact.LocalPositionCm, Center, Extent);
+	const FDNDamageResult Result = FDNDamage::ApplyImpact(DamageConfig, DamageState, Impact);
+	PushDentsToMaterial();
+	UE_LOG(LogDetonauto, Display, TEXT("DNDent: batida em peça de rua de %.1f m/s na zona %d: dano da zona +%.2f%s (rodada de Crash: %s, câmera de batida: %s)"),
+		DeltaVMs, static_cast<int32>(Impact.Zone), Result.AddedZoneDamage, Result.bDentAdded ? TEXT(", amassado novo") : TEXT(""),
+		FDNImpactPolicy::CountsForCrashRound(EDNImpactSource::Prop) ? TEXT("conta") : TEXT("não conta"),
+		FDNImpactPolicy::TriggersCrashCam(EDNImpactSource::Prop) ? TEXT("dispara") : TEXT("não dispara"));
 }
 
 void ADNVehicle::PushDentsToMaterial()
@@ -958,9 +993,44 @@ void ADNVehicle::DentKey(const FInputActionValue& Value, int32 DentIndex)
 	DentViewSecondsLeft = 3.0f;
 }
 
+void ADNVehicle::PlowDebris()
+{
+	if (VelocityBeforeStepCmS.SizeSquared2D() < FMath::Square(100.0))
+	{
+		return; // abaixo de 1 m/s não varre (B9)
+	}
+	// a caixa da carroceria, orientada, com 30 cm a mais na frente: o destroço sai antes de aparecer atravessando o capô
+	FVector Center;
+	FVector Extent;
+	GetBodyBox(Center, Extent);
+	const FTransform& Frame = BodyComp ? BodyComp->GetComponentTransform() : GetActorTransform();
+	Center.X += 15.0f;
+	Extent.X += 15.0f;
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->OverlapMultiByObjectType(Overlaps, Frame.TransformPosition(Center), Frame.GetRotation(), FCollisionObjectQueryParams(ECC_DNDebris),
+		FCollisionShape::MakeBox(Extent * Frame.GetScale3D().GetAbs()));
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		ADNBreakableProp* Prop = Cast<ADNBreakableProp>(Overlap.GetActor());
+		if (Prop && Overlap.GetComponent() == Prop->GetBodyComponent())
+		{
+			Prop->Plow(VelocityBeforeStepCmS); // a base e o toco também são destroço, mas não saem do lugar
+		}
+	}
+}
+
 void ADNVehicle::OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if (!BodyComp)
+	// peça de rua destrutível (lote 17c): ela decide se quebra e já devolve o carro com a velocidade de antes menos a perda. Peça
+	// já quebrada não conta de novo (vários contatos no mesmo passo). Abaixo do limiar ela é sólida e segue como batida comum.
+	if (ADNBreakableProp* Prop = Cast<ADNBreakableProp>(OtherActor))
+	{
+		if (Prop->IsBroken() || Prop->HandleCarHit(*this, VelocityBeforeStepCmS, AngularBeforeStepDegS, Hit.ImpactPoint))
+		{
+			return;
+		}
+	}
+	if (!BodyComp || !bRealHitDamage)
 	{
 		return;
 	}
