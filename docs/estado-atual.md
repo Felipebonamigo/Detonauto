@@ -21,12 +21,13 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação) | `Source/Detonauto/Core/` | Testadas; 635 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível) | `Source/Detonauto/Core/` | Testadas; 659 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
-| Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros |
+| Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros, mobiliário |
 | Subsistemas de dados e de save | `Core/DNGameDataSubsystem`, `Core/DNRecordsSubsystem` | Testados sem mundo |
 | Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, HUD de depuração |
+| Mobiliário destrutível | `Crash/ADNBreakableProp`, `Crash/UDNBreakableSubsystem` | Poste, árvore, banco, lixeira e hidrante da `L_Lookdev` caem quando o carro bate; o carro segue perdendo de 2% a 23% da velocidade; destroço nunca segura o carro e é varrido da frente (`docs/lote-17c.md`) |
 | Tráfego e rodada de Crash | `Traffic/`, `Vehicle/DNCrashTestGameMode` | Lote 13 parcial: código na main, medição ainda não rodou |
 | Mapa de teste | `ADNVehicleArena`, criado por código no `/Engine/Maps/Entry` | Feio de propósito; **não serve para julgar visual** |
 | Arte | `Content/Detonauto/Vehicle/SportsCar` | Carro do template da Epic, provisório; `SK_DNSportsCarBody` é a carroceria dele com os 5 alvos, refeita por `Tools/Unreal/damage-body.ps1` |
@@ -48,6 +49,8 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 13c | Pontuação por dano no Crash | Aprovado (`docs/regras-de-jogo.md`, revisão de 14 out): livro por veículo, P1 a P6, mutação 7 de 7 |
 | 17 | Dano visual, camada 1: deformação grande por zona | Aprovado (`docs/lote-17.md`): regra com mutação 18 de 19 (1 equivalente), carroceria com 5 alvos gerada no Blender. Leitura da revisão: ainda "macio", não chapa amassada; segue no 17b |
 | 16b | Polimento visual: pintura, poste moderno, folhagem, vitrines | Na main, aguardando revisão (`docs/lookdev.md`, seção 16b) |
+| 17b | Desgaste da pintura por zona e vincos mais duros | Na main; faltam os fechamentos (capturas 0,3/0,6/1,0 nos 4 ângulos, batida a 100 km/h na `L_Lookdev`, comparação com o 17, custo com 37,8 mil vértices) |
+| 17c | Mobiliário destrutível | Na main, aguardando revisão (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Mudou o contrato: sai `IgnoreCarS`, entra o varrer (B9). Falta o Felipe jogar |
 
 ## Primeiro playtest (14 out)
 
@@ -157,6 +160,16 @@ melhor e ele quer cinco modos.
   duas saídas do verniz, e o material deixou de compilar (pintura cinza).
 - Scripts de conteúdo regravam assets iguais com binário novo: antes do commit,
   desfaça (`git checkout --`) os que não mudaram de propósito, para não gastar LFS.
+- Chaos: o traço da suspensão das rodas corre no canal **WorldDynamic** (resposta em
+  `WheelTraceCollisionResponses`). Ignorar o carro só no canal Vehicle não basta: as
+  rodas sobem no objeto e o carro é lançado sem contato no chassi, e nenhum evento
+  de batida aparece. Destroço tem tipo próprio (`ECC_DNDebris`), que as rodas ignoram.
+- Contato que não aparece no log não é prova de que não houve contato: o `OnCarHit`
+  sai cedo para peça já quebrada. Para achar quem freia o carro, logar em cada
+  fronteira (contato com destroço, rodas, chassi) antes de mudar a regra.
+- O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
+  o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
+  poste) ele diz REPROVADO de propósito.
 
 ## Pendências do Felipe
 
@@ -174,10 +187,10 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Lote 17b (pedido na revisão do 17): riscos, tinta arrancada, primer e metal
-   nu e fuligem no material da pintura por zona (parâmetros em `Damage.csv`);
-   vincos mais duros no Blender, comparados lado a lado com os de hoje; batida
-   real a 100 km/h capturada na `L_Lookdev`, de perto.
+1. Fechamentos do 17b: capturas a 0,3, 0,6 e 1,0 nos 4 ângulos, batida real a
+   100 km/h na `L_Lookdev` (`-DNWallAheadM`), comparação lado a lado com o 17,
+   custo com 37,8 mil vértices e, se a frente a 1,0 ainda parecer tímida, recuo
+   maior decidido pela captura.
 2. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
 3. Lotes 18 a 21 (`docs/fatia-vertical.md`): câmera de batida, efeitos Niagara,
    primeiro cruzamento e som base.

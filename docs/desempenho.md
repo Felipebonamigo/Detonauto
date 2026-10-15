@@ -319,6 +319,24 @@ escuras; só o carro do jogador.
 Contra o lote 16 (4,55 e 4,72 ms): +0,3 parado e +0,65 andando, dentro do ruído de ~1 ms. Se a próxima medição confirmar a subida
 andando, a suspeita é a copa mais densa (mais cartões de folha mascarados na tela).
 
+## Lote 17c: 16 peças de rua derrubadas (14 out 2026)
+
+Mesmo protocolo, nenhum outro Unreal aberto. O carro anda sozinho a 60 km/h (`-DNCruiseKmh=60`, sem tecla) e a medição vai de 8 a
+18 s (`-Scenario parado -Warmup 8 -Measure 10`). Com as peças, a fileira `-DNPropLine` põe 16 peças na faixa (poste, lixeira, banco e
+hidrante, 4 vezes), a partir de 40 m e a cada 12 m: o carro derruba as 16 entre 4 e 15 s, e até 16 simulam ao mesmo tempo. O veredito
+da fileira deu 16 de 16 nas duas execuções. Física: `Exclusive/GameThread/Physics` e `Exclusive/AllWorkers/Physics` do CSV Profiler.
+
+| Cenário | Frame média / p95 | Game | GPU média / p95 | Física, linha do jogo | Física, trabalhadores | Quadros |
+|---|---|---|---|---|---|---|
+| rua intacta (1) | 4,83 / 5,40 ms | 1,44 / 1,71 ms | 4,52 / 5,05 ms | 0,14 / 0,19 ms | 0,23 / 0,35 ms | 2069 em 10 s |
+| rua intacta (2) | 4,80 / 5,36 ms | 1,44 / 1,70 ms | 4,50 / 5,03 ms | 0,14 / 0,19 ms | 0,23 / 0,34 ms | 2082 em 10 s |
+| 16 peças (1) | 4,84 / 5,39 ms | 1,61 / 2,22 ms | 4,53 / 5,07 ms | 0,12 / 0,16 ms | 0,33 / 0,45 ms | 2068 em 10 s |
+| 16 peças (2) | 4,82 / 5,39 ms | 1,62 / 2,25 ms | 4,52 / 5,06 ms | 0,12 / 0,16 ms | 0,34 / 0,47 ms | 2073 em 10 s |
+
+**Leitura:** o quadro não muda (+0,02 ms; a GPU limita). A linha do jogo sobe 0,18 ms na média e 0,55 ms no p95 (o tick das peças
+soltas, o varrer e a quebra em si), e a física nos trabalhadores sobe 0,11 ms. As duas execuções de cada cenário ficaram a menos de
+0,04 ms uma da outra. Longe dos 8 ms de orçamento da linha do jogo.
+
 ## Para o Felipe testar na Sprint 6
 
 1. Abra o carro do template, jogue com Alt+P e digite `stat unit`.
