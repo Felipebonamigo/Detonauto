@@ -49,10 +49,14 @@ foreach ($name in $Scenario) {
     if ($name -eq 'andando' -and $MeasureTo -gt $MeasureFrom -and $MeasureFrom -gt 0) { $start, $stop = $MeasureFrom, $MeasureTo }
     $keys = "EXEC:csvprofile start@$start;EXEC:csvprofile stop@$stop;QUIT@$($stop + 2)"
     if ($name -eq 'andando') { $keys = "W@2-$($stop + 1);" + $keys }
+    # outro Unreal aberto antes ou depois do cenário (outra sessão usando o PC) invalida a medição: a GPU é dividida
+    $busyBefore = @(Get-Process UnrealEditor, UnrealEditor-Cmd -ErrorAction SilentlyContinue).Count
     $before = @(Get-ChildItem $csvDir -Filter *.csv -ErrorAction SilentlyContinue | ForEach-Object FullName)
     & (Join-Path $PSScriptRoot 'vehicle-probe.ps1') -Uproject $ctx.Uproject -Map /Game/Detonauto/Maps/L_Lookdev -ResX 1920 -ResY 1080 -AlvoPS5 `
         -Exec 't.MaxFPS 0' -Keys $keys -TimeoutSeconds ($stop + 240) -ExtraArgs $ExtraArgs | Out-Null
     $csv = Get-ChildItem $csvDir -Filter *.csv -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.FullName } | Sort-Object LastWriteTime | Select-Object -Last 1
+    Start-Sleep -Seconds 3  # o jogo medido termina de fechar
+    $busyAfter = @(Get-Process UnrealEditor, UnrealEditor-Cmd -ErrorAction SilentlyContinue).Count
     if (-not $csv) { Write-Host "[$name] sem CSV"; $failed++; continue }
     # Leitura direta (o Import-Csv recusa: o CSV do Unreal pode repetir nomes de coluna). O arquivo termina com linhas de eventos e o
     # cabeçalho repetido: só entram as linhas cujo FrameTime é número.
@@ -73,6 +77,11 @@ foreach ($name in $Scenario) {
     }
     # Janela sem foco: o driver ou o Windows limitam o jogo a 60 fps mesmo com t.MaxFPS 0, a placa baixa o clock e o tempo de GPU
     # parece maior. Medição assim não vale (medido em 14 out 2026: o mesmo cenário deu 5,1 ms com foco e 16,9 ms travado em 60).
+    if ($busyBefore -gt 0 -or $busyAfter -gt 0) {
+        Write-Host "[$name] DESCARTADA: havia outro Unreal aberto ($busyBefore antes, $busyAfter depois). Repita com o PC livre."
+        $failed++
+        continue
+    }
     $fps = $r.Frame.N / ($stop - $start)
     if ([math]::Abs($fps - 60) -lt 2 -and $r.Frame.Mean -gt 16.0) {
         Write-Host "[$name] DESCARTADA: travada em ~60 fps ($([math]::Round($fps, 1)) quadros/s). A janela do jogo perdeu o foco? Repita sem mexer no PC."
