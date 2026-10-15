@@ -12,7 +12,10 @@ que faz as três etapas em ordem:
 Conferências do import (termina com erro se falhar): os 5 alvos existem com os nomes de FDNDamageMorph::TargetName, e
 os limites da malha nova batem com os das malhas de origem (eixos e escala certos na ida e volta pelo Blender).
 
-LIMITE DE SEGURANÇA: só grava em /Game/Detonauto/Vehicle/SportsCar e os .fbx e o relatório dentro da pasta do projeto.
+--mode import-parts (lote 18b): importa o que o Tools/Blender/split_car_parts.py gravou (a carroceria sem as peças, com os vãos, e
+cada peça e vidro em /Game/Detonauto/Vehicle/SportsCar/Parts).
+
+LIMITE DE SEGURANÇA: só grava em /Game/Detonauto/Vehicle/SportsCar (e Parts) e os .fbx e o relatório dentro da pasta do projeto.
 """
 
 import sys
@@ -228,6 +231,118 @@ def import_body(fbx, report):
     check_materials(load(BODY, unreal.SkeletalMesh), by_name, "depois de salvar", report)
 
 
+PARTS_DIR = CAR_DIR + "/Parts"
+PARTS_PREFIX = "SK_DNSportsCar_"
+
+
+def source_materials():
+    """Os materiais das malhas de origem, pelo nome do slot que vai no .fbx."""
+    by_name = {}
+    for mesh in [load(name, unreal.StaticMesh) for name in SOURCES]:
+        for slot in mesh.get_editor_property("static_materials"):
+            material = slot.get_editor_property("material_interface")
+            if material is not None:
+                by_name[material.get_name()] = material
+    return by_name
+
+
+def import_skeletal(fbx, dest_dir, name, skeleton, report):
+    """Importa um .fbx como malha com esqueleto (1 osso, os 5 alvos, cor de vértice e normais do arquivo), sem física."""
+    fbx = inside_project(fbx)
+    task = unreal.AssetImportTask()
+    task.filename = fbx
+    task.destination_path = dest_dir
+    task.destination_name = name
+    task.automated = True
+    task.replace_existing = True
+    task.save = False
+    opts = unreal.FbxImportUI()
+    opts.set_editor_property("import_mesh", True)
+    opts.set_editor_property("import_as_skeletal", True)
+    opts.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
+    opts.set_editor_property("import_materials", False)
+    opts.set_editor_property("import_textures", False)
+    opts.set_editor_property("import_animations", False)
+    opts.set_editor_property("create_physics_asset", False)  # a peça solta usa uma caixa simples no motor (ADNCarPart)
+    opts.set_editor_property("skeleton", skeleton)
+    data = opts.get_editor_property("skeletal_mesh_import_data")
+    data.set_editor_property("import_morph_targets", True)
+    data.set_editor_property("vertex_color_import_option", unreal.VertexColorImportOption.REPLACE)
+    data.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
+    data.set_editor_property("convert_scene", True)
+    task.options = opts
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    mesh = unreal.load_asset(dest_dir + "/" + name)
+    if not isinstance(mesh, unreal.SkeletalMesh):
+        raise BodyError("A importação não criou %s/%s" % (dest_dir, name))
+    return mesh
+
+
+def dress(mesh, by_name, report):
+    """Põe nos slots os materiais de origem, pelo nome."""
+    slots = mesh.get_editor_property("materials")
+    for i in range(len(slots)):
+        slot = slots[i]  # cópia do struct: volta pelo índice (lote 17)
+        slot_name = str(slot.get_editor_property("material_slot_name"))
+        material = by_name.get(slot_name)
+        if material is None:
+            raise BodyError("%s: slot sem material de origem: %s (conhecidos: %s)" % (mesh.get_name(), slot_name, sorted(by_name)))
+        slot.set_editor_property("material_interface", material)
+        slots[i] = slot
+        ensure_usage(material.get_base_material(), report)
+    mesh.set_editor_property("materials", slots)
+
+
+def import_parts(work_dir, report):
+    """
+    Lote 18b: a carroceria sem as peças (SK_DNSportsCarBody, com os vãos) e cada peça e vidro em /Game/Detonauto/Vehicle/SportsCar/Parts,
+    todos com o esqueleto SKEL_DNSportsCarBody (um osso "root") e os 5 alvos. Confere os alvos de cada malha e que a união dos limites
+    bate com as malhas de origem (nenhuma peça fora do lugar na ida e volta pelo Blender).
+    """
+    work_dir = inside_project(work_dir)
+    skeleton = load(SKELETON, unreal.Skeleton)
+    by_name = source_materials()
+    files = sorted(f for f in os.listdir(work_dir) if f.startswith(PARTS_PREFIX) and f.endswith(".fbx"))
+    if not files:
+        raise BodyError("Nenhuma peça (%s*.fbx) em %s" % (PARTS_PREFIX, work_dir))
+    meshes = []
+    body = import_skeletal(os.path.join(work_dir, BODY + ".fbx"), CAR_DIR, BODY, skeleton, report)
+    dress(body, by_name, report)
+    meshes.append((CAR_DIR + "/" + BODY, body))
+    for f in files:
+        name = f[:-4]
+        mesh = import_skeletal(os.path.join(work_dir, f), PARTS_DIR, name, skeleton, report)
+        dress(mesh, by_name, report)
+        meshes.append((PARTS_DIR + "/" + name, mesh))
+    lo = [float("inf")] * 3
+    hi = [float("-inf")] * 3
+    for path, mesh in meshes:
+        missing = [m for m in MORPHS if m not in morph_names(mesh)]
+        # a importação descarta o alvo que não desloca nenhum vértice (o para-choque da frente não muda com a traseira nem com o teto):
+        # na peça é normal; a carroceria precisa dos 5
+        if missing and mesh is body:
+            raise BodyError("%s sem os alvos %s" % (path, missing))
+        if missing:
+            report.append("%s: sem os alvos %s (nenhum vértice deslocado por eles)" % (path, missing))
+        b = mesh.get_bounds()
+        o = (b.origin.x, b.origin.y, b.origin.z)
+        e = (b.box_extent.x, b.box_extent.y, b.box_extent.z)
+        for i in range(3):
+            lo[i] = min(lo[i], o[i] - e[i])
+            hi[i] = max(hi[i], o[i] + e[i])
+        report.append("%s: centro %s, meia caixa %s cm" % (path, tuple(round(v, 1) for v in o), tuple(round(v, 1) for v in e)))
+    src_lo, src_hi = union_bounds([load(name, unreal.StaticMesh) for name in SOURCES])
+    worst = max(max(abs(lo[i] - src_lo[i]), abs(hi[i] - src_hi[i])) for i in range(3))
+    report.append("limites da união: %s a %s (origens %s a %s)" % (tuple(round(v, 1) for v in lo), tuple(round(v, 1) for v in hi),
+                                                                  tuple(round(v, 1) for v in src_lo), tuple(round(v, 1) for v in src_hi)))
+    if worst > BOUNDS_TOLERANCE_CM:
+        raise BodyError("A união das peças não bate com as origens (diferença de %.1f cm)" % worst)
+    for path, _ in meshes:
+        if not unreal.EditorAssetLibrary.save_asset(path, only_if_is_dirty=False):
+            raise BodyError("Não consegui salvar " + path)
+    report.append("salvas: a carroceria e %d peça(s)/vidro(s)" % len(files))
+
+
 def check_materials(body, by_name, when, report):
     for slot in body.get_editor_property("materials"):
         name = str(slot.get_editor_property("material_slot_name"))
@@ -240,7 +355,7 @@ def check_materials(body, by_name, when, report):
 
 def main():
     parser = argparse.ArgumentParser(prog="damage_body.py")
-    parser.add_argument("--mode", choices=("export", "import"), required=True)
+    parser.add_argument("--mode", choices=("export", "import", "import-parts"), required=True)
     parser.add_argument("--dir", required=True, help="pasta dos .fbx (dentro do projeto)")
     args = parser.parse_args(sys.argv[1:])
     report = []
@@ -249,6 +364,8 @@ def main():
     try:
         if args.mode == "export":
             export_sources(args.dir, report)
+        elif args.mode == "import-parts":
+            import_parts(args.dir, report)
         else:
             import_body(os.path.join(args.dir, BODY + ".fbx"), report)
     except BodyError as exc:
