@@ -83,6 +83,12 @@ e `Data/EffectsSettings.csv` (os tetos globais), com validador e teste de deriva
   destruído e a frente em 0,7. Nunca desce com o dano.
 - **E8, orçamento:** cada disparo recebe o que cabe até o teto, nunca negativo.
 - **Mobiliário:** `Props` lista os tipos de `Breakables.csv` que disparam o pó (poste e árvore) e as folhas (árvore).
+- **E9, pool:** cada efeito pega uma vaga livre ou, se está cheio, a que termina primeiro: o efeito novo sempre aparece. O fim
+  exato da vaga já conta como livre.
+- **E10, partículas vivas:** cada disparo conta até o fim da vida dele (`LifeMaxS`) contra o teto de GPU.
+- **E11, fumaça contínua:** sprites estimados = taxa × sprites/s × vida. Acima de 400, todas as taxas caem na mesma proporção.
+- **E12, sprites por segundo:** nos efeitos contínuos, `CountMax` é a taxa com o valor 1: pneu 30/s, motor 20/s, fogo 30/s.
+- **Ligação no motor e contrato dos parâmetros de usuário:** `docs/lote-19.md`.
 
 ## Aprovação
 

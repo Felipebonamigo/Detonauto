@@ -52,6 +52,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 17b | Desgaste da pintura por zona e vincos mais duros | Na main, aguardando revisão (`docs/lote-17b.md`): capturas dos níveis nos 4 ângulos com o sol por trás, batida real a 100 km/h na `L_Lookdev`, lado a lado com o 17, frente em 1,0 mais destruída (recuo em rampa e capô em tenda). Custo com 37,8 mil vértices pendente (PC ocupado por outras sessões) |
 | 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
 | 18 | Câmera de velocidade e de batida | Aprovado (`docs/lote-18.md`, revisão de 15 out, com as três mudanças de contrato): FOV, tremor e desfoque nas bordas pela velocidade; câmera de batida com câmera lenta, órbita que mostra o amassado e não entra em prédio; controle do destroço medido (−1,24 m / +1,28 m). Passe do desfoque 0,038 ms. Pendentes: quadro inteiro com e sem desfoque com o PC livre, e o Felipe jogar |
+| 19 | Efeitos de batida (Niagara) | Em andamento (`docs/lote-19.md`): notas da revisão do 18b feitas (trinca, vão, para-brisa recortado); regras, CSV e ligação no C++ aprovados ou prontos, verificados pelo log. Falta montar os 9 sistemas Niagara pelo MCP numa sessão nova (passo a passo no `lote-19.md`), as capturas e o custo |
 | 18b | Peças que soltam e vidros que quebram | Na main, aguardando revisão (`docs/lote-18b.md`, `docs/regras-pecas.md`): 11 peças (Presa → Pendurada → Solta) e 8 vidros e lentes, malhas cortadas no Blender por script; trinca procedural no para-brisa; cacos sem Niagara. Itens 1 a 7 com capturas e custo (+0,11 ms de Frame e +0,16 de Game por carro com as peças presas). Achados: P5 (o empurrão atravessava o carro) e a câmera entrando no carro. Falta o Felipe jogar |
 
 ## Primeiro playtest (14 out)
@@ -200,10 +201,12 @@ melhor e ele quer cinco modos.
 - Python da 5.8: `set_material_instance_static_switch_parameter_value` devolve `False`
   mesmo quando liga a chave. Confira lendo o valor de volta
   (`get_material_instance_static_switch_parameter_value`).
-- Unreal MCP: o servidor `unreal-mcp-detonauto` está no escopo local do Claude Code
-  (`~/.claude.json`, pasta do projeto). A sessão do app do Claude (Code) não carrega esse
-  escopo, só os servidores de usuário e o `.mcp.json` do projeto: para usar o MCP, o
-  editor tem que estar aberto e a sessão tem que enxergar o servidor.
+- Unreal MCP: a sessão do app do Claude (Code) não carrega o escopo local do Claude Code,
+  só os servidores de usuário e o `.mcp.json` do projeto. Por decisão do Felipe (15 out), o
+  `unreal-mcp-detonauto` também está no escopo de usuário (`claude mcp add --scope user`,
+  `http://127.0.0.1:8010/mcp`). A porta é só deste jogo: Age of Earth 8020 e TDFende 8030
+  não colidem. O servidor só responde com o editor aberto, e a sessão precisa começar
+  com o editor já aberto (ela não recarrega servidores).
 - O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
   o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
   poste) ele diz REPROVADO de propósito.
@@ -238,13 +241,13 @@ melhor e ele quer cinco modos.
 2. Medições do PC livre feitas em 15 out (`docs/desempenho.md`): desfoque do 18 no
    quadro inteiro (+0,01 a +0,04 ms), alvos com a carroceria densa (17b, nada) e o
    lote 13.
-3. Lotes 19 a 21 (`docs/fatia-vertical.md`): efeitos Niagara, primeiro
-   cruzamento e som base. Antes do 20: árvore leve (20 MB ou menos) e texturas de
-   modelo em 2k. Notas da revisão do 18b para o 19:
-   - trinca com linhas finas na normal e na rugosidade, não albedo branco, e a
-     conferir se ela passa para fora do vidro;
-   - vão com material de metal escuro e normais suaves;
-   - cacos em Niagara com pool.
+3. Lote 19: montar os 9 sistemas Niagara pelo MCP numa sessão NOVA, aberta com o editor
+   do Detonauto já aberto. Antes, ler este arquivo, `docs/regras-efeitos.md` e
+   `docs/lote-19.md` (o contrato dos parâmetros de usuário e o passo a passo). Depois,
+   capturas e custo. Pendência da revisão: escurecer o fundo do porta-malas e o difusor
+   cinza-claros (textura do chassi do template) quando mexer no material de novo.
+   Lotes 20 e 21 (`docs/fatia-vertical.md`): primeiro cruzamento e som base. Antes do
+   20: árvore leve (20 MB ou menos) e texturas de modelo em 2k.
 4. **Antes de pôr peças no tráfego (lote 20):** cada carro com peças tem 27
    componentes de malha com esqueleto presos ao chassi, e isso custa +0,16 ms de
    Game por carro (`docs/desempenho.md`, 18b). Medir o tick deles desligado com a
