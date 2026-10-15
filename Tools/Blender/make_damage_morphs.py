@@ -374,22 +374,36 @@ def add_shape_keys(body, box, waves, report):
             raise MorphError("%s dobra a malha sobre si mesma (determinante %.2f)" % (name, worst))
 
 
-def wear_colors(body, box, waves, report):
+def displacement_magnitudes(points, box, waves):
+    """Quanto cada zona desloca cada ponto [m], uma lista por zona."""
+    mags = []
+    for zone in range(len(ZONES)):
+        row = []
+        for p in points:
+            d = displacement(zone, box, waves[zone], p[0], p[1], p[2])
+            row.append(math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]))
+        mags.append(row)
+    return mags
+
+
+def zone_peaks(points, box, waves):
+    """O maior deslocamento de cada zona entre os pontos: o 1,0 da cor de vértice do desgaste."""
+    return [max(max(row), 1e-6) if row else 1e-6 for row in displacement_magnitudes(points, box, waves)]
+
+
+def wear_colors(body, box, waves, report, peaks=None):
     """
     Cor de vértice para o desgaste da pintura (lote 17b): quanto cada zona amassa naquele ponto, puxado para as cristas dos vincos,
     onde a tinta solta primeiro. R = frente, G = traseira, B = laterais (o material escolhe o lado pelo sinal de Y), A = teto. O
     material multiplica pelo peso da zona: as lascas e os riscos aparecem onde a chapa dobrou, e não espalhados pela zona inteira.
+    peaks: o 1,0 de cada zona. Sem ele, o maior desta malha; as peças do lote 18b passam o do carro inteiro, para casar com a
+    carroceria.
     """
     verts = body.data.vertices
-    mags = []
-    for zone in range(len(ZONES)):
-        row = []
-        for v in verts:
-            d = displacement(zone, box, waves[zone], v.co.x, v.co.y, v.co.z)
-            row.append(math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]))
-        mags.append(row)
+    mags = displacement_magnitudes([v.co for v in verts], box, waves)
     attr = body.data.color_attributes.new("DN_Desgaste", "FLOAT_COLOR", "POINT")
-    peaks = [max(max(row), 1e-6) for row in mags]
+    if peaks is None:
+        peaks = [max(max(row), 1e-6) if row else 1e-6 for row in mags]
     covered = 0
     for i, v in enumerate(verts):
         fx, sy, hz = box.normalized(v.co.x, v.co.y, v.co.z)
