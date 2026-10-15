@@ -3,6 +3,8 @@
 #include "Vehicle/DNVehicleArena.h"
 #include "Crash/DNBreakableProp.h"
 #include "Crash/DNBreakableSubsystem.h"
+#include "Traffic/DNTrafficVehicle.h"
+#include "Core/DNGameDataSubsystem.h"
 #include "Vehicle/DNTurboComponent.h"
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -116,6 +118,40 @@ void ADNVehicleTestGameMode::StartPlay()
 	if (FParse::Value(Cmd, TEXT("DNWallAheadM="), WallAheadM) && WallAheadM > 0.0f)
 	{
 		SpawnWallAhead(WallAheadM);
+		float BlockSideM = 0.0f;
+		if (FParse::Value(Cmd, TEXT("DNBlockSideM="), BlockSideM) && BlockSideM != 0.0f)
+		{
+			SpawnBlockBeside(WallAheadM, BlockSideM);
+		}
+	}
+	// lote 18: carro de tráfego parado na faixa, capturas da câmera de batida em tempo real e o controle do destroço segurado
+	float TrafficAheadM = 0.0f;
+	if (FParse::Value(Cmd, TEXT("DNTrafficAheadM="), TrafficAheadM) && TrafficAheadM > 0.0f)
+	{
+		SpawnTrafficAhead(TrafficAheadM);
+	}
+	FString CrashShots;
+	if (FParse::Value(Cmd, TEXT("DNCrashShots="), CrashShots, false))
+	{
+		TArray<FString> Items;
+		CrashShots.ParseIntoArray(Items, TEXT(","));
+		for (const FString& Item : Items)
+		{
+			CrashShotDelays.Add(FMath::Max(0.0f, FCString::Atof(*Item)));
+		}
+		CrashShotDelays.Sort();
+	}
+	FParse::Value(Cmd, TEXT("DNCrashSteer="), CrashSteer);
+	FString SpeedShotList;
+	if (FParse::Value(Cmd, TEXT("DNSpeedShots="), SpeedShotList, false))
+	{
+		TArray<FString> Items;
+		SpeedShotList.ParseIntoArray(Items, TEXT(","));
+		for (const FString& Item : Items)
+		{
+			SpeedShots.Add(FCString::Atof(*Item));
+		}
+		SpeedShots.Sort();
 	}
 	// lote 17c: peças de rua na faixa do carro, piloto automático de velocidade e capturas de cada quebra
 	FString PropLine;
@@ -390,6 +426,97 @@ void ADNVehicleTestGameMode::SpawnWallAhead(float DistanceM)
 	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: barreira a %.0f m à frente da largada"), DistanceM);
 }
 
+void ADNVehicleTestGameMode::SpawnBlockBeside(float WallAheadM, float SideM)
+{
+	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+	const FTransform Base = Spot ? Spot->GetActorTransform() : FTransform(FVector(0.0f, 0.0f, 120.0f));
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!Cube)
+	{
+		return;
+	}
+	// 14 m ao longo da rua terminando na barreira, 6 m de fundo, 15 m de altura; a face perto do carro fica a |S| metros da faixa
+	const float Half = 300.0f;
+	const float Side = SideM * 100.0f + FMath::Sign(SideM) * Half;
+	FVector Location = Base.TransformPosition(FVector(WallAheadM * 100.0f - 700.0f, Side, 0.0f));
+	Location.Z = 750.0f;
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AStaticMeshActor* Block = GetWorld()->SpawnActor<AStaticMeshActor>(Location, Base.Rotator(), Params);
+	if (!Block)
+	{
+		return;
+	}
+	UStaticMeshComponent* Comp = Block->GetStaticMeshComponent();
+	Comp->SetMobility(EComponentMobility::Movable);
+	Comp->SetStaticMesh(Cube);
+	Comp->SetWorldScale3D(FVector(14.0f, 6.0f, 15.0f));
+	Comp->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+	if (UMaterialInterface* Concrete = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Detonauto/Lookdev/Materials/MI_MeioFio.MI_MeioFio")))
+	{
+		Comp->SetMaterial(0, Concrete);
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: bloco de 15 m (prédio) a %.1f m da faixa, encostado na barreira"), SideM);
+}
+
+void ADNVehicleTestGameMode::SpawnTrafficAhead(float DistanceM)
+{
+	const UDNGameDataSubsystem* Data = GetGameInstance() ? GetGameInstance()->GetSubsystem<UDNGameDataSubsystem>() : nullptr;
+	if (!Data || Data->GetTrafficVehicles().IsEmpty())
+	{
+		UE_LOG(LogDetonauto, Error, TEXT("ADNVehicleTestGameMode: sem os carros de Data/TrafficVehicles.csv; carro de tráfego não criado"));
+		return;
+	}
+	const AActor* Spot = MapStart ? static_cast<AActor*>(MapStart) : static_cast<AActor*>(Start);
+	const FTransform Base = Spot ? Spot->GetActorTransform() : FTransform(FVector(0.0f, 0.0f, 120.0f));
+	FVector Location = Base.TransformPosition(FVector(DistanceM * 100.0f, 0.0f, 0.0f));
+	Location.Z = 0.0f; // no asfalto (a cena tem o chão da rua em z = 0)
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ADNTrafficVehicle* Car = GetWorld()->SpawnActor<ADNTrafficVehicle>(Location, Base.Rotator(), Params);
+	if (!Car)
+	{
+		return;
+	}
+	// atravessado na faixa (de lado para o carro do jogador), parado e já com física: a batida é de verdade, sem trilha
+	const FDNTrafficVehicleEntry& Spec = Data->GetTrafficVehicles()[0];
+	Car->Activate(Spec, Location, Base.GetRotation().GetRightVector(), 0.0f, 0.0f, Data->GetDamageConfig());
+	Car->WakeUp();
+	UE_LOG(LogDetonauto, Display, TEXT("ADNVehicleTestGameMode: carro de tráfego '%s' parado e atravessado a %.0f m da largada"), *Spec.Id, DistanceM);
+}
+
+void ADNVehicleTestGameMode::CrashCamTick(ADNVehicle& Vehicle)
+{
+	if (Vehicle.CrashCamPhase() == EDNCrashCamPhase::Idle)
+	{
+		return;
+	}
+	bCrashSeen = true;
+	const float T = Vehicle.CrashCamSeconds();
+	// capturas com o HUD em tempo real depois do disparo; uma por quadro (o pedido seguinte no mesmo quadro trocaria o nome da anterior)
+	if (CrashShotDelays.IsValidIndex(CrashShotNext) && T + 1.0e-4f >= CrashShotDelays[CrashShotNext])
+	{
+		const FString Name = FString::Printf(TEXT("dn-crash-t%04dms"), FMath::RoundToInt(CrashShotDelays[CrashShotNext] * 1000.0f));
+		FScreenshotRequest::RequestScreenshot(Name, true, false);
+		UE_LOG(LogDetonauto, Display, TEXT("DNCrashShots: %s em %.3f s reais, fase %d, escala de tempo %.3f, %.0f km/h"),
+			*Name, T, static_cast<int32>(Vehicle.CrashCamPhase()), Vehicle.CrashTimeScale(), Vehicle.SpeedKmh());
+		++CrashShotNext;
+	}
+	// controle do destroço segurado: A (esquerda) ou D (direita), pelo mesmo caminho do teclado do jogador
+	if (CrashSteer != 0.0f)
+	{
+		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+		const bool bActive = Vehicle.CrashCamPhase() == EDNCrashCamPhase::Entering || Vehicle.CrashCamPhase() == EDNCrashCamPhase::Holding;
+		const FKey Key = CrashSteer < 0.0f ? EKeys::A : EKeys::D;
+		if (PC && bActive != bCrashSteerHeld)
+		{
+			bCrashSteerHeld = bActive;
+			PC->InputKey(FInputKeyEventArgs::CreateSimulated(Key, bActive ? IE_Pressed : IE_Released, bActive ? 1.0f : 0.0f, 1));
+			UE_LOG(LogDetonauto, Display, TEXT("DNCrashSteer: %s %s em %.2f s reais"), bActive ? TEXT("aperta") : TEXT("solta"), *Key.ToString(), T);
+		}
+	}
+}
+
 ADNVehicle* ADNVehicleTestGameMode::FindVehicle() const
 {
 	return Cast<ADNVehicle>(UGameplayStatics::GetPlayerPawn(this, 0));
@@ -398,7 +525,7 @@ ADNVehicle* ADNVehicleTestGameMode::FindVehicle() const
 void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!bProbe && !bShot && ScriptEvents.IsEmpty() && CruiseKmh <= 0.0f && !bPropShots)
+	if (!bProbe && !bShot && ScriptEvents.IsEmpty() && CruiseKmh <= 0.0f && !bPropShots && CrashShotDelays.IsEmpty() && CrashSteer == 0.0f && SpeedShots.IsEmpty())
 	{
 		return;
 	}
@@ -406,6 +533,17 @@ void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 	if (!Vehicle)
 	{
 		return;
+	}
+	if (SpeedShots.IsValidIndex(SpeedShotNext) && Vehicle->SpeedKmh() >= SpeedShots[SpeedShotNext])
+	{
+		const FString Name = FString::Printf(TEXT("dn-speed-%03.0fkmh"), SpeedShots[SpeedShotNext]);
+		FScreenshotRequest::RequestScreenshot(Name, true, false);
+		UE_LOG(LogDetonauto, Display, TEXT("DNSpeedShots: %s a %.1f km/h, FOV %.1f, desfoque %.2f"), *Name, Vehicle->SpeedKmh(), Vehicle->DisplayedFov(), Vehicle->EdgeBlurStrength());
+		++SpeedShotNext;
+	}
+	if (!CrashShotDelays.IsEmpty() || CrashSteer != 0.0f)
+	{
+		CrashCamTick(*Vehicle);
 	}
 	if (!ScriptEvents.IsEmpty())
 	{

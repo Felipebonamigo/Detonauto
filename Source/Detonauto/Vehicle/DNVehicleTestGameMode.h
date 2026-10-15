@@ -95,6 +95,24 @@ protected:
 	TObjectPtr<ACameraActor> PropCam;
 	bool bPropCamInView = false;
 
+	/** Lote 18, câmera de batida: -DNTrafficAheadM=M põe um carro de tráfego parado (já com física) na faixa, a M metros da largada;
+	 *  -DNBlockSideM=S põe um bloco de 15 m de altura (um "prédio") ao lado da barreira de -DNWallAheadM, S metros para a direita
+	 *  (negativo: esquerda), para conferir que a câmera não entra nele. */
+	void SpawnTrafficAhead(float DistanceM);
+	void SpawnBlockBeside(float WallAheadM, float SideM);
+
+	/** -DNCrashShots=0,0.15,0.6: capturas com o HUD (a escala de tempo escrita) nesses segundos REAIS depois do disparo da câmera de
+	 *  batida (dn-crash-t<ms>); -DNCrashSteer=-1|1 segura A ou D (o controle do destroço) enquanto ele vale. */
+	void CrashCamTick(ADNVehicle& Vehicle);
+	TArray<float> CrashShotDelays;
+	int32 CrashShotNext = 0;
+	float CrashSteer = 0.0f;
+	bool bCrashSteerHeld = false;
+	bool bCrashSeen = false;
+	/** -DNSpeedShots=60,150,220: uma captura com o HUD quando o carro passa de cada velocidade [km/h] (dn-speed-<v>kmh). */
+	TArray<float> SpeedShots;
+	int32 SpeedShotNext = 0;
+
 	/** -DNCruiseKmh=N: piloto automático segura N km/h na reta (o log diz que o acelerador vem dele). */
 	float CruiseKmh = 0.0f;
 	float CruiseLogLeft = 0.0f;
