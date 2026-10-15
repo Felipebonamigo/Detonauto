@@ -38,6 +38,11 @@ testes: `docs/regras-camera.md`.
 
 - Faíscas no impacto e quando a carroceria raspa no chão ou na parede.
 - Cacos de vidro e de plástico (farol) no impacto forte.
+- **Vidro trincado** (pedido na revisão do 17b): para-brisa, vidros e faróis
+  ganham máscara de trinca no material, a partir do dano da zona (frente e teto
+  para o para-brisa). A trinca começa em 0,4 e fica estilhaçada em 1,0. O farol
+  apaga quando a frente passa de 0,6. É barato, e é o que mais falta para a
+  frente destruída ler como destruída.
 - Fumaça de pneu na derrapagem (ligada ao ângulo de deslize da assistência).
 - Fumaça do motor quando a zona da frente passa de 60% de dano; fogo acima de
   90%, se o custo couber.
