@@ -353,6 +353,18 @@ desfoque (média e p95 pelo `lookdev-measure.ps1`, `-ExtraArgs '-DNEdgeBlurForce
 cinco tentativas de 15 out, quatro foram descartadas por outro Unreal aberto (as três com o desfoque entre elas); a que valeu, sem o
 desfoque, deu Frame 4,74 / 5,29 ms e GPU 4,45 / 4,94 ms (média / p95).
 
+**Quadro inteiro, medido depois com o PC livre** (15 out, nenhum outro Unreal aberto, já com as peças do 18b, parado, duas execuções
+alternadas):
+
+| Cenário | Frame média / p95 | Game | GPU média / p95 | Quadros |
+|---|---|---|---|---|
+| desfoque na força máxima (`-DNEdgeBlurForce=0.5`) (1) | 4,82 / 5,33 ms | 1,64 / 2,36 ms | 4,54 / 5,03 ms | 2073 em 10 s |
+| sem desfoque (`-DNNoEdgeBlur`) (1) | 4,81 / 5,29 ms | 1,63 / 2,35 ms | 4,52 / 5,01 ms | 2080 em 10 s |
+| desfoque na força máxima (2) | 4,85 / 5,35 ms | 1,62 / 2,35 ms | 4,56 / 5,05 ms | 2063 em 10 s |
+| sem desfoque (2) | 4,81 / 5,32 ms | 1,65 / 2,39 ms | 4,53 / 5,01 ms | 2079 em 10 s |
+
+**Leitura:** +0,01 a +0,04 ms de Frame e +0,02 a +0,03 ms de GPU, do tamanho do passe medido sozinho (0,038 ms). Fechado.
+
 ## Lote 18b: peças que soltam e vidros (15 out 2026)
 
 Mesmo protocolo (`lookdev-measure.ps1 -Scenario parado`, perfil `DN_AlvoPS5`, 1920x1080), **nenhum outro Unreal aberto**. Cada carro
@@ -365,6 +377,8 @@ corte. Os estacionados são `ADNVehicle` (`-DNParkedCars=6`) e também ganham pe
 | só o jogador, com peças | 4,81 / 5,30 ms | 1,59 / 2,32 ms | 4,53 / 5,01 ms | 0,10 / 0,11 ms | 0,12 / 0,15 ms | 2080 em 10 s |
 | + 6 intactos, sem peças (1) | 4,76 / 5,25 ms | 1,95 / 2,73 ms | 4,48 / 4,97 ms | 0,31 / 0,37 ms | 0,19 / 0,23 ms | 2100 em 10 s |
 | + 6 intactos, sem peças (2) | 4,76 / 5,24 ms | 1,94 / 2,70 ms | 4,49 / 4,97 ms | 0,31 / 0,36 ms | 0,18 / 0,22 ms | 2100 em 10 s |
+| + 6 com as 5 zonas em 1,0, sem peças (1) | 4,77 / 5,28 ms | 1,96 / 2,72 ms | 4,49 / 4,98 ms | – | – | 2099 em 10 s |
+| + 6 com as 5 zonas em 1,0, sem peças (2) | 4,78 / 5,26 ms | 1,99 / 2,76 ms | 4,50 / 4,99 ms | – | – | 2093 em 10 s |
 | + 6 intactos, com peças presas (1) | 5,54 / 6,20 ms | 3,00 / 3,85 ms | 5,11 / 5,63 ms | 0,36 / 0,83 ms | 0,19 / 0,25 ms | 1806 em 10 s |
 | + 6 intactos, com peças presas (2) | 5,55 / 6,24 ms | 3,05 / 3,89 ms | 5,11 / 5,62 ms | 0,38 / 0,94 ms | 0,19 / 0,24 ms | 1802 em 10 s |
 | + 6 com 36 peças penduradas (dano 0,45) | 5,63 / 6,35 ms | 3,46 / 4,21 ms | 5,18 / 5,68 ms | 0,39 / 0,75 ms | 0,31 / 0,58 ms | 1776 em 10 s |
@@ -381,11 +395,42 @@ Na janela de 15 a 19 s, o dano entra a 1 s do começo e as 24 peças que o orça
   execuções de cada lado ficaram a 0,05 ms uma da outra. O Game sobe porque cada carro tem 27 componentes de malha com esqueleto presos
   ao chassi (19 novos e os 8 de antes), e cada um faz tick e atualiza a posição a cada quadro. É a alavanca se o tráfego ganhar peças:
   tick desligado com a peça presa, ou a pose do chassi como líder (`SetLeaderPoseComponent`).
+- **Alvos de deformação com a carroceria densa** (fecha a pendência do 17b): 6 em 1,0 contra 6 intactos, sem peças, +0,01 a +0,02 ms
+  de Frame e de GPU. Nada.
 - **36 penduradas:** +0,46 ms de Game e +0,12 ms na física dos trabalhadores (36 restrições), contra os intactos com peças.
 - **24 voando ao mesmo tempo:** +0,5 ms de Game na média e +1,2 no p95. O p95 inclui o quadro em que 66 peças soltam de uma vez
   (6 carros × 5 zonas por `DNZone`). A física dos trabalhadores sobe 0,15 ms e a GPU não muda.
 - Tudo longe do orçamento (Game 8 ms; GPU ~5 ms na 4070 Ti, ~10 ms estimados no PS5). O p95 da física na linha do jogo subiu com
   as peças presas (0,37 → 0,83–0,94 ms) sem a média mudar: picos, não custo fixo. Medir de novo quando o tráfego ganhar peças.
+
+## Lote 13: rodada de Crash e custo do tráfego (15 out 2026)
+
+`Tools/Unreal/crash-measure.ps1` com os 8 cenários padrão, PC livre (nenhum outro Unreal aberto), 1920x1080, semente 12345. É a
+estrada de teste do `ADNCrashTestGameMode` sobre `/Engine/Maps/Entry`, sem a cena de aparência, e o tráfego ainda são as caixas
+provisórias. Relatório completo em `Saved/Measure/20261015-022749/relatorio.txt`.
+
+| Cenário | Pontos | Destruídos | Medalha | Duração da rodada | Acordaram |
+|---|---|---|---|---|---|
+| C-100-20 (Rail) | 58 | 0 | nenhuma | 5,36 s | 2 de 20 |
+| C-100-40 (Rail) | 1320 | 0 | bronze | 7,53 s | 5 de 40 |
+| C-130-20 (Rail) | 54 | 0 | nenhuma | 11,44 s | 2 de 20 |
+| C-130-40 (Rail) | 2186 | 0 | bronze | 29,66 s | 38 de 40 |
+| C-130-40 (Physics) | 11162 | 0 | prata | 18,63 s | 0 de 40 (já nascem físicos) |
+
+| Cenário | Frame média / p95 | Game média / p95 | GPU média / p95 |
+|---|---|---|---|
+| P-0, sem tráfego | 3,66 / 3,98 ms | 1,63 / 2,34 ms | 3,40 / 3,45 ms |
+| P-40, Rail | 3,83 / 4,22 ms | 2,26 / 2,93 ms | 3,55 / 3,64 ms |
+| P-40, Physics | 3,81 / 4,21 ms | 2,47 / 3,09 ms | 3,51 / 3,61 ms |
+
+**Leitura:**
+
+- **Custo:** 0,016 ms de Game por carro em trilho e 0,021 ms em física, com 40 carros parados ao lado da estrada. Cabe com folga; o
+  `Rail` não é gargalo nessa densidade, então o Mass (proposta 3) continua sem motivo.
+- **Rodada:** ninguém é destruído em nenhum cenário, e a pontuação por dano (13c) é o que dá pontos. A 130 km/h com 40 carros em trilho,
+  38 acordam e a rodada dura 29,7 s, com 10 962 eventos de impacto. Com todos físicos desde o início ela rende 5 vezes mais (11 162,
+  prata) em 18,6 s. Os números da rodada são para a calibração de medalhas e de dano do Crash, não para o desempenho.
+- Medir de novo quando o tráfego usar o carro de verdade (lote 20), com peças (ver a nota dos 27 componentes no 18b).
 
 ## Para o Felipe testar na Sprint 6
 

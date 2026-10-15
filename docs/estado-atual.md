@@ -26,9 +26,9 @@ histórico das conversas. Atualizar a cada lote fechado.
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros, mobiliário |
 | Subsistemas de dados e de save | `Core/DNGameDataSubsystem`, `Core/DNRecordsSubsystem` | Testados sem mundo |
-| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, câmera de velocidade (FOV, tremor, desfoque nas bordas) e de batida (câmera lenta, órbita, controle do destroço), peças que penduram e soltam e vidros que trincam e estouram (`Vehicle/ADNCarPart`, `Vehicle/ADNGlassShards`), HUD de depuração |
+| Carro jogável | `Vehicle/ADNVehicle` | Presets por dados, turbo real com FOV, freio de mão com rampa, assistência de derrapagem, 5 câmeras por dados (tecla C), rodas no eixo certo, carroceria que amassa por zona (alvos de deformação) com o amassado local por cima, câmera de velocidade (FOV, tremor, desfoque nas bordas) e de batida (câmera lenta, órbita, controle do destroço), peças que penduram e soltam e vidros que trincam e estouram (`Vehicle/ADNCarPart`, `Vehicle/ADNGlassShards`), tecla R que recomeça na largada com tudo reposto (`DNRestart`, também pelo console), HUD de depuração |
 | Mobiliário destrutível | `Crash/ADNBreakableProp`, `Crash/UDNBreakableSubsystem` | Poste, árvore, banco, lixeira e hidrante da `L_Lookdev` caem quando o carro bate; o carro segue perdendo de 2% a 23% da velocidade; destroço nunca segura o carro e é varrido da frente (`docs/lote-17c.md`) |
-| Tráfego e rodada de Crash | `Traffic/`, `Vehicle/DNCrashTestGameMode` | Lote 13 parcial: código na main, medição ainda não rodou |
+| Tráfego e rodada de Crash | `Traffic/`, `Vehicle/DNCrashTestGameMode` | Lote 13 medido em 15 out (`docs/desempenho.md`): 0,016 ms de Game por carro em trilho; nenhuma rodada destrói carro, os pontos vêm do dano (13c) |
 | Mapa de teste | `ADNVehicleArena`, criado por código no `/Engine/Maps/Entry` | Feio de propósito; **não serve para julgar visual** |
 | Arte | `Content/Detonauto/Vehicle/SportsCar` | Carro do template da Epic, provisório; `SK_DNSportsCarBody` é a carroceria dele com os 5 alvos e os vãos, refeita por `Tools/Unreal/damage-body.ps1`; as 19 peças e vidros ficam em `SportsCar/Parts`, cortados por `Tools/Blender/split_car_parts.py` (`damage-body.ps1 -Parts`) |
 
@@ -41,7 +41,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 9 | Regras do dano | Aprovado |
 | 10–11 | Protótipo do amassado e calibração da batida | Aprovados; técnica revista em `docs/plano-visual.md` |
 | 12 | Carro no projeto principal | Aprovado |
-| 13 | Tráfego real e rodada de Crash | Parcial; falta a medição |
+| 13 | Tráfego real e rodada de Crash | Medido em 15 out (`docs/desempenho.md`); aguardando revisão |
 | 14 | Bugs do 1º playtest (rodas, amassado, curva) e ajustes (derrapagem, turbo, câmeras) | Aprovado (`docs/lote-14.md`). B3: não mexer no esterço; o preset padrão virou o arcade-3. Revisão: assistência só com 3 rodas no chão |
 | 15 | Plano visual, passos 1 e 2: base de renderização e cena de aparência | Na main, aguardando revisão (`docs/lookdev.md`, `docs/desempenho.md`): capturas antes e depois nos 4 ângulos; Frame 5,1 ms parado e 5,3 ms andando no perfil alvo PS5 (RTX 4070 Ti) |
 | 13b | Correções do tráfego achadas na revisão independente | Aprovado (`docs/regras-trafego.md`, seção do 13b) |
@@ -216,8 +216,6 @@ melhor e ele quer cinco modos.
 - Backup em HD externo.
 - Playtest do lote 14: roteiro em `docs/pendente-playtest.md`, seção 8. Responder
   o que é a curva "dura" (B3).
-- Fechar o outro Unreal aberto (`AgeOfEarthUE`) e não usar o PC enquanto a sessão
-  local mede desempenho (lote 13).
 - Olhar as capturas da cena de aparência (`docs/lookdev.md`) e dizer se a luz de
   fim de tarde é a direção certa.
 - Proposta de recursos do Unreal decidida pela nuvem em 14 out (ver o fim de
@@ -225,13 +223,24 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Revisão do lote 18b (`docs/lote-18b.md`) e o Felipe jogar os lotes 18 e 18b.
-2. Com o PC livre: quadro inteiro do lote 18 com e sem desfoque, custo do 17b com 37,8
-   mil vértices e o lote 13 (`crash-measure.ps1`).
+1. O Felipe joga o playtest 2 (`docs/roteiro-playtest-2.md`): lotes 14 a 18b, com a
+   tecla R para recomeçar. O lote 18b foi aprovado pelo par em 15 out.
+2. Medições do PC livre feitas em 15 out (`docs/desempenho.md`): desfoque do 18 no
+   quadro inteiro (+0,01 a +0,04 ms), alvos com a carroceria densa (17b, nada) e o
+   lote 13.
 3. Lotes 19 a 21 (`docs/fatia-vertical.md`): efeitos Niagara, primeiro
    cruzamento e som base. Antes do 20: árvore leve (20 MB ou menos) e texturas de
-   modelo em 2k.
-4. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
+   modelo em 2k. Notas da revisão do 18b para o 19:
+   - trinca com linhas finas na normal e na rugosidade, não albedo branco, e a
+     conferir se ela passa para fora do vidro;
+   - vão com material de metal escuro e normais suaves;
+   - cacos em Niagara com pool.
+4. **Antes de pôr peças no tráfego (lote 20):** cada carro com peças tem 27
+   componentes de malha com esqueleto presos ao chassi, e isso custa +0,16 ms de
+   Game por carro (`docs/desempenho.md`, 18b). Medir o tick deles desligado com a
+   peça presa, ou a pose do chassi como líder (`SetLeaderPoseComponent`), antes de
+   multiplicar por 40 carros.
+5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
 

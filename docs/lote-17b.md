@@ -78,7 +78,7 @@ Antes e depois: [`lascas-antes-depois.jpg`](img/dano-zonas-17b/lascas-antes-depo
 `parede-100kmh-frente-esq.jpg` foram refeitas. Na frente as lascas ficam esparsas; nas dobras da porta e na asa (com a traseira
 batida) elas aparecem em grupos. Os riscos ainda quase não se leem a 3 m.
 
-### Custo: pendente
+### Custo
 
 A medição com 37,8 mil vértices (6 carros amassados contra 6 intactos, como no lote 17) não fechou: outras sessões (TDFende e
 AgeOfEarth) abriram a Unreal no mesmo PC durante as rodadas, e uma delas deu 47,9 ms de quadro com a GPU dividida. O
@@ -86,9 +86,17 @@ AgeOfEarth) abriram a Unreal no mesmo PC durante as rodadas, e uma delas deu 47,
 PC livre. Expectativa: no lote 17, com 7 mil vértices, os alvos de deformação ficaram dentro do ruído; o skin cache com 5,4 vezes mais
 vértices deve continuar abaixo de 1 ms.
 
+**Medido depois (15 out, PC livre), com a carroceria do 18b**, que é ainda mais densa: subdividida de novo antes do corte das peças,
+arquivo de 15,4 para 19,7 MB. Sem as peças (`-DNNoParts`), para isolar a carroceria. 6 carros com as 5 zonas em 1,0 contra 6 intactos,
+duas execuções de cada:
+
+- Frame: 4,77 e 4,78 ms contra 4,76 e 4,76;
+- GPU: 4,49 e 4,50 ms contra 4,48 e 4,49.
+
+Os alvos custam +0,01 a +0,02 ms, ou seja, nada. Tabela em `docs/desempenho.md`, seção do 18b.
+
 ## Ficou para depois
 
-- O custo com 37,8 mil vértices, com o PC livre (acima).
 - O Felipe jogar e dizer se agora parece chapa amassada.
 - A lasca de tinta, de perto, ainda parece pontilhado claro uniforme. Variar o tamanho e juntar lascas nas cristas é ajuste para
   quando o carro final (City Sample) entrar.

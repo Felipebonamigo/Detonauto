@@ -70,8 +70,8 @@ No `vehicle-probe.ps1 -Map /Game/Detonauto/Maps/L_Lookdev -AlvoPS5 -ResX 1920 -R
    [`destroco-direita.jpg`](img/camera-18/destroco-direita.jpg).
 7. **Custo** no `DN_AlvoPS5`, 1920x1080: o passe `PostProcessMaterial 1920x1080 Material=M_DNEdgeBlur` medido por `profilegpu` com a
    força máxima do CSV (0,5) fixada parado: **0,038 ms de mediana, 0,041 ms no pior de 12 amostras**. O resto da câmera é uma consulta
-   de esfera por quadro durante a câmera lenta. Medição do quadro inteiro (média e p95, com e sem) pendente: o TDFende ficou aberto em
-   todas as tentativas e o `lookdev-measure` descartou (ver `docs/desempenho.md`).
+   de esfera por quadro durante a câmera lenta. Quadro inteiro, medido depois com o PC livre: +0,01 a +0,04 ms de Frame e +0,02 a
+   +0,03 ms de GPU com o desfoque na força máxima, em duas execuções (ver `docs/desempenho.md`).
 8. **O Felipe joga** e diz se a velocidade e a batida "vendem": pendente.
 
 Suíte: 677 de 677.
