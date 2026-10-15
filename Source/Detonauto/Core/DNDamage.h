@@ -35,6 +35,7 @@ enum class EDNDamageZone : uint8
 	Under
 };
 
+/** Lote 18b (docs/regras-pecas.md): o GlassFront saiu (vidro tem regra própria, FDNGlass) e as peças novas entraram no fim. */
 enum class EDNDamagePart : uint8
 {
 	Hood,
@@ -43,7 +44,11 @@ enum class EDNDamagePart : uint8
 	DoorRight,
 	BumperFront,
 	BumperRear,
-	GlassFront
+	FenderFrontLeft,
+	FenderFrontRight,
+	FenderRearLeft,
+	FenderRearRight,
+	Spoiler
 };
 
 /** Todos os números do dano. Unidades: m/s (variação de velocidade), cm, e frações de 0 a 1 de dano. */
@@ -105,7 +110,7 @@ struct FDNDent
 struct FDNDamageState
 {
 	static constexpr int32 ZoneCount = 6;
-	static constexpr int32 PartCount = 7;
+	static constexpr int32 PartCount = 11;
 	/** As 5 primeiras zonas do enum (Front a Roof) entram no total; a Under não. */
 	static constexpr int32 TotalZoneCount = 5;
 

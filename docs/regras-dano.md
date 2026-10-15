@@ -104,6 +104,12 @@ O contrato acima não cobria; ficaram assim em `Core/DNDamage.h` e nos testes (`
   do total ficam fixos no código (`DNDamage.cpp`), comentados.
 - **D11.** Validação do CSV além do contrato: nenhuma relação entre campos (por exemplo `PartDetachDeltaVMs >= DentMinDeltaVMs`).
 
+**Lote 18b (peças que soltam, `docs/regras-pecas.md`):** o `GlassFront` saiu do `EDNDamagePart` (vidro tem regra própria,
+`FDNGlass`) e as peças novas entraram no fim do enum: `FenderFrontLeft`, `FenderFrontRight`, `FenderRearLeft`, `FenderRearRight`
+(zona Front ou Rear) e `Spoiler` (Rear). A regra 4 acima continua com os limiares globais do `Damage.csv` e vale para quem não tem
+linhas em `Data/CarParts.csv` (hoje, o tráfego). O carro do jogador usa `FDNCarParts` (`Core/DNCarParts.h`): limiares por peça, o
+estágio pendurado e a zona secundária.
+
 **Regra 5 (destruído), decisão confirmada:** destruído quando o total das 5 zonas chega a 0,5 ou qualquer das zonas Front,
 Rear, Left, Right e Roof chega a 1,0. A Under sozinha não destrói. A versão anterior só destruía por Front ou Rear e deixava
 uma zona lateral saturada sobreviver (total 0,2); foi corrigida (D12 em `Core/DNDamage.h`).

@@ -372,7 +372,11 @@ void FDNDamageSpec::Define()
 		{
 			TestTrue("capo", FDNDamage::ZoneOfPart(EDNDamagePart::Hood) == EDNDamageZone::Front);
 			TestTrue("para-choque dianteiro", FDNDamage::ZoneOfPart(EDNDamagePart::BumperFront) == EDNDamageZone::Front);
-			TestTrue("vidro dianteiro", FDNDamage::ZoneOfPart(EDNDamagePart::GlassFront) == EDNDamageZone::Front);
+			TestTrue("para-lama dianteiro esquerdo", FDNDamage::ZoneOfPart(EDNDamagePart::FenderFrontLeft) == EDNDamageZone::Front);
+			TestTrue("para-lama dianteiro direito", FDNDamage::ZoneOfPart(EDNDamagePart::FenderFrontRight) == EDNDamageZone::Front);
+			TestTrue("para-lama traseiro esquerdo", FDNDamage::ZoneOfPart(EDNDamagePart::FenderRearLeft) == EDNDamageZone::Rear);
+			TestTrue("para-lama traseiro direito", FDNDamage::ZoneOfPart(EDNDamagePart::FenderRearRight) == EDNDamageZone::Rear);
+			TestTrue("aerofolio", FDNDamage::ZoneOfPart(EDNDamagePart::Spoiler) == EDNDamageZone::Rear);
 			TestTrue("porta-malas", FDNDamage::ZoneOfPart(EDNDamagePart::Trunk) == EDNDamageZone::Rear);
 			TestTrue("para-choque traseiro", FDNDamage::ZoneOfPart(EDNDamagePart::BumperRear) == EDNDamageZone::Rear);
 			TestTrue("porta esquerda", FDNDamage::ZoneOfPart(EDNDamagePart::DoorLeft) == EDNDamageZone::Left);
@@ -385,9 +389,11 @@ void FDNDamageSpec::Define()
 			TestEqual("11,99: nenhuma", FDNDamage::ApplyImpact(FDNDamageConfig(), S, Hit(11.99f)).DetachedParts.Num(), 0);
 			FDNDamageState T;
 			const FDNDamageResult R = FDNDamage::ApplyImpact(FDNDamageConfig(), T, Hit(12.f));
-			TestTrue(FString::Printf(TEXT("12,0: capo, para-choque e vidro; veio %s"), *ShowParts(R.DetachedParts)),
-				SameParts(R.DetachedParts, { EDNDamagePart::Hood, EDNDamagePart::BumperFront, EDNDamagePart::GlassFront }));
-			TestTrue("estado marca as tres", T.bPartDetached[static_cast<int32>(EDNDamagePart::Hood)] && T.bPartDetached[static_cast<int32>(EDNDamagePart::BumperFront)] && T.bPartDetached[static_cast<int32>(EDNDamagePart::GlassFront)]);
+			// lote 18b: o vidro saiu da lista (regra própria, FDNGlass) e os para-lamas entraram no fim do enum
+			TestTrue(FString::Printf(TEXT("12,0: capo, para-choque e os dois para-lamas da frente; veio %s"), *ShowParts(R.DetachedParts)),
+				SameParts(R.DetachedParts, { EDNDamagePart::Hood, EDNDamagePart::BumperFront, EDNDamagePart::FenderFrontLeft, EDNDamagePart::FenderFrontRight }));
+			TestTrue("estado marca as quatro", T.bPartDetached[static_cast<int32>(EDNDamagePart::Hood)] && T.bPartDetached[static_cast<int32>(EDNDamagePart::BumperFront)]
+				&& T.bPartDetached[static_cast<int32>(EDNDamagePart::FenderFrontLeft)] && T.bPartDetached[static_cast<int32>(EDNDamagePart::FenderFrontRight)]);
 			TestFalse("o porta-malas nao", T.bPartDetached[static_cast<int32>(EDNDamagePart::Trunk)]);
 		});
 
@@ -395,7 +401,8 @@ void FDNDamageSpec::Define()
 		{
 			const FDNDamageConfig C;
 			FDNDamageState Rear, Left, Right, Roof, Under;
-			TestTrue("traseira", SameParts(FDNDamage::ApplyImpact(C, Rear, Hit(12.f, EDNDamageZone::Rear)).DetachedParts, { EDNDamagePart::Trunk, EDNDamagePart::BumperRear }));
+			TestTrue("traseira", SameParts(FDNDamage::ApplyImpact(C, Rear, Hit(12.f, EDNDamageZone::Rear)).DetachedParts, { EDNDamagePart::Trunk, EDNDamagePart::BumperRear,
+				EDNDamagePart::FenderRearLeft, EDNDamagePart::FenderRearRight, EDNDamagePart::Spoiler }));
 			TestTrue("esquerda", SameParts(FDNDamage::ApplyImpact(C, Left, Hit(12.f, EDNDamageZone::Left)).DetachedParts, { EDNDamagePart::DoorLeft }));
 			TestTrue("direita", SameParts(FDNDamage::ApplyImpact(C, Right, Hit(12.f, EDNDamageZone::Right)).DetachedParts, { EDNDamagePart::DoorRight }));
 			TestEqual("teto", FDNDamage::ApplyImpact(C, Roof, Hit(12.f, EDNDamageZone::Roof)).DetachedParts.Num(), 0);
@@ -428,12 +435,13 @@ void FDNDamageSpec::Define()
 		{
 			const FDNDamageConfig C;
 			FDNDamageState S;
-			TestEqual("1o impacto", FDNDamage::ApplyImpact(C, S, Hit(20.f)).DetachedParts.Num(), 3);
+			TestEqual("1o impacto", FDNDamage::ApplyImpact(C, S, Hit(20.f)).DetachedParts.Num(), 4);
 			const FDNDamageResult R = FDNDamage::ApplyImpact(C, S, Hit(30.f, EDNDamageZone::Front, FVector(1000, 0, 0)));
 			TestEqual("2o impacto: nada novo", R.DetachedParts.Num(), 0);
 			TestTrue("seguem soltas", S.bPartDetached[static_cast<int32>(EDNDamagePart::Hood)]);
 			// uma peca de OUTRA zona ainda solta depois
-			TestTrue("a traseira ainda solta", SameParts(FDNDamage::ApplyImpact(C, S, Hit(20.f, EDNDamageZone::Rear, FVector(2000, 0, 0))).DetachedParts, { EDNDamagePart::Trunk, EDNDamagePart::BumperRear }));
+			TestTrue("a traseira ainda solta", SameParts(FDNDamage::ApplyImpact(C, S, Hit(20.f, EDNDamageZone::Rear, FVector(2000, 0, 0))).DetachedParts, { EDNDamagePart::Trunk, EDNDamagePart::BumperRear,
+				EDNDamagePart::FenderRearLeft, EDNDamagePart::FenderRearRight, EDNDamagePart::Spoiler }));
 		});
 
 		It("impacto abaixo do limiar nao solta nada nem com peca pendente", [this]()
@@ -542,7 +550,8 @@ void FDNDamageSpec::Define()
 			TestTrue("dano da traseira segue", R.AddedZoneDamage > 0.f);
 			TestTrue("amassado novo", R.bDentAdded);
 			TestEqual("dois amassados", S.Dents.Num(), 2);
-			TestTrue("pecas da traseira soltam", SameParts(R.DetachedParts, { EDNDamagePart::Trunk, EDNDamagePart::BumperRear }));
+			TestTrue("pecas da traseira soltam", SameParts(R.DetachedParts, { EDNDamagePart::Trunk, EDNDamagePart::BumperRear,
+				EDNDamagePart::FenderRearLeft, EDNDamagePart::FenderRearRight, EDNDamagePart::Spoiler }));
 		});
 	});
 

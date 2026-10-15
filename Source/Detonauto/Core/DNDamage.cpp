@@ -81,10 +81,14 @@ EDNDamageZone FDNDamage::ZoneOfPart(EDNDamagePart Part)
 	{
 	case EDNDamagePart::Hood:
 	case EDNDamagePart::BumperFront:
-	case EDNDamagePart::GlassFront:
+	case EDNDamagePart::FenderFrontLeft:
+	case EDNDamagePart::FenderFrontRight:
 		return EDNDamageZone::Front;
 	case EDNDamagePart::Trunk:
 	case EDNDamagePart::BumperRear:
+	case EDNDamagePart::FenderRearLeft:
+	case EDNDamagePart::FenderRearRight:
+	case EDNDamagePart::Spoiler:
 		return EDNDamageZone::Rear;
 	case EDNDamagePart::DoorLeft:
 		return EDNDamageZone::Left;
