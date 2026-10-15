@@ -52,7 +52,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 17b | Desgaste da pintura por zona e vincos mais duros | Na main, aguardando revisão (`docs/lote-17b.md`): capturas dos níveis nos 4 ângulos com o sol por trás, batida real a 100 km/h na `L_Lookdev`, lado a lado com o 17, frente em 1,0 mais destruída (recuo em rampa e capô em tenda). Custo com 37,8 mil vértices pendente (PC ocupado por outras sessões) |
 | 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
 | 18 | Câmera de velocidade e de batida | Aprovado (`docs/lote-18.md`, revisão de 15 out, com as três mudanças de contrato): FOV, tremor e desfoque nas bordas pela velocidade; câmera de batida com câmera lenta, órbita que mostra o amassado e não entra em prédio; controle do destroço medido (−1,24 m / +1,28 m). Passe do desfoque 0,038 ms. Pendentes: quadro inteiro com e sem desfoque com o PC livre, e o Felipe jogar |
-| 19 | Efeitos de batida (Niagara) | Em andamento (`docs/lote-19.md`): notas da revisão do 18b feitas (trinca, vão, para-brisa recortado); regras, CSV e ligação no C++ aprovados ou prontos, verificados pelo log. Falta montar os 9 sistemas Niagara pelo MCP numa sessão nova (passo a passo no `lote-19.md`), as capturas e o custo |
+| 19 | Efeitos de batida (Niagara) | Em andamento (`docs/lote-19.md`): os 9 sistemas `NS_DN*` montados pelo MCP em `Content/Detonauto/Effects`, compilando e aparecendo nas capturas (faíscas, cacos, fumaça de pneu, fumaça e fogo do motor, poste e árvore; `docs/img/efeitos-lote19/`). Falta o custo com 6 carros (outro Unreal aberto impediu a medição), uma captura do raspão e o Felipe julgar. Receita e achados no `lote-19.md` |
 | 18b | Peças que soltam e vidros que quebram | Na main, aguardando revisão (`docs/lote-18b.md`, `docs/regras-pecas.md`): 11 peças (Presa → Pendurada → Solta) e 8 vidros e lentes, malhas cortadas no Blender por script; trinca procedural no para-brisa; cacos sem Niagara. Itens 1 a 7 com capturas e custo (+0,11 ms de Frame e +0,16 de Game por carro com as peças presas). Achados: P5 (o empurrão atravessava o carro) e a câmera entrando no carro. Falta o Felipe jogar |
 
 ## Primeiro playtest (14 out)
@@ -241,10 +241,8 @@ melhor e ele quer cinco modos.
 2. Medições do PC livre feitas em 15 out (`docs/desempenho.md`): desfoque do 18 no
    quadro inteiro (+0,01 a +0,04 ms), alvos com a carroceria densa (17b, nada) e o
    lote 13.
-3. Lote 19: montar os 9 sistemas Niagara pelo MCP numa sessão NOVA, aberta com o editor
-   do Detonauto já aberto. Antes, ler este arquivo, `docs/regras-efeitos.md` e
-   `docs/lote-19.md` (o contrato dos parâmetros de usuário e o passo a passo). Depois,
-   capturas e custo. Pendência da revisão: escurecer o fundo do porta-malas e o difusor
+3. Lote 19: os 9 sistemas Niagara estão montados (`docs/lote-19.md`). Falta medir o custo com 6 carros no `DN_AlvoPS5` com o PC livre
+   e o Felipe julgar o visual. Pendência da revisão: escurecer o fundo do porta-malas e o difusor
    cinza-claros (textura do chassi do template) quando mexer no material de novo.
    Lotes 20 e 21 (`docs/fatia-vertical.md`): primeiro cruzamento e som base. Antes do
    20: árvore leve (20 MB ou menos) e texturas de modelo em 2k.

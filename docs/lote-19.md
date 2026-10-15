@@ -1,8 +1,8 @@
 # Lote 19: efeitos de batida (Niagara)
 
-Contrato: [`regras-efeitos.md`](regras-efeitos.md). Em andamento desde 15 out 2026. Feito na sessão local até aqui: as notas da revisão do
-18b (trinca e vão), as regras puras, o CSV e a ligação no C++. **Falta montar os sistemas Niagara** pelo Unreal MCP, numa sessão nova,
-e depois as capturas e o custo.
+Contrato: [`regras-efeitos.md`](regras-efeitos.md). Em andamento desde 15 out 2026. Feito na sessão local: as notas da revisão do
+18b (trinca e vão), as regras puras, o CSV, a ligação no C++ e os 9 sistemas Niagara (seção "Montagem pelo MCP", no fim). **Falta o custo**
+com 6 carros e o Felipe jogar.
 
 ## O que existe
 
@@ -84,3 +84,56 @@ Cada efeito é um sistema em `/Game/Detonauto/Effects/NS_DN<Efeito>`, com o nome
 
 - Na largada com o pé no fundo, a roda patina e solta fumaça de ~20 a ~77 km/h. Se for demais: a taxa da roda patinando (`Extra` da
   `fumaca-pneu`, 0,6) ou a velocidade mínima (`MinSpeedKmh`, 20) no CSV.
+
+## Montagem pelo MCP (15 out 2026, sessão local)
+
+Esta sessão não carregou o servidor MCP (ele só existe com o editor aberto no início). Contorno: cliente HTTP direto em
+`http://127.0.0.1:8010/mcp` (`Tools/Unreal/niagara-mcp/`: `mcp.sh` abre a sessão, `c.py` chama `call_tool`, `ns.py` e `fam.py` têm os
+auxiliares do Niagara). O C++ e o CSV não mudaram. Tudo em `Content/Detonauto/Effects/`.
+
+**Estado: os 9 sistemas existem, compilam sem erro, carregam no jogo e aparecem nas capturas. Falta o custo e o julgamento do Felipe.**
+
+| Sistema | Visto na captura | Observação |
+|---|---|---|
+| `NS_DNSparkImpact` | sim (muro a 100 km/h) | riscos laranja no focinho e no chão |
+| `NS_DNSparkScrape` | só pelo log (`SparkScrape 16/19/7`) | falta uma captura lateral boa do para-choque |
+| `NS_DNPlasticChips` | não distingui | pequenos e escuros; ver "Para o Felipe julgar" |
+| `NS_DNGlassShards` | sim (pontos brancos) | brilhos (`Extra`) ainda não ligados |
+| `NS_DNPropDust` | pouco (poste, rente ao chão) | fraco; aumentar se o Felipe quiser |
+| `NS_DNPropLeaves` | pouco (árvore) | folhas 12 a 20 cm, conferir |
+| `NS_DNTireSmoke` | sim (rastros atrás das rodas traseiras) | |
+| `NS_DNEngineSmoke` | sim (0,6 clara; 0,8 rala, depois escurecida sem nova captura) | rever a escura |
+| `NS_DNEngineFire` | sim (0,95, bolas de fogo subindo) | parece bola, não chama; rever |
+
+Capturas (sol por trás, 1920, sem HUD, exceto onde dito): `docs/img/efeitos-lote19/`
+(`muro-100kmh-faiscas-cacos`, `motor-06-08-095`, `fumaca-pneu`, `poste-quebrando`, `arvore-quebrando`, `faiscas-no-prop`).
+Lascas e cacos da primeira ao muro estão em quadros pequenos da folha `muro-100kmh-faiscas-cacos`.
+
+**O que não está feito:**
+- **Custo** com 6 carros no `DN_AlvoPS5` (item 7 do contrato). O `lookdev-measure.ps1` recusa com outro Unreal aberto e o Felipe estava
+  com o projeto Zombie aberto. Rodar quando o PC estiver livre: `-DNParkedCars=6` com `-DNParkedDamage=1` e `-DNParkedDamageAtS`.
+  Os efeitos ainda não têm número.
+- Captura do **raspão** do para-choque (só o log) e das **lascas** isoladas.
+- Texturas do Starter Content / Content Examples: não estão no PC. Usei a `T_soft_smoke` da própria engine (cópia
+  `T_DNSoftSmoke`, linha em `licencas.csv`). Perguntar ao Felipe se quer baixar algo melhor.
+- `Velocity` (herança de velocidade do carro) e `Extra` (brilhos do vidro) declarados e sem módulo ligado.
+- O aviso do contrato "faísca com colisão barata pela profundidade da cena" não foi feito (sem colisão).
+
+**Achados que o próximo montador precisa saber:**
+- **Exposição física de dia:** cor de sprite com valores perto de 1 sai preta. Faíscas e fogo usam dezenas de milhares
+  (`60000,20000,3000`), fumaça cinza clara 16000 a 23000. Mudou a aparência de "nada" para "visível".
+- **Espaço do cone:** o C++ gira o sistema para a direção e o cone aplicava a rotação de novo. `Cone Axis Coordinate Space = World`.
+- **Escala do sprite:** o módulo `ScaleSpriteSize` do modelo nasce em tamanho 0 e cresce; tirei dos contínuos (a fumaça virava
+  pontinhos). Tamanho fixo: pneu 50 a 110 cm, fumaça do motor 30 a 60, fogo 12 a 24.
+- **Material `M_DNSoftParticle`:** translucente, sem luz, cor da partícula, opacidade = canal R da textura de fumaça x máscara radial
+  x alfa da partícula, com `DepthFade`. Sem a máscara radial os sprites saem como quadrados.
+- O módulo `ScaleAttributesByCameraDistance` (fade perto da câmera) vem com `Min Scale = 1`; ficou em 0.
+- Fumaça de pneu: no `stat niagara` aparecia com partículas e sem sprite até corrigir o tamanho (item acima).
+- `GetSystemCompileState` trava o MCP depois de um recarregamento; usei `GetStackIssues` e o log do jogo.
+- A câmera de batida do `-DNCrashShots` sai com HUD; sem HUD só pelo roteiro `SHOT@t` (tempo do jogo, passo fixo `-UseFixedTimeStep -FPS=60`).
+- Para estados do motor sem bater: `EXEC:DNZone 0 0.6@t` (e 0.8, 0.95) no roteiro de teclas.
+- O editor do Detonauto foi fechado de fora 3 vezes (`CloseEditor()`, saída limpa) junto com a abertura de outro projeto (Zombie). Não
+  é falha do MCP.
+
+**Para o Felipe julgar:** tamanho e densidade das faíscas, se o fogo parece fogo, a cor da fumaça escura do motor, se o pó do poste
+e as folhas da árvore aparecem o bastante, e a fumaça de pneu na largada (ver "Para o Felipe julgar" mais acima).
