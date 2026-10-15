@@ -648,11 +648,13 @@ void FDNDataAllSpec::Define()
 			Data.DamageConfig = { DNTest::DamageEntry() };
 			Data.CarConfigs = { DNTest::CarEntry() };
 			Data.CameraModes = { DNTest::CameraEntry() };
-			Data.Breakables = { DNTest::Entry<FDNBreakableEntry>(DNTest::BreakableRow(), TEXT("poste")) };
+			Data.Breakables = DNTest::EffectProps(); // poste e arvore: os tipos que Effects.csv cita
 			Data.BreakableSettings = { DNTest::Entry<FDNBreakableSettingsEntry>(DNTest::BreakableSettingsRow()) };
 			Data.CameraFx = { DNTest::Entry<FDNCameraFxEntry>(DNTest::CameraFxRow()) };
 			Data.CarParts = { DNTest::Entry<FDNCarPartEntry>(DNTest::CarPartRow(), TEXT("para-choque")) };
 			Data.CarGlass = { DNTest::Entry<FDNCarGlassEntry>(DNTest::CarGlassRow(), TEXT("vidro")) };
+			Data.Effects = DNTest::EffectEntries();
+			Data.EffectsSettings = { DNTest::Entry<FDNEffectsSettingsEntry>(DNTest::EffectsSettingsRow()) };
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -687,7 +689,13 @@ void FDNDataAllSpec::Define()
 			Data.CarParts[0].Row.MassKg = 0.f;
 			Data.CarGlass = { DNTest::Entry<FDNCarGlassEntry>(DNTest::CarGlassRow(), TEXT("vidro")) };
 			Data.CarGlass[0].Row.CrackFrom = 2.f;
+			Data.Effects = DNTest::EffectEntries();
+			Data.Effects[0].Row.PoolMax = 0;
+			Data.EffectsSettings = { DNTest::Entry<FDNEffectsSettingsEntry>(DNTest::EffectsSettingsRow()) };
+			Data.EffectsSettings[0].Row.MaxSmokeSprites = 0;
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
+			ExpectError(*this, TEXT("efeitos"), Errors, { TEXT("Effects.csv"), TEXT("PoolMax") });
+			ExpectError(*this, TEXT("tetos dos efeitos"), Errors, { TEXT("EffectsSettings.csv"), TEXT("MaxSmokeSprites") });
 			ExpectError(*this, TEXT("pecas do carro"), Errors, { TEXT("CarParts.csv"), TEXT("MassKg") });
 			ExpectError(*this, TEXT("vidros do carro"), Errors, { TEXT("CarGlass.csv"), TEXT("CrackFrom") });
 			ExpectError(*this, TEXT("config da camera"), Errors, { TEXT("CameraFx.csv"), TEXT("CrashCamTimeScale") });

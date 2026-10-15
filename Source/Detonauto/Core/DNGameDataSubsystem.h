@@ -75,6 +75,10 @@ public:
 	TArray<FDNCarPartSpec> GetCarParts(const FString& CarId) const;
 	/** Os vidros e lentes do carro CarId (Data/CarGlass.csv), na ordem do arquivo; vazio se não tem ou se a tabela é inválida. */
 	TArray<FDNGlassSpec> GetCarGlass(const FString& CarId) const;
+	/** O efeito (Data/Effects.csv, lote 19). Falso, sem mexer em Out, se a tabela é inválida: nenhum efeito sai com números inventados. */
+	bool GetEffect(EDNEffect Effect, FDNEffectSpec& Out) const;
+	/** Os tetos de Data/EffectsSettings.csv, ou o padrão da struct se a tabela é inválida. */
+	FDNEffectsSettings GetEffectsSettings() const;
 
 private:
 	FDNData Data;
@@ -93,4 +97,6 @@ private:
 	bool bCameraFxValid = false;
 	bool bCarPartsValid = false;
 	bool bCarGlassValid = false;
+	bool bEffectsValid = false;
+	bool bEffectsSettingsValid = false;
 };

@@ -24,6 +24,9 @@
 //   CarParts.csv        Id, CarId, Part, Zone, SecondaryZone, MassKg, HangDamage, HangDeltaVMs, DetachDamage, DetachDeltaVMs, HingeEdge,
 //                       HingeMaxDeg, HingeDamping, LaunchMs (uma peça por linha e por carro; lote 18b, docs/regras-pecas.md)
 //   CarGlass.csv        Id, CarId, Glass, Zone, SecondaryZone, CrackFrom, BurstDamage, BurstDeltaVMs (um vidro por linha e por carro)
+//   Effects.csv         Id, Effect, TriggerMin, TriggerFull, MinSpeedKmh, CountMin, CountMax, CountPerUnit, Extra, LifeMinS, LifeMaxS,
+//                       SpeedMinMs, SpeedMaxMs, PoolMax, Props (um efeito por linha, cada um uma vez; lote 19, docs/regras-efeitos.md)
+//   EffectsSettings.csv Id + os campos de FDNEffectsSettings (uma linha, id "padrao")
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -42,6 +45,7 @@
 #include "Core/DNCameraFx.h"
 #include "Core/DNBreakable.h"
 #include "Core/DNCarParts.h"
+#include "Core/DNEffects.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -685,6 +689,94 @@ struct FDNCarGlassRow : public FTableRowBase
 	}
 };
 
+/** Data/Effects.csv: um efeito por linha (lote 19, docs/regras-efeitos.md). O que cada coluna quer dizer em cada efeito: a tabela de
+ *  FDNEffectSpec em Core/DNEffects.h. Textos: Effect (EDNEffect); Props, os tipos de Breakables.csv separados por ';' (só no pó e nas
+ *  folhas do mobiliário). */
+USTRUCT(BlueprintType)
+struct FDNEffectRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Effect;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TriggerMin = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TriggerFull = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MinSpeedKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CountMin = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CountMax = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CountPerUnit = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float Extra = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LifeMinS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LifeMaxS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SpeedMinMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SpeedMaxMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 PoolMax = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Props;
+
+	/** O efeito; falso se o texto do efeito não é válido (Out fica como estava). */
+	bool ToSpec(FDNEffectSpec& Out) const
+	{
+		FDNEffectSpec S;
+		if (!FDNEffects::ParseEffect(Effect, S.Effect))
+		{
+			return false;
+		}
+		S.TriggerMin = TriggerMin;
+		S.TriggerFull = TriggerFull;
+		S.MinSpeedKmh = MinSpeedKmh;
+		S.CountMin = CountMin;
+		S.CountMax = CountMax;
+		S.CountPerUnit = CountPerUnit;
+		S.Extra = Extra;
+		S.LifeMinS = LifeMinS;
+		S.LifeMaxS = LifeMaxS;
+		S.SpeedMinMs = SpeedMinMs;
+		S.SpeedMaxMs = SpeedMaxMs;
+		S.PoolMax = PoolMax;
+		S.Props = PropKinds();
+		Out = S;
+		return true;
+	}
+
+	/** Os tipos de Props, sem espaços e sem itens vazios. */
+	TArray<FString> PropKinds() const
+	{
+		TArray<FString> Kinds;
+		Props.ParseIntoArray(Kinds, TEXT(";"));
+		TArray<FString> Out;
+		for (const FString& Kind : Kinds)
+		{
+			const FString Trimmed = Kind.TrimStartAndEnd();
+			if (!Trimmed.IsEmpty())
+			{
+				Out.Add(Trimmed);
+			}
+		}
+		return Out;
+	}
+};
+
+/** Data/EffectsSettings.csv: os tetos globais dos efeitos (uma linha, id "padrao"). Campos: FDNEffectsSettings. */
+USTRUCT(BlueprintType)
+struct FDNEffectsSettingsRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxGpuParticles = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxSmokeSprites = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SmokeFadeNearCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SmokeFadeFarCm = 0.0f;
+
+	FDNEffectsSettings ToSettings() const
+	{
+		FDNEffectsSettings S;
+		S.MaxGpuParticles = MaxGpuParticles;
+		S.MaxSmokeSprites = MaxSmokeSprites;
+		S.SmokeFadeNearCm = SmokeFadeNearCm;
+		S.SmokeFadeFarCm = SmokeFadeFarCm;
+		return S;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -710,6 +802,8 @@ using FDNBreakableEntry = TDNTableEntry<FDNBreakableRow>;
 using FDNBreakableSettingsEntry = TDNTableEntry<FDNBreakableSettingsRow>;
 using FDNCarPartEntry = TDNTableEntry<FDNCarPartRow>;
 using FDNCarGlassEntry = TDNTableEntry<FDNCarGlassRow>;
+using FDNEffectEntry = TDNTableEntry<FDNEffectRow>;
+using FDNEffectsSettingsEntry = TDNTableEntry<FDNEffectsSettingsRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -731,4 +825,6 @@ struct FDNData
 	TArray<FDNBreakableSettingsEntry> BreakableSettings;
 	TArray<FDNCarPartEntry> CarParts;
 	TArray<FDNCarGlassEntry> CarGlass;
+	TArray<FDNEffectEntry> Effects;
+	TArray<FDNEffectsSettingsEntry> EffectsSettings;
 };

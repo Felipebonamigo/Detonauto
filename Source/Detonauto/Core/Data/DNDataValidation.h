@@ -65,6 +65,18 @@ struct FDNDataValidation
 	 *  [0, 100] (0 = nunca).
 	 */
 	static TArray<FString> ValidateCarGlass(const TArray<FDNCarGlassEntry>& Rows);
+	/**
+	 *  Effects.csv (efeitos de batida, lote 19, docs/regras-efeitos.md): cada efeito de EDNEffect exatamente uma vez; Effect conhecido;
+	 *  TriggerMin [0, 100]; TriggerFull [0, 100] e, onde há rampa (PlasticChips, TireSmoke, EngineSmoke), maior que TriggerMin; dano
+	 *  (EngineSmoke, EngineFire) em [0, 1]; MinSpeedKmh [0, 300]; CountMin [0, 5000] e CountMax [CountMin, 5000]; CountPerUnit
+	 *  [0, 10000]; Extra [0, 1000], em [0, 1] na TireSmoke e na EngineFire; LifeMinS (0, 30] e LifeMaxS [LifeMinS, 30]; SpeedMinMs
+	 *  [0, 100] e SpeedMaxMs [SpeedMinMs, 100]; PoolMax [1, 64]; Props só no PropDust e no PropLeaves (e obrigatório neles), cada tipo
+	 *  em Breakables.
+	 */
+	static TArray<FString> ValidateEffects(const TArray<FDNEffectEntry>& Rows, const TArray<FDNBreakableEntry>& Breakables);
+	/** EffectsSettings.csv: uma linha; MaxGpuParticles [1, 100000], MaxSmokeSprites [1, 10000], SmokeFadeNearCm [0, 2000] e
+	 *  SmokeFadeFarCm (SmokeFadeNearCm, 5000]. */
+	static TArray<FString> ValidateEffectsSettings(const TArray<FDNEffectsSettingsEntry>& Rows);
 
 	/**
 	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros

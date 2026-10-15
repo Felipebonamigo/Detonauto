@@ -35,6 +35,8 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bCameraFxValid = FDNDataValidation::ValidateCameraFx(Data.CameraFx).IsEmpty();
 	bCarPartsValid = FDNDataValidation::ValidateCarParts(Data.CarParts).IsEmpty();
 	bCarGlassValid = FDNDataValidation::ValidateCarGlass(Data.CarGlass).IsEmpty();
+	bEffectsValid = FDNDataValidation::ValidateEffects(Data.Effects, Data.Breakables).IsEmpty();
+	bEffectsSettingsValid = FDNDataValidation::ValidateEffectsSettings(Data.EffectsSettings).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -192,4 +194,27 @@ TArray<FDNGlassSpec> UDNGameDataSubsystem::GetCarGlass(const FString& CarId) con
 		}
 	}
 	return Out;
+}
+
+bool UDNGameDataSubsystem::GetEffect(EDNEffect Effect, FDNEffectSpec& Out) const
+{
+	if (!bEffectsValid)
+	{
+		return false;
+	}
+	for (const FDNEffectEntry& E : Data.Effects)
+	{
+		FDNEffectSpec Spec;
+		if (E.Row.ToSpec(Spec) && Spec.Effect == Effect)
+		{
+			Out = Spec;
+			return true;
+		}
+	}
+	return false;
+}
+
+FDNEffectsSettings UDNGameDataSubsystem::GetEffectsSettings() const
+{
+	return (bEffectsSettingsValid && Data.EffectsSettings.Num() == 1) ? Data.EffectsSettings[0].Row.ToSettings() : FDNEffectsSettings();
 }

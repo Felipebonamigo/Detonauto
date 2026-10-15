@@ -648,6 +648,8 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateCameraFx(Data.CameraFx));
 	Errors.Append(ValidateCarParts(Data.CarParts));
 	Errors.Append(ValidateCarGlass(Data.CarGlass));
+	Errors.Append(ValidateEffects(Data.Effects, Data.Breakables));
+	Errors.Append(ValidateEffectsSettings(Data.EffectsSettings));
 	return Errors;
 }
 
@@ -887,6 +889,105 @@ TArray<FString> FDNDataValidation::ValidateCarGlass(const TArray<FDNCarGlassEntr
 		CheckRange(File, E.Id, TEXT("CrackFrom"), R.CrackFrom, 0.0f, true, 1.0f, true, Errors);
 		CheckRange(File, E.Id, TEXT("BurstDamage"), R.BurstDamage, 0.0f, true, 1.0f, true, Errors);
 		CheckRange(File, E.Id, TEXT("BurstDeltaVMs"), R.BurstDeltaVMs, 0.0f, true, 100.0f, true, Errors);
+	}
+	return Errors;
+}
+
+namespace
+{
+	/** Inteiro na faixa fechada [Min, Max]; senão registra o erro. */
+	void CheckIntRange(const TCHAR* File, const FString& Id, const TCHAR* Field, int32 Value, int32 Min, int32 Max, TArray<FString>& Errors)
+	{
+		if (Value < Min || Value > Max)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo '%s' precisa ser um inteiro em [%d, %d] (veio %d)."), File, *Id, Field, Min, Max, Value));
+		}
+	}
+}
+
+TArray<FString> FDNDataValidation::ValidateEffects(const TArray<FDNEffectEntry>& Rows, const TArray<FDNBreakableEntry>& Breakables)
+{
+	constexpr const TCHAR* File = TEXT("Effects.csv");
+	TArray<FString> Errors;
+	CheckIds(File, Rows, Errors);
+	TMap<EDNEffect, FString> Seen; // efeito -> id da primeira linha
+	for (const FDNEffectEntry& E : Rows)
+	{
+		const FDNEffectRow& R = E.Row;
+		EDNEffect Effect = EDNEffect::SparkImpact;
+		if (!FDNEffects::ParseEffect(R.Effect, Effect))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Effect' tem efeito desconhecido '%s'."), File, *E.Id, *R.Effect));
+			continue;
+		}
+		if (const FString* First = Seen.Find(Effect))
+		{
+			Errors.Add(FString::Printf(TEXT("%s: o efeito %s aparece duas vezes (linhas '%s' e '%s')."), File, FDNEffects::EffectName(Effect), **First, *E.Id));
+		}
+		else
+		{
+			Seen.Add(Effect, E.Id);
+		}
+		// limiares: dano (motor e fogo) em [0, 1]; o resto em [0, 100]; a rampa termina depois de começar
+		const bool bDamage = Effect == EDNEffect::EngineSmoke || Effect == EDNEffect::EngineFire;
+		const float TriggerTop = bDamage ? 1.0f : 100.0f;
+		CheckRange(File, E.Id, TEXT("TriggerMin"), R.TriggerMin, 0.0f, true, TriggerTop, true, Errors);
+		const bool bRamp = Effect == EDNEffect::PlasticChips || Effect == EDNEffect::TireSmoke || Effect == EDNEffect::EngineSmoke;
+		const float FullMin = bRamp && FMath::IsFinite(R.TriggerMin) ? R.TriggerMin : 0.0f;
+		CheckRange(File, E.Id, TEXT("TriggerFull"), R.TriggerFull, FullMin, !bRamp, TriggerTop, true, Errors);
+		CheckRange(File, E.Id, TEXT("MinSpeedKmh"), R.MinSpeedKmh, 0.0f, true, 300.0f, true, Errors);
+		CheckIntRange(File, E.Id, TEXT("CountMin"), R.CountMin, 0, 5000, Errors);
+		CheckIntRange(File, E.Id, TEXT("CountMax"), R.CountMax, FMath::Max(0, R.CountMin), 5000, Errors);
+		CheckRange(File, E.Id, TEXT("CountPerUnit"), R.CountPerUnit, 0.0f, true, 10000.0f, true, Errors);
+		const bool bFraction = Effect == EDNEffect::TireSmoke || Effect == EDNEffect::EngineFire;
+		CheckRange(File, E.Id, TEXT("Extra"), R.Extra, 0.0f, true, bFraction ? 1.0f : 1000.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("LifeMinS"), R.LifeMinS, 0.0f, false, 30.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("LifeMaxS"), R.LifeMaxS, FMath::IsFinite(R.LifeMinS) ? R.LifeMinS : 0.0f, true, 30.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("SpeedMinMs"), R.SpeedMinMs, 0.0f, true, 100.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("SpeedMaxMs"), R.SpeedMaxMs, FMath::IsFinite(R.SpeedMinMs) ? R.SpeedMinMs : 0.0f, true, 100.0f, true, Errors);
+		CheckIntRange(File, E.Id, TEXT("PoolMax"), R.PoolMax, 1, 64, Errors);
+		// mobiliário: só no pó e nas folhas, obrigatório neles, e cada tipo existe em Breakables.csv
+		const TArray<FString> Kinds = R.PropKinds();
+		const bool bProp = Effect == EDNEffect::PropDust || Effect == EDNEffect::PropLeaves;
+		if (!bProp && !Kinds.IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Props' só vale no PropDust e no PropLeaves (veio '%s')."), File, *E.Id, *R.Props));
+		}
+		if (bProp && Kinds.IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Props' precisa dos tipos de peça de rua que disparam o efeito."), File, *E.Id));
+		}
+		for (const FString& Kind : Kinds)
+		{
+			if (!Breakables.ContainsByPredicate([&Kind](const FDNBreakableEntry& B) { return B.Id.Equals(Kind, ESearchCase::IgnoreCase); }))
+			{
+				Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Props' cita o tipo '%s', que não existe em Breakables.csv."), File, *E.Id, *Kind));
+			}
+		}
+	}
+	for (int32 i = 0; i <= static_cast<int32>(EDNEffect::PropLeaves); ++i)
+	{
+		const EDNEffect Effect = static_cast<EDNEffect>(i);
+		if (!Seen.Contains(Effect))
+		{
+			Errors.Add(FString::Printf(TEXT("%s: falta a linha do efeito %s (cada efeito precisa de uma)."), File, FDNEffects::EffectName(Effect)));
+		}
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateEffectsSettings(const TArray<FDNEffectsSettingsEntry>& Rows)
+{
+	constexpr const TCHAR* File = TEXT("EffectsSettings.csv");
+	TArray<FString> Errors;
+	CheckSingleRow(File, Rows, Errors);
+	for (const FDNEffectsSettingsEntry& E : Rows)
+	{
+		const FDNEffectsSettingsRow& R = E.Row;
+		CheckIntRange(File, E.Id, TEXT("MaxGpuParticles"), R.MaxGpuParticles, 1, 100000, Errors);
+		CheckIntRange(File, E.Id, TEXT("MaxSmokeSprites"), R.MaxSmokeSprites, 1, 10000, Errors);
+		CheckRange(File, E.Id, TEXT("SmokeFadeNearCm"), R.SmokeFadeNearCm, 0.0f, true, 2000.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("SmokeFadeFarCm"), R.SmokeFadeFarCm, FMath::IsFinite(R.SmokeFadeNearCm) ? R.SmokeFadeNearCm : 0.0f, false, 5000.0f, true, Errors);
 	}
 	return Errors;
 }

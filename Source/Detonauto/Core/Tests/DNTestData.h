@@ -242,6 +242,59 @@ namespace DNTest
 		return E;
 	}
 
+	/** Uma linha de Effects.csv (lote 19). */
+	inline FDNEffectRow EffectRow(const TCHAR* Effect, float TriggerMin, float TriggerFull, float MinSpeedKmh, int32 CountMin, int32 CountMax,
+		float PerUnit, float Extra, float LifeMin, float LifeMax, float SpeedMin, float SpeedMax, int32 Pool, const TCHAR* Props = TEXT(""))
+	{
+		FDNEffectRow R;
+		R.Effect = Effect;
+		R.TriggerMin = TriggerMin;
+		R.TriggerFull = TriggerFull;
+		R.MinSpeedKmh = MinSpeedKmh;
+		R.CountMin = CountMin;
+		R.CountMax = CountMax;
+		R.CountPerUnit = PerUnit;
+		R.Extra = Extra;
+		R.LifeMinS = LifeMin;
+		R.LifeMaxS = LifeMax;
+		R.SpeedMinMs = SpeedMin;
+		R.SpeedMaxMs = SpeedMax;
+		R.PoolMax = Pool;
+		R.Props = Props;
+		return R;
+	}
+
+	/** A tabela do contrato de Effects.csv (docs/regras-efeitos.md e as decisões E2 a E7), uma linha por efeito, na ordem do enum. */
+	inline TArray<FDNEffectEntry> EffectEntries()
+	{
+		return {
+			Entry<FDNEffectEntry>(EffectRow(TEXT("SparkImpact"), 4.f, 0.f, 0.f, 10, 120, 6.f, 0.f, 0.3f, 0.8f, 4.f, 12.f, 8), TEXT("faisca-impacto")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("SparkScrape"), 3.f, 0.f, 0.f, 0, 300, 15.f, 0.f, 0.2f, 0.5f, 2.f, 8.f, 8), TEXT("faisca-raspao")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("GlassShards"), 0.f, 0.f, 0.f, 60, 150, 250.f, 20.f, 1.5f, 1.5f, 1.f, 4.f, 4), TEXT("cacos-vidro")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("PlasticChips"), 12.f, 30.f, 0.f, 10, 30, 0.f, 0.f, 1.f, 2.f, 3.f, 9.f, 4), TEXT("lascas-plastico")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("TireSmoke"), 8.f, 25.f, 20.f, 0, 0, 0.f, 0.6f, 2.f, 4.f, 0.5f, 1.5f, 4), TEXT("fumaca-pneu")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("EngineSmoke"), 0.6f, 0.8f, 0.f, 0, 0, 0.f, 0.f, 3.f, 5.f, 0.5f, 1.5f, 6), TEXT("fumaca-motor")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("EngineFire"), 0.9f, 0.f, 0.f, 0, 0, 0.f, 0.7f, 0.4f, 0.8f, 1.f, 3.f, 6), TEXT("fogo")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("PropDust"), 0.f, 0.f, 0.f, 20, 40, 0.f, 0.f, 1.f, 2.f, 0.5f, 2.f, 4, TEXT("poste;arvore")), TEXT("po-mobiliario")),
+			Entry<FDNEffectEntry>(EffectRow(TEXT("PropLeaves"), 0.f, 0.f, 0.f, 30, 40, 0.f, 0.f, 3.f, 5.f, 0.5f, 2.f, 4, TEXT("arvore")), TEXT("folhas")) };
+	}
+
+	/** Os tipos de peça de rua citados por Effects.csv (poste e arvore), para a validação das referências. */
+	inline TArray<FDNBreakableEntry> EffectProps()
+	{
+		return { Entry<FDNBreakableEntry>(BreakableRow(), TEXT("poste")), Entry<FDNBreakableEntry>(BreakableRow(), TEXT("arvore")) };
+	}
+
+	inline FDNEffectsSettingsRow EffectsSettingsRow(const FDNEffectsSettings& S = FDNEffectsSettings())
+	{
+		FDNEffectsSettingsRow R;
+		R.MaxGpuParticles = S.MaxGpuParticles;
+		R.MaxSmokeSprites = S.MaxSmokeSprites;
+		R.SmokeFadeNearCm = S.SmokeFadeNearCm;
+		R.SmokeFadeFarCm = S.SmokeFadeFarCm;
+		return R;
+	}
+
 	inline FDNTurboConfigEntry TurboEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTurboConfigEntry>(TurboRow(), Id); }
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }
