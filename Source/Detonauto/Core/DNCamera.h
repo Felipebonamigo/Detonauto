@@ -30,6 +30,10 @@ struct FDNCameraConfig
 	float Fov = 95.0f;
 	/** Chase: velocidade com que a câmera acompanha a rotação do carro (menor = mais solta); 0 = presa, sem atraso. */
 	float Smoothing = 2.0f;
+	/** Lote 18: quanto do campo de visão por velocidade este modo usa (dentro do carro abrir demais enjoa: o motorista usa 0,5). */
+	float SpeedFovScale = 1.0f;
+	/** Lote 18: quanto do tremor de velocidade este modo usa. */
+	float ShakeScale = 1.0f;
 };
 
 struct FDNCameraCycle

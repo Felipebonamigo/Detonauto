@@ -133,7 +133,7 @@ struct FDNDataLoader
 		return ParseEntries<RowType>(Csv, FPaths::GetCleanFilename(RelativePath), OutEntries);
 	}
 
-	/** Lê as catorze tabelas de Data/. */
+	/** Lê as quinze tabelas de Data/. */
 	static TArray<FString> LoadAll(FDNData& OutData)
 	{
 		TArray<FString> Errors;
@@ -151,6 +151,7 @@ struct FDNDataLoader
 		Errors.Append(LoadEntries<FDNCameraConfigRow>(TEXT("Data/Cameras.csv"), OutData.CameraModes));
 		Errors.Append(LoadEntries<FDNBreakableRow>(TEXT("Data/Breakables.csv"), OutData.Breakables));
 		Errors.Append(LoadEntries<FDNBreakableSettingsRow>(TEXT("Data/BreakableSettings.csv"), OutData.BreakableSettings));
+		Errors.Append(LoadEntries<FDNCameraFxRow>(TEXT("Data/CameraFx.csv"), OutData.CameraFx));
 		return Errors;
 	}
 };

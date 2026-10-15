@@ -159,6 +159,40 @@ namespace DNTest
 		R.PitchDeg = C.PitchDeg;
 		R.Fov = C.Fov;
 		R.Smoothing = C.Smoothing;
+		R.SpeedFovScale = C.SpeedFovScale;
+		R.ShakeScale = C.ShakeScale;
+		return R;
+	}
+
+	inline FDNCameraFxRow CameraFxRow(const FDNCameraFxSettings& S = FDNCameraFxSettings())
+	{
+		FDNCameraFxRow R;
+		R.SpeedFovStartKmh = S.SpeedFovStartKmh;
+		R.SpeedFovFullKmh = S.SpeedFovFullKmh;
+		R.SpeedFovMaxAddDeg = S.SpeedFovMaxAddDeg;
+		R.TurboFovAddDeg = S.TurboFovAddDeg;
+		R.MaxFovDeg = S.MaxFovDeg;
+		R.FovBlendDegPerS = S.FovBlendDegPerS;
+		R.ShakeStartKmh = S.ShakeStartKmh;
+		R.ShakeFullKmh = S.ShakeFullKmh;
+		R.ShakeMaxDeg = S.ShakeMaxDeg;
+		R.ShakeHz = S.ShakeHz;
+		R.EdgeBlurStartKmh = S.EdgeBlurStartKmh;
+		R.EdgeBlurFullKmh = S.EdgeBlurFullKmh;
+		R.EdgeBlurMax = S.EdgeBlurMax;
+		R.EdgeBlurInnerRadius = S.EdgeBlurInnerRadius;
+		R.CrashCamMinDeltaVMs = S.CrashCamMinDeltaVMs;
+		R.CrashCamTimeScale = S.CrashCamTimeScale;
+		R.CrashCamEnterS = S.CrashCamEnterS;
+		R.CrashCamHoldS = S.CrashCamHoldS;
+		R.CrashCamExitS = S.CrashCamExitS;
+		R.CrashCamCooldownS = S.CrashCamCooldownS;
+		R.CrashCamOrbitRadiusM = S.CrashCamOrbitRadiusM;
+		R.CrashCamOrbitHeightM = S.CrashCamOrbitHeightM;
+		R.CrashCamOrbitDegPerS = S.CrashCamOrbitDegPerS;
+		R.CrashCamProbeCm = S.CrashCamProbeCm;
+		R.WreckSteerAccelMs2 = S.WreckSteerAccelMs2;
+		R.WreckSteerMaxDeltaVMs = S.WreckSteerMaxDeltaVMs;
 		return R;
 	}
 

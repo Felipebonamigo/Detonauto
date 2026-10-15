@@ -68,6 +68,8 @@ public:
 	bool TryGetBreakableKind(const FString& Kind, FDNBreakableKind& Out) const;
 	/** Os valores globais de Data/BreakableSettings.csv, ou o padrão se a tabela é inválida (S1). */
 	FDNBreakableSettings GetBreakableSettings() const;
+	/** Os valores globais de Data/CameraFx.csv (lote 18), ou o padrão se a tabela é inválida (S1). */
+	FDNCameraFxSettings GetCameraFxSettings() const;
 
 private:
 	FDNData Data;
@@ -83,4 +85,5 @@ private:
 	bool bTrafficVehiclesValid = false;
 	bool bBreakablesValid = false;
 	bool bBreakableSettingsValid = false;
+	bool bCameraFxValid = false;
 };

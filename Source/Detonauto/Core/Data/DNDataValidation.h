@@ -48,6 +48,9 @@ struct FDNDataValidation
 	static TArray<FString> ValidateBreakables(const TArray<FDNBreakableEntry>& Rows);
 	/** BreakableSettings.csv: uma linha e as faixas de cada campo. */
 	static TArray<FString> ValidateBreakableSettings(const TArray<FDNBreakableSettingsEntry>& Rows);
+	/** CameraFx.csv (câmera de velocidade e de batida, docs/regras-camera.md): uma linha, as faixas de cada campo e o fim de cada
+	 *  rampa depois do começo. */
+	static TArray<FString> ValidateCameraFx(const TArray<FDNCameraFxEntry>& Rows);
 
 	/**
 	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros

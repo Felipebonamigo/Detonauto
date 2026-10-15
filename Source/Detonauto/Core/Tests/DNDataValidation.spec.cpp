@@ -650,6 +650,7 @@ void FDNDataAllSpec::Define()
 			Data.CameraModes = { DNTest::CameraEntry() };
 			Data.Breakables = { DNTest::Entry<FDNBreakableEntry>(DNTest::BreakableRow(), TEXT("poste")) };
 			Data.BreakableSettings = { DNTest::Entry<FDNBreakableSettingsEntry>(DNTest::BreakableSettingsRow()) };
+			Data.CameraFx = { DNTest::Entry<FDNCameraFxEntry>(DNTest::CameraFxRow()) };
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -678,7 +679,10 @@ void FDNDataAllSpec::Define()
 			Data.Breakables[0].Row.MinBreakSpeedKmh = -1.f;
 			Data.BreakableSettings = { DNTest::Entry<FDNBreakableSettingsEntry>(DNTest::BreakableSettingsRow()) };
 			Data.BreakableSettings[0].Row.MaxActiveProps = 0;
+			Data.CameraFx = { DNTest::Entry<FDNCameraFxEntry>(DNTest::CameraFxRow()) };
+			Data.CameraFx[0].Row.CrashCamTimeScale = 0.f;
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
+			ExpectError(*this, TEXT("config da camera"), Errors, { TEXT("CameraFx.csv"), TEXT("CrashCamTimeScale") });
 			ExpectError(*this, TEXT("mobiliario"), Errors, { TEXT("Breakables.csv"), TEXT("MinBreakSpeedKmh") });
 			ExpectError(*this, TEXT("config do mobiliario"), Errors, { TEXT("BreakableSettings.csv"), TEXT("MaxActiveProps") });
 			ExpectError(*this, TEXT("carros"), Errors, { TEXT("Cars.csv"), TEXT("MassKg") });

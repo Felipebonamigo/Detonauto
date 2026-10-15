@@ -622,6 +622,8 @@ TArray<FString> FDNDataValidation::ValidateCameras(const TArray<FDNCameraConfigE
 		Range(TEXT("PitchDeg"), R.PitchDeg, -45.0f, 45.0f);
 		Range(TEXT("Fov"), R.Fov, 40.0f, 120.0f);
 		Range(TEXT("Smoothing"), R.Smoothing, 0.0f, 30.0f);
+		Range(TEXT("SpeedFovScale"), R.SpeedFovScale, 0.0f, 2.0f);   // lote 18: quanto do campo de visão por velocidade o modo usa
+		Range(TEXT("ShakeScale"), R.ShakeScale, 0.0f, 3.0f);         // lote 18: quanto do tremor o modo usa
 	}
 	return Errors;
 }
@@ -643,6 +645,57 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateCameras(Data.CameraModes));
 	Errors.Append(ValidateBreakables(Data.Breakables));
 	Errors.Append(ValidateBreakableSettings(Data.BreakableSettings));
+	Errors.Append(ValidateCameraFx(Data.CameraFx));
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateCameraFx(const TArray<FDNCameraFxEntry>& Rows)
+{
+	constexpr const TCHAR* CameraFxFile = TEXT("CameraFx.csv");
+	TArray<FString> Errors;
+	if (Rows.Num() != 1)
+	{
+		Errors.Add(FString::Printf(TEXT("%s: precisa ter exatamente uma linha (veio %d)."), CameraFxFile, Rows.Num()));
+	}
+	CheckIds(CameraFxFile, Rows, Errors);
+	for (const FDNCameraFxEntry& E : Rows)
+	{
+		const FDNCameraFxRow& R = E.Row;
+		auto Range = [&](const TCHAR* Field, float Value, float Min, bool bMinIn, float Max, bool bMaxIn) { CheckRange(CameraFxFile, E.Id, Field, Value, Min, bMinIn, Max, bMaxIn, Errors); };
+		// as rampas de velocidade: começo em [0, 400] e fim maior que o começo, até 500
+		auto RampCheck = [&](const TCHAR* StartField, float Start, const TCHAR* FullField, float Full)
+		{
+			Range(StartField, Start, 0.0f, true, 400.0f, true);
+			Range(FullField, Full, 0.0f, false, 500.0f, true);
+			if (FMath::IsFinite(Start) && FMath::IsFinite(Full) && Full <= Start)
+			{
+				Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo '%s' (%g) precisa ser maior que '%s' (%g)."), CameraFxFile, *E.Id, FullField, Full, StartField, Start));
+			}
+		};
+		RampCheck(TEXT("SpeedFovStartKmh"), R.SpeedFovStartKmh, TEXT("SpeedFovFullKmh"), R.SpeedFovFullKmh);
+		RampCheck(TEXT("ShakeStartKmh"), R.ShakeStartKmh, TEXT("ShakeFullKmh"), R.ShakeFullKmh);
+		RampCheck(TEXT("EdgeBlurStartKmh"), R.EdgeBlurStartKmh, TEXT("EdgeBlurFullKmh"), R.EdgeBlurFullKmh);
+		Range(TEXT("SpeedFovMaxAddDeg"), R.SpeedFovMaxAddDeg, 0.0f, true, 30.0f, true);
+		Range(TEXT("TurboFovAddDeg"), R.TurboFovAddDeg, 0.0f, true, 30.0f, true);
+		Range(TEXT("MaxFovDeg"), R.MaxFovDeg, 60.0f, false, 140.0f, true);
+		Range(TEXT("FovBlendDegPerS"), R.FovBlendDegPerS, 0.0f, false, 360.0f, true);
+		Range(TEXT("ShakeMaxDeg"), R.ShakeMaxDeg, 0.0f, true, 5.0f, true);
+		Range(TEXT("ShakeHz"), R.ShakeHz, 0.0f, false, 60.0f, true);
+		Range(TEXT("EdgeBlurMax"), R.EdgeBlurMax, 0.0f, true, 1.0f, true);
+		Range(TEXT("EdgeBlurInnerRadius"), R.EdgeBlurInnerRadius, 0.0f, true, 1.0f, false);
+		Range(TEXT("CrashCamMinDeltaVMs"), R.CrashCamMinDeltaVMs, 0.0f, false, 100.0f, true);
+		Range(TEXT("CrashCamTimeScale"), R.CrashCamTimeScale, 0.0f, false, 1.0f, true);
+		Range(TEXT("CrashCamEnterS"), R.CrashCamEnterS, 0.0f, false, 5.0f, true);
+		Range(TEXT("CrashCamHoldS"), R.CrashCamHoldS, 0.0f, true, 10.0f, true);
+		Range(TEXT("CrashCamExitS"), R.CrashCamExitS, 0.0f, false, 5.0f, true);
+		Range(TEXT("CrashCamCooldownS"), R.CrashCamCooldownS, 0.0f, true, 30.0f, true);
+		Range(TEXT("CrashCamOrbitRadiusM"), R.CrashCamOrbitRadiusM, 0.0f, false, 50.0f, true);
+		Range(TEXT("CrashCamOrbitHeightM"), R.CrashCamOrbitHeightM, 0.0f, true, 50.0f, true);
+		Range(TEXT("CrashCamOrbitDegPerS"), R.CrashCamOrbitDegPerS, 0.0f, true, 360.0f, true);
+		Range(TEXT("CrashCamProbeCm"), R.CrashCamProbeCm, 0.0f, false, 200.0f, true);
+		Range(TEXT("WreckSteerAccelMs2"), R.WreckSteerAccelMs2, 0.0f, true, 50.0f, true);
+		Range(TEXT("WreckSteerMaxDeltaVMs"), R.WreckSteerMaxDeltaVMs, 0.0f, true, 50.0f, true);
+	}
 	return Errors;
 }
 

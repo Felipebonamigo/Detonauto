@@ -20,6 +20,7 @@
 //   Breakables.csv      Id, MassKg, MinBreakSpeedKmh, LaunchFactor, LaunchUpMs, TopplesAtBase, BreakHeightCm, Points (um tipo de peça
 //                       de rua por linha)
 //   BreakableSettings.csv Id + os campos de FDNBreakableSettings (uma linha, id "padrao")
+//   CameraFx.csv        Id + os campos de FDNCameraFxSettings (uma linha, id "padrao"; lote 18, docs/regras-camera.md)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -35,6 +36,7 @@
 #include "Core/DNDamage.h"
 #include "Core/DNCar.h"
 #include "Core/DNCamera.h"
+#include "Core/DNCameraFx.h"
 #include "Core/DNBreakable.h"
 #include "DNDataRows.generated.h"
 
@@ -446,6 +448,8 @@ struct FDNCameraConfigRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float PitchDeg = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float Fov = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float Smoothing = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SpeedFovScale = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ShakeScale = 0.0f;
 
 	/** Âncora desconhecida cai em Chase (a validação já recusou o arquivo antes). */
 	FDNCameraConfig ToConfig() const
@@ -459,7 +463,76 @@ struct FDNCameraConfigRow : public FTableRowBase
 		C.PitchDeg = PitchDeg;
 		C.Fov = Fov;
 		C.Smoothing = Smoothing;
+		C.SpeedFovScale = SpeedFovScale;
+		C.ShakeScale = ShakeScale;
 		return C;
+	}
+};
+
+/** Data/CameraFx.csv: os valores globais da câmera de velocidade e de batida (uma linha, id "padrao"). Campos: FDNCameraFxSettings em
+ *  Core/DNCameraFx.h; contrato em docs/regras-camera.md. */
+USTRUCT(BlueprintType)
+struct FDNCameraFxRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SpeedFovStartKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SpeedFovFullKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SpeedFovMaxAddDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float TurboFovAddDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MaxFovDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float FovBlendDegPerS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ShakeStartKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ShakeFullKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ShakeMaxDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ShakeHz = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float EdgeBlurStartKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float EdgeBlurFullKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float EdgeBlurMax = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float EdgeBlurInnerRadius = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamMinDeltaVMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamTimeScale = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamEnterS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamHoldS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamExitS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamCooldownS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamOrbitRadiusM = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamOrbitHeightM = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamOrbitDegPerS = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrashCamProbeCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WreckSteerAccelMs2 = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WreckSteerMaxDeltaVMs = 0.0f;
+
+	FDNCameraFxSettings ToSettings() const
+	{
+		FDNCameraFxSettings S;
+		S.SpeedFovStartKmh = SpeedFovStartKmh;
+		S.SpeedFovFullKmh = SpeedFovFullKmh;
+		S.SpeedFovMaxAddDeg = SpeedFovMaxAddDeg;
+		S.TurboFovAddDeg = TurboFovAddDeg;
+		S.MaxFovDeg = MaxFovDeg;
+		S.FovBlendDegPerS = FovBlendDegPerS;
+		S.ShakeStartKmh = ShakeStartKmh;
+		S.ShakeFullKmh = ShakeFullKmh;
+		S.ShakeMaxDeg = ShakeMaxDeg;
+		S.ShakeHz = ShakeHz;
+		S.EdgeBlurStartKmh = EdgeBlurStartKmh;
+		S.EdgeBlurFullKmh = EdgeBlurFullKmh;
+		S.EdgeBlurMax = EdgeBlurMax;
+		S.EdgeBlurInnerRadius = EdgeBlurInnerRadius;
+		S.CrashCamMinDeltaVMs = CrashCamMinDeltaVMs;
+		S.CrashCamTimeScale = CrashCamTimeScale;
+		S.CrashCamEnterS = CrashCamEnterS;
+		S.CrashCamHoldS = CrashCamHoldS;
+		S.CrashCamExitS = CrashCamExitS;
+		S.CrashCamCooldownS = CrashCamCooldownS;
+		S.CrashCamOrbitRadiusM = CrashCamOrbitRadiusM;
+		S.CrashCamOrbitHeightM = CrashCamOrbitHeightM;
+		S.CrashCamOrbitDegPerS = CrashCamOrbitDegPerS;
+		S.CrashCamProbeCm = CrashCamProbeCm;
+		S.WreckSteerAccelMs2 = WreckSteerAccelMs2;
+		S.WreckSteerMaxDeltaVMs = WreckSteerMaxDeltaVMs;
+		return S;
 	}
 };
 
@@ -542,6 +615,7 @@ using FDNTakedownConfigEntry = TDNTableEntry<FDNTakedownConfigRow>;
 using FDNDamageConfigEntry = TDNTableEntry<FDNDamageConfigRow>;
 using FDNCarConfigEntry = TDNTableEntry<FDNCarConfigRow>;
 using FDNCameraConfigEntry = TDNTableEntry<FDNCameraConfigRow>;
+using FDNCameraFxEntry = TDNTableEntry<FDNCameraFxRow>;
 using FDNBreakableEntry = TDNTableEntry<FDNBreakableRow>;
 using FDNBreakableSettingsEntry = TDNTableEntry<FDNBreakableSettingsRow>;
 
@@ -560,6 +634,7 @@ struct FDNData
 	TArray<FDNDamageConfigEntry> DamageConfig;
 	TArray<FDNCarConfigEntry> CarConfigs;
 	TArray<FDNCameraConfigEntry> CameraModes;
+	TArray<FDNCameraFxEntry> CameraFx;
 	TArray<FDNBreakableEntry> Breakables;
 	TArray<FDNBreakableSettingsEntry> BreakableSettings;
 };

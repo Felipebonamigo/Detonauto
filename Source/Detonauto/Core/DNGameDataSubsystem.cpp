@@ -32,6 +32,7 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bTrafficVehiclesValid = FDNDataValidation::ValidateTrafficVehicles(Data.Vehicles).IsEmpty();
 	bBreakablesValid = FDNDataValidation::ValidateBreakables(Data.Breakables).IsEmpty();
 	bBreakableSettingsValid = FDNDataValidation::ValidateBreakableSettings(Data.BreakableSettings).IsEmpty();
+	bCameraFxValid = FDNDataValidation::ValidateCameraFx(Data.CameraFx).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -133,6 +134,11 @@ bool UDNGameDataSubsystem::TryGetBreakableKind(const FString& Kind, FDNBreakable
 FDNBreakableSettings UDNGameDataSubsystem::GetBreakableSettings() const
 {
 	return (bBreakableSettingsValid && Data.BreakableSettings.Num() == 1) ? Data.BreakableSettings[0].Row.ToSettings() : FDNBreakableSettings();
+}
+
+FDNCameraFxSettings UDNGameDataSubsystem::GetCameraFxSettings() const
+{
+	return (bCameraFxValid && Data.CameraFx.Num() == 1) ? Data.CameraFx[0].Row.ToSettings() : FDNCameraFxSettings();
 }
 
 bool UDNGameDataSubsystem::TryGetCarConfig(const FString& Id, FDNCarConfig& Out) const
