@@ -21,7 +21,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 
 | Área | Onde | Estado |
 |---|---|---|
-| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível) | `Source/Detonauto/Core/` | Testadas; 659 testes de Automation |
+| Regras puras (turbo, Crash, takedown, medalhas, dano, tráfego, globo, progresso, save, roda visual, parâmetros do amassado, peso dos alvos de deformação, mobiliário destrutível) | `Source/Detonauto/Core/` | Testadas; 661 testes de Automation |
 | Base de renderização | `Config/DefaultEngine.ini`, `Config/DefaultDeviceProfiles.ini` | Lumen (GI e reflexos), sombras virtuais, campos de distância, TSR; perfil `DN_AlvoPS5` (`docs/desempenho.md`) |
 | Cena de aparência | `Content/Detonauto/Maps/L_Lookdev`, feita por `Tools/Unreal/create_lookdev.py` | Para julgar visual: céu, sol de fim de tarde, rua com texturas CC0, prédios em blocos (`docs/lookdev.md`) |
 | Dados de ajuste em CSV com validador e teste de deriva | `Data/` | Cidades, cruzamentos, tráfego, turbo, Crash, takedown, dano, carros, mobiliário |
@@ -50,7 +50,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 17 | Dano visual, camada 1: deformação grande por zona | Aprovado (`docs/lote-17.md`): regra com mutação 18 de 19 (1 equivalente), carroceria com 5 alvos gerada no Blender. Leitura da revisão: ainda "macio", não chapa amassada; segue no 17b |
 | 16b | Polimento visual: pintura, poste moderno, folhagem, vitrines | Na main, aguardando revisão (`docs/lookdev.md`, seção 16b) |
 | 17b | Desgaste da pintura por zona e vincos mais duros | Na main; faltam os fechamentos (capturas 0,3/0,6/1,0 nos 4 ângulos, batida a 100 km/h na `L_Lookdev`, comparação com o 17, custo com 37,8 mil vértices) |
-| 17c | Mobiliário destrutível | Na main, aguardando revisão (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Mudou o contrato: sai `IgnoreCarS`, entra o varrer (B9). Falta o Felipe jogar |
+| 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
 
 ## Primeiro playtest (14 out)
 
@@ -167,6 +167,16 @@ melhor e ele quer cinco modos.
 - Contato que não aparece no log não é prova de que não houve contato: o `OnCarHit`
   sai cedo para peça já quebrada. Para achar quem freia o carro, logar em cada
   fronteira (contato com destroço, rodas, chassi) antes de mudar a regra.
+- Captura de 1920x1080 trava o quadro por ~0,3 s: o tempo de jogo anda, a física só o
+  passo máximo, e uma sequência "+0,15 s, +0,3 s..." sai quase igual. Para sequência
+  de capturas, `-ExtraArgs '-UseFixedTimeStep','-FPS=60'`.
+- Chaos: velocidade e giro aplicados a um corpo valem para o **centro de massa**. Peça
+  que tomba em volta do pé precisa de `v_cm = v_pé + ω × (cm − pé)` (B3), senão o pé
+  volta para trás.
+- Malha grande (árvore) com a colisão automática vira um convexo do tamanho dela, que
+  encosta nos prédios ao simular. As malhas `UCX_` no FBX não servem na 5.8 (a
+  importação gera convexos a mais e dispara um `ensure`). O `split_prop.py` grava um
+  `collision.json` e o `create_lookdev.py` aplica cápsulas analíticas.
 - O `-DNPropLine` imprime um veredito no QUIT (`DNPropLine: resumo ... APROVADO`): é
   o teste no motor do "bater e seguir". Contra peça que não deve quebrar (10 km/h no
   poste) ele diz REPROVADO de propósito.

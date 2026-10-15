@@ -19,7 +19,7 @@ Contrato: [`regras-mobiliario.md`](regras-mobiliario.md). Pedido do Felipe em 14
   C1 a C4). O carro varre o destroço que alcança: ele sai da frente a 1,1 vez a velocidade do carro, com um pulo de 1,5 m/s, e o carro
   não muda (`ADNVehicle::PlowDebris`, uma consulta de sobreposição por quadro na caixa da carroceria).
 - **Cena:** `create_lookdev.py` põe todo o mobiliário da `L_Lookdev` como `ADNBreakableProp`. O poste e o jacarandá entram cortados por
-  `Tools/Blender/split_prop.py` (poste a 10 cm, jacarandá a 40 cm na escala da cena): `SM_dn_street_light_base` (96 vértices) e
+  `Tools/Blender/split_prop.py` (poste a 10 cm, jacarandá a 15 cm na escala da cena): `SM_dn_street_light_base` (96 vértices) e
   `_top` (428); `SM_jacaranda_tree_stump` (15 mil) e `_top` (3 milhões, o modelo original). As linhas de licença estão em
   `docs/licencas.csv` (CC0 permite modificar; a modificação está anotada).
 
@@ -47,7 +47,7 @@ No `vehicle-probe.ps1 -Map /Game/Detonauto/Maps/L_Lookdev -Keys ... -ExtraArgs .
 2. **Entra o varrer (B9),** com `PlowFactor` 1,1 e `PlowUpMs` 1,5 em `BreakableSettings.csv`. Sem ele, o carro atravessava o banco
    caído quando o alcançava ([`varrer-sem-e-com.jpg`](img/mobiliario-17c/varrer-sem-e-com.jpg): à esquerda, o banco cruzando o capô;
    à direita, o banco jogado na calçada).
-3. **A base e o toco são destroço desde o início:** as rodas passam por cima do toco de 40 cm da árvore sem pular.
+3. **A base e o toco são destroço desde o início:** as rodas passam por cima do toco da árvore sem pular.
 
 ## Provas
 
@@ -84,12 +84,38 @@ No `vehicle-probe.ps1 -Map /Game/Detonauto/Maps/L_Lookdev -Keys ... -ExtraArgs .
   seção do lote 17c. O quadro não muda (4,8 ms); a linha do jogo sobe 0,18 ms na média e 0,55 ms no p95, e a física nos trabalhadores
   sobe 0,11 ms.
 
+## Revisão (itens 1 a 3 da nuvem, 15 out 2026)
+
+1. **Orçamento (B10):** estourado o limite de 16 peças simulando, congela a peça mais LENTA, e nunca uma no ar se houver outra no
+   chão; empate fica com a mais antiga. A peça diz se está apoiada por um traço curto para baixo. Com 24 peças a 100 km/h, o
+   orçamento congelou só peças paradas no chão (0,2 a 1,6 m/s), e as 24 quebraram.
+2. **Toco:** com 40 cm ele atravessava o para-choque (captura baixa, de lado). O jacarandá agora parte a 15 cm, e o carro passa por
+   cima do pé de raiz ([`toco-15cm-de-lado.jpg`](img/mobiliario-17c/toco-15cm-de-lado.jpg)).
+3. **Árvore tombando, achado na mesma captura:** a física gira a peça em volta do centro de massa. Por isso o pé da árvore voltava
+   para trás, e o tronco subia e ficava flutuando sobre o carro. Agora o tombo é em volta do pé (B3, com o braço real até o
+   centro de massa). Também saiu a colisão automática da copa (um convexo de 14 × 11 m na cena, que encostava nos prédios e
+   travava a árvore no ar), trocada por duas cápsulas no eixo do tronco. Sequência:
+   [`arvore-sequencia.jpg`](img/mobiliario-17c/arvore-sequencia.jpg).
+4. **Capturas grandes, 1920x1080, com o sol por trás:** câmera parada à frente da peça, olhando para o carro que vem
+   (`-DNPropCam`):
+   - [`poste-caindo.jpg`](img/mobiliario-17c/poste-caindo.jpg): o poste no meio da queda, 0,25 s depois do contato;
+   - [`arvore-tombando.jpg`](img/mobiliario-17c/arvore-tombando.jpg): a árvore tombando, 0,8 s depois;
+   - [`banco-voando.jpg`](img/mobiliario-17c/banco-voando.jpg): o banco voando, 0,2 s depois;
+   - de lado, com câmera parada: [`poste-de-lado.jpg`](img/mobiliario-17c/poste-de-lado.jpg).
+5. **Captura com passo fixo** (`-UseFixedTimeStep -FPS=60` no `-ExtraArgs`): cada captura de 1920x1080 trava o quadro por uns
+   0,3 s. Sem o passo fixo, o tempo de jogo andava 0,3 s e a física só o passo máximo, então os quadros de "+0,15 s" até "+1,2 s"
+   saíam quase iguais. `-DNPropShotDelays=0.12,0.25,0.4` escolhe os instantes.
+
+Visto nas capturas, para a nuvem decidir: o poste caindo atravessa o capô por um instante, porque o destroço não segura mais o
+carro. O varrer empurra o centro de massa, mas o poste gira por cima do carro.
+
 ## Ficou para depois
 
 - **O Felipe jogar e dizer se parece destruição** (item 5 da aprovação do contrato).
 - A medição pôs as 16 peças em fila na faixa do carro, e não em zigue-zague pela calçada como o contrato pedia: o piloto do teste segue
   reto. Com o carro passando reto, as 16 caem; o custo de simular é o mesmo.
-- A árvore a 60 km/h é lançada a 8,8 m/s, mais devagar que o carro: ela fica para trás tombada sobre a rua, e o carro passa sob a copa.
-  O varrer empurra o centro de massa, mas a copa é grande. Fica aceitável na captura; um tombo para o lado é ajuste do lote 19.
-- Placa e paraciclo existem no CSV, mas ainda não têm modelo na cena.
+- Placa e paraciclo existem no CSV, mas ainda não têm modelo na cena: ficam para o lote 20, feitos por script no Blender (placa de rua
+  genérica, sem marca e sem nome real de rua até passar pelo `conferir-fato`).
+- Pergunta para o playtest: o destroço pesado varrido (tronco, poste caído) sai a 1,1 vez a velocidade do carro sem frear o carro. Se
+  o Felipe achar que fica sem peso, a saída é aplicar a perda da regra também no varrer das peças pesadas.
 - Folhas, faíscas e o jato do hidrante ficam para o lote 19; o som de impacto, para o lote 21.
