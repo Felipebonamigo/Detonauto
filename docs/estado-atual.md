@@ -250,6 +250,12 @@ City Sample Vehicles (lote 20); o download no Fab é do Felipe.
 
 Pendências de design (decidir com playtest, não fazer agora):
 
+- **Lote 20, o modo do tráfego muda a pontuação 5 vezes** (medição do lote 13, 15 out):
+  no C-130-40, com o mesmo cruzamento, Rail deu 2 186 pontos (bronze) e Physics 11 162
+  (prata). O modo do tráfego não pode decidir a medalha. Investigar de onde vem a
+  diferença: massa efetiva do Rail acordado, atrito, tempo para acordar e quanto dano
+  cada carro recebe. Igualar, ou explicar e escolher um modo só para o Crash.
+
 - A 130 km/h a rodada rende MENOS que a 100 (o carro é desviado no primeiro
   impacto): o contrário do que um arcade quer. Alavanca provável: proporção de
   massa jogador × tráfego nas batidas e/ou controle do carro em câmera lenta
