@@ -102,6 +102,12 @@ Máquina de estados: `Idle → Entering → Holding → Exiting → Cooldown →
   `Entering` e desce no `Exiting`.
 - O teste confere os valores nos instantes de borda e no meio de cada fase, o
   limiar exato e a espera.
+- **Escolhas da implementação (aprovadas na revisão):**
+  - `Entering` desce com `1 − (1 − u)²` (saída suave): no meio da fase, escala
+    0,4375 e peso 0,75;
+  - `Exiting` volta com `smoothstep`: no meio, escala 0,625 e peso 0,5;
+  - a sobra de um passo de tempo passa para a fase seguinte (um passo grande
+    atravessa várias fases).
 
 ### `FDNWreckSteer`
 
@@ -113,6 +119,9 @@ direita do jogador vira uma aceleração horizontal de até `WreckSteerAccelMs2`
 - O total de variação de velocidade por batida é limitado a
   `WreckSteerMaxDeltaVMs`.
 - Fora da câmera de batida, nada.
+- **Escolha da implementação (aprovada):** a direção é a perpendicular à
+  velocidade horizontal que fica do lado direito da tela (o sinal da entrada
+  escolhe o lado). Com o carro parado, vale a direita da tela.
 - Nome de trabalho: "controle do destroço". Nunca use o nome do Burnout.
 
 ## Câmera de batida no motor
