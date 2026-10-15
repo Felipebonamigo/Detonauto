@@ -3,6 +3,8 @@
 #include "Vehicle/DNGlassShards.h"
 #include "Vehicle/DNVehicleWheels.h"
 #include "Vehicle/DNTurboComponent.h"
+#include "Vehicle/DNCarEffectsComponent.h"
+#include "Effects/DNEffectsSubsystem.h"
 #include "Crash/DNBreakableProp.h"
 #include "Traffic/DNTrafficVehicle.h"
 #include "Core/DNBreakable.h"
@@ -55,6 +57,12 @@ namespace
 	constexpr float LensCrackedOpacity = 0.55f;
 	/** Quanto o centro da trinca entra na caixa do vidro, em fração da meia caixa (0: na borda; 1: no meio). */
 	constexpr float GlassCrackInset = 0.7f;
+	/** Lote 19: um choque dá vários contatos em quadros seguidos; as faíscas de impacto saem uma vez a cada tanto [s do jogo]. */
+	constexpr double ImpactFxGapS = 0.15;
+	/** Raspão: uma rajada de faíscas a cada tanto por peça [s do jogo]; a primeira cobre este intervalo. 0,08 s com vida de 0,5 s: ~6
+	 *  rajadas vivas por peça, abaixo do pool de 8 (a 0,05 s o pool reciclava rajada viva) */
+	constexpr double ScrapeFxGapS = 0.08;
+	constexpr float FirstScrapeIntervalS = 0.1f;
 
 	/** Desfoque nas bordas (lote 18): Tools/Unreal/create_edge_blur_material.ps1. */
 	const TCHAR* EdgeBlurPath = TEXT("/Game/Detonauto/Camera/M_DNEdgeBlur.M_DNEdgeBlur");
@@ -156,6 +164,7 @@ ADNVehicle::ADNVehicle()
 
 	// --- turbo: cola fina sobre o FDNTurbo do Core; quem tem as entradas (este carro) chama Step() a cada quadro ---
 	Turbo = CreateDefaultSubobject<UDNTurboComponent>(TEXT("Turbo"));
+	Effects = CreateDefaultSubobject<UDNCarEffectsComponent>(TEXT("Effects"));
 
 	// --- Chaos: chassi, rodas, motor, transmissão e direção, tudo em C++ ---
 	UChaosWheeledVehicleMovementComponent* Move = Chaos();
@@ -488,6 +497,26 @@ void ADNVehicle::BeginPlay()
 float ADNVehicle::SpeedKmh() const
 {
 	return GetVelocity().Size() * 0.036f; // cm/s -> km/h
+}
+
+int32 ADNVehicle::WheelCount() const
+{
+	const UChaosWheeledVehicleMovementComponent* Move = Chaos();
+	return Move ? Move->GetNumWheels() : 0;
+}
+
+const FWheelStatus* ADNVehicle::WheelStatus(int32 Index) const
+{
+	const UChaosWheeledVehicleMovementComponent* Move = Chaos();
+	return Move && Index >= 0 && Index < Move->GetNumWheels() ? &Move->GetWheelState(Index) : nullptr;
+}
+
+FVector ADNVehicle::EngineBayWorld() const
+{
+	FVector Center, Extent;
+	GetBodyBox(Center, Extent);
+	const FTransform& Frame = BodyComp ? BodyComp->GetComponentTransform() : GetActorTransform();
+	return Frame.TransformPosition(Center + FVector(0.6f * Extent.X, 0.0f, 0.35f * Extent.Z));
 }
 
 FString ADNVehicle::TurboText() const
@@ -1048,6 +1077,17 @@ void ADNVehicle::DNRestart()
 	// o atraso de rotação a acerta (o Tick devolve o atraso do modo)
 	CameraBoom->bEnableCameraRotationLag = false;
 	CameraSnapFrames = 2;
+	// lote 19: fumaça, fogo e os disparos vivos (faíscas, cacos, pó) somem
+	if (Effects)
+	{
+		Effects->ResetEffects();
+	}
+	if (UDNEffectsSubsystem* Fx = GetWorld()->GetSubsystem<UDNEffectsSubsystem>())
+	{
+		Fx->ResetAll();
+	}
+	LastImpactFxTime = -10.0;
+	LastScrapeFxTime.Reset();
 	// o mobiliário quebrado volta inteiro no lugar
 	int32 Props = 0;
 	for (TActorIterator<ADNBreakableProp> It(GetWorld()); It; ++It)
@@ -1070,6 +1110,29 @@ void ADNVehicle::DNRestart()
 void ADNVehicle::RestartKey(const FInputActionValue& Value)
 {
 	DNRestart();
+}
+
+void ADNVehicle::OnPartScraped(ADNCarPart* Part, const FVector& Point, float SpeedCmS)
+{
+	// lote 19: a peça avisa a cada contato com o chão; as faíscas saem em rajadas de ScrapeFxGapS com o tempo desde a anterior
+	UDNEffectsSubsystem* Fx = GetWorld()->GetSubsystem<UDNEffectsSubsystem>();
+	if (!Fx || !Part)
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	const TWeakObjectPtr<ADNCarPart> Key(Part);
+	double* Last = LastScrapeFxTime.Find(Key);
+	if (!Last)
+	{
+		Last = &LastScrapeFxTime.Add(Key, Now - FirstScrapeIntervalS);
+	}
+	if (Now - *Last < ScrapeFxGapS)
+	{
+		return;
+	}
+	Fx->OnScrape(Point, GetVelocity(), SpeedCmS / 100.0f, static_cast<float>(Now - *Last));
+	*Last = Now;
 }
 
 void ADNVehicle::UpdateDamageMorphs(float DeltaSeconds)
@@ -1216,6 +1279,15 @@ void ADNVehicle::OnCarHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	// a que ficou sólida, abaixo do limiar) nunca dispara (FDNImpactPolicy)
 	const EDNImpactSource Source = SolidProp ? EDNImpactSource::Prop : (Cast<ADNTrafficVehicle>(OtherActor) ? EDNImpactSource::Traffic : EDNImpactSource::World);
 	TryCrashCam(DeltaV, Source, Hit.ImpactPoint);
+	// lote 19: faísca e lascas no contato (superfície dura: muro, poste inteiro, carro), uma rajada por choque (ImpactFxGapS)
+	if (UDNEffectsSubsystem* Fx = GetWorld()->GetSubsystem<UDNEffectsSubsystem>())
+	{
+		const double FxNow = GetWorld()->GetTimeSeconds();
+		if (FxNow - LastImpactFxTime >= ImpactFxGapS && Fx->OnImpact(Hit.ImpactPoint, Hit.ImpactNormal, VelocityBeforeStepCmS, DeltaV) > 0)
+		{
+			LastImpactFxTime = FxNow;
+		}
+	}
 
 	if (!BodyComp || !bRealHitDamage)
 	{
@@ -1580,6 +1652,7 @@ void ADNVehicle::SpawnPartsAndGlass()
 			continue;
 		}
 		const TArray<UMaterialInstanceDynamic*> Dynamics = Part->Init(*GetMesh(), *PartMesh, Spec, DentParent);
+		Part->OnPartScrape.AddUObject(this, &ADNVehicle::OnPartScraped);
 		Parts.Add(Part);
 		PartSpecs.Add(Spec);
 		PartStages.Add(EDNPartStage::Attached);
@@ -1734,12 +1807,20 @@ void ADNVehicle::EvaluatePartsAndGlass(const FDNImpact* Impact)
 		Glass->SetVisibility(false);
 		const FBoxSphereBounds B = Glass->Bounds;
 		const FVector Velocity = GetMesh()->GetPhysicsLinearVelocityAtPoint(B.Origin) + Outward * 150.0;
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		if (ADNGlassShards* Shards = GetWorld()->SpawnActor<ADNGlassShards>(FVector::ZeroVector, FRotator::ZeroRotator, Params))
+		// lote 19: os cacos do Niagara pela área do vidro (as duas maiores medidas da caixa); sem o sistema, os cacos antigos
+		TArray<double> Sides = { B.BoxExtent.X, B.BoxExtent.Y, B.BoxExtent.Z };
+		Sides.Sort([](double A, double C) { return A > C; });
+		const float AreaM2 = static_cast<float>((2.0 * Sides[0] / 100.0) * (2.0 * Sides[1] / 100.0));
+		UDNEffectsSubsystem* Fx = GetWorld()->GetSubsystem<UDNEffectsSubsystem>();
+		if (!Fx || !Fx->OnGlassBurst(B.Origin, B.BoxExtent * 0.8, Velocity, AreaM2))
 		{
-			UMaterialInterface* Material = GlassMaterials[i].IsEmpty() ? nullptr : GlassMaterials[i][0].Get();
-			Shards->Burst(B.Origin, B.BoxExtent * 0.8, Velocity, ShardsPerGlass, Material);
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (ADNGlassShards* Shards = GetWorld()->SpawnActor<ADNGlassShards>(FVector::ZeroVector, FRotator::ZeroRotator, Params))
+			{
+				UMaterialInterface* Material = GlassMaterials[i].IsEmpty() ? nullptr : GlassMaterials[i][0].Get();
+				Shards->Burst(B.Origin, B.BoxExtent * 0.8, Velocity, ShardsPerGlass, Material);
+			}
 		}
 		UE_LOG(LogDetonauto, Display, TEXT("DNGlass: %s estourou (trinca %.2f)"), FDNGlass::GlassName(GlassSpecs[i].Glass), FDNGlass::Crack(GlassSpecs[i], DamageState));
 	}

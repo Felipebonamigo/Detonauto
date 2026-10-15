@@ -56,6 +56,7 @@ class UInputAction;
 class UInputMappingContext;
 class UChaosWheeledVehicleMovementComponent;
 class UDNTurboComponent;
+class UDNCarEffectsComponent;
 class ADNCarPart;
 struct FInputActionValue;
 
@@ -72,6 +73,10 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 
 	UPROPERTY(VisibleAnywhere, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UDNTurboComponent> Turbo;
+
+	/** Fumaça de pneu, fumaça e fogo do motor (lote 19). */
+	UPROPERTY(VisibleAnywhere, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UDNCarEffectsComponent> Effects;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> ThrottleAction;
@@ -193,6 +198,15 @@ public:
 	UDNTurboComponent* GetTurbo() const { return Turbo; }
 	const FDNCarConfig& GetCarConfig() const { return Car; }
 	float SpeedKmh() const;
+
+	// ---- para os efeitos contínuos (lote 19, Vehicle/UDNCarEffectsComponent) ----
+	/** O dano acumulado (zonas e destruído). */
+	const FDNDamageState& GetDamage() const { return DamageState; }
+	/** Rodas do Chaos e o estado de cada uma (contato, ponto, deslizamento em radianos); nulo fora da faixa. */
+	int32 WheelCount() const;
+	const struct FWheelStatus* WheelStatus(int32 Index) const;
+	/** O vão do motor no mundo: frente da caixa da carroceria, no alto (de onde saem fumaça e fogo). */
+	FVector EngineBayWorld() const;
 
 	/** Botão do freio de mão e do turbo (as teclas Espaço e Shift chamam estas; as ferramentas de teste também). */
 	void SetHandbrake(bool bHeld);
@@ -349,6 +363,8 @@ protected:
 	void PushGlassCrack();
 	/** Carro novo: peças presas, vidros inteiros. */
 	void ResetPartsAndGlass();
+	/** Lote 19: a peça pendurada raspando no chão solta faíscas (UDNEffectsSubsystem::OnScrape). */
+	void OnPartScraped(ADNCarPart* Part, const FVector& Point, float SpeedCmS);
 
 	/** Fecha a janela de contatos vencida e aplica a batida (o maior valor da janela). */
 	void FlushImpacts(double Now);
@@ -428,6 +444,9 @@ protected:
 	FTransform StartTransform = FTransform::Identity;
 	/** Quadros sem o atraso de rotação da câmera depois do DNRestart (a câmera chega junto com o carro). */
 	int32 CameraSnapFrames = 0;
+	/** Lote 19: a última faísca de impacto [s do jogo] (vários contatos no mesmo choque dão uma rajada só) e o último raspão de cada peça. */
+	double LastImpactFxTime = -10.0;
+	TMap<TWeakObjectPtr<ADNCarPart>, double> LastScrapeFxTime;
 
 	/** Velocidade com que o turbo entra e sai do campo de visão (o quanto ele soma é TurboFovAddDeg de Data/CameraFx.csv). */
 	static constexpr float TurboFovBlendSpeed = 5.0f;
