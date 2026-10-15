@@ -66,3 +66,12 @@ Captures/
 
 # cache do Python (scripts do Blender importados como biblioteca)
 __pycache__/
+
+# Upscalers (DLSS e Streamline da NVIDIA, FSR da AMD, XeSS da Intel): ficam só no PC, nunca no git.
+# São perto de 2 GB, o repositório é público e a licença da NVIDIA não deixa redistribuir.
+# Instalação: skill ligar-upscaler.
+Plugins/DLSS*/
+Plugins/Streamline*/
+Plugins/NIS/
+Plugins/FSR*/
+Plugins/XeSS*/
