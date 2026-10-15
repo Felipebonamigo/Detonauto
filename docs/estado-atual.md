@@ -49,7 +49,7 @@ histórico das conversas. Atualizar a cada lote fechado.
 | 13c | Pontuação por dano no Crash | Aprovado (`docs/regras-de-jogo.md`, revisão de 14 out): livro por veículo, P1 a P6, mutação 7 de 7 |
 | 17 | Dano visual, camada 1: deformação grande por zona | Aprovado (`docs/lote-17.md`): regra com mutação 18 de 19 (1 equivalente), carroceria com 5 alvos gerada no Blender. Leitura da revisão: ainda "macio", não chapa amassada; segue no 17b |
 | 16b | Polimento visual: pintura, poste moderno, folhagem, vitrines | Na main, aguardando revisão (`docs/lookdev.md`, seção 16b) |
-| 17b | Desgaste da pintura por zona e vincos mais duros | Na main; faltam os fechamentos (capturas 0,3/0,6/1,0 nos 4 ângulos, batida a 100 km/h na `L_Lookdev`, comparação com o 17, custo com 37,8 mil vértices) |
+| 17b | Desgaste da pintura por zona e vincos mais duros | Na main, aguardando revisão (`docs/lote-17b.md`): capturas dos níveis nos 4 ângulos com o sol por trás, batida real a 100 km/h na `L_Lookdev`, lado a lado com o 17, frente em 1,0 mais destruída (recuo em rampa e capô em tenda). Custo com 37,8 mil vértices pendente (PC ocupado por outras sessões) |
 | 17c | Mobiliário destrutível | Aprovado na mecânica (`docs/lote-17c.md`): 16 de 16 peças derrubadas a 60 km/h, perda medida igual à da regra, custo +0,18 ms na linha do jogo. Contrato: sai `IgnoreCarS`, entram o varrer (B9), o orçamento pela peça mais lenta (B10) e o tombo em volta do pé (B3). Falta o Felipe jogar |
 
 ## Primeiro playtest (14 out)
@@ -98,7 +98,9 @@ melhor e ele quer cinco modos.
 - Roteiro de teclas reais: `vehicle-probe.ps1 -Keys "W@0.5-9;C@3;SHOT@4;QUIT@8"`
   entra pelo `PlayerController`, o mesmo caminho do teclado do Felipe.
 - Medição de desempenho só com nenhum outro Unreal aberto; `crash-measure.ps1`
-  recusa se houver um.
+  recusa se houver um, e o `lookdev-measure.ps1` descarta o cenário se houver um
+  antes ou depois dele. Outras sessões (TDFende, AgeOfEarth) usam a Unreal no
+  mesmo PC: espere 60 s seguidos sem nenhuma aberta antes de medir.
 - Blender 5.2.2 LTS em `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`
   (instalado por winget em 14 out). `Tools/Blender/export_fbx_batch.py` testado:
   escala 1:1, e o +X do Blender chega como +X do Unreal (modelar o carro com a
@@ -201,13 +203,11 @@ melhor e ele quer cinco modos.
 
 ## Próximo passo
 
-1. Fechamentos do 17b: capturas a 0,3, 0,6 e 1,0 nos 4 ângulos, batida real a
-   100 km/h na `L_Lookdev` (`-DNWallAheadM`), comparação lado a lado com o 17,
-   custo com 37,8 mil vértices e, se a frente a 1,0 ainda parecer tímida, recuo
-   maior decidido pela captura.
+1. Lote 18: câmera de velocidade e de batida (`docs/regras-camera.md`).
 2. Lote 13: medição de custo (`crash-measure.ps1`), com nenhum outro Unreal aberto.
-3. Lotes 18 a 21 (`docs/fatia-vertical.md`): câmera de batida, efeitos Niagara,
-   primeiro cruzamento e som base.
+3. Lotes 19 a 21 (`docs/fatia-vertical.md`): efeitos Niagara, primeiro
+   cruzamento e som base. Antes do 20: árvore leve (20 MB ou menos) e texturas de
+   modelo em 2k.
 5. City Sample: o Felipe precisa baixar no Fab (prédios, mobiliário e veículos);
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
