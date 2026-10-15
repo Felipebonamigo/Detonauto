@@ -48,7 +48,10 @@ ZONES = ("DN_Front", "DN_Rear", "DN_Left", "DN_Right", "DN_Roof")
 # Valores em fração do tamanho do carro. Frente e traseira mudaram do contrato (recuo de 18% e 14% do comprimento caindo a
 # zero a 35%): com eles a lataria recuava para trás das rodas, que ficavam soltas na frente (captura do lote 17). Agora o
 # amassado forte fica no balanço, da ponta até o para-lama, e só uma cauda leve passa da roda.
-FRONT_CRUSH = 0.55      # a ponta da frente recua esta fração da distância da ponta até o começo do para-lama (17b: era 0,45)
+FRONT_CRUSH = 0.75      # a ponta da frente recua esta fração da distância da ponta até o começo do para-lama (17b: 0,45, depois
+                        # 0,55; no fechamento do 17b a batida real a 100 km/h ainda saía tímida). Com a queda suave o recuo não
+                        # passa de ~0,66 sem dobrar (determinante 1 - 1,5 x recuo); a frente usa a rampa crush_ramp, de inclinação 1.
+                        # Mais que isso o nariz passaria das rodas (o balanço é só 12% do comprimento)
 REAR_CRUSH = 0.50       # (17b: era 0,40; a revisão pediu mais amplitude em 1,0, até onde a conferência de dobra deixa)
 ARCH_MARGIN = 0.02      # o amassado forte acaba um pouco depois do começo do para-lama (fração do comprimento)
 TAIL_DEPTH = 0.025      # cauda leve: recuo extra na ponta, fração do comprimento...
@@ -62,7 +65,9 @@ CREASES = 3.0           # quantas cristas cabem na região amassada de cada zona
 CREASE_HOOD = 0.05      # frente e traseira: altura das cristas no capô e no porta-malas, fração da altura do carro...
 CREASE_FENDER = 0.035   # ...e nos para-lamas, fração da largura (0,035 e 0,025 quase não apareciam no capô)
 CREASE_SIDE = 0.30      # portas e teto: amplitude das cristas, fração do afundamento principal da zona
-HOOD_RISE = 0.08        # o capô sobe em "V" até esta fração da altura (o porta-malas, 60% disso)
+HOOD_RISE = 0.14        # o capô sobe em "V" (em tenda) até esta fração da altura (fechamento do 17b: era 0,08)
+REAR_RISE = 0.048       # o porta-malas sobe até esta fração (60% do 0,08 de antes: a traseira não mudou no fechamento)
+FRONT_FOLD_GAIN = 1.6   # a frente dobra 1,6 vez mais que a traseira (fechamento do 17b: a frente em 1,0 saía tímida)
 CORNER_BIAS = 0.25      # frente e traseira: a quina menos atingida recua até 25% menos que a outra
 PILLAR_LEAN = 0.04      # as colunas inclinam: o topo da cabine anda de lado esta fração da largura
 
@@ -79,6 +84,18 @@ def smoothstep(t):
 def falloff(t):
     """1 até t = 0, 0 a partir de t = 1, com derivada contínua no meio."""
     return 1.0 - smoothstep(t)
+
+
+def crush_ramp(t):
+    """Recuo da frente ao longo do balanço (t = distância da ponta / alcance): 1 na ponta, cai em linha reta até t = 0,8 e
+    encosta em 0 em t = 1,2 sem quina. Inclinação de no máximo 1: com recuo C o determinante fica em 1 - C, longe de dobrar."""
+    t = max(t, 0.0)
+    if t <= 0.8:
+        return 1.0 - t
+    if t >= 1.2:
+        return 0.0
+    u = t - 0.8
+    return 0.2 - u + 1.25 * u * u
 
 
 def bump(t):
@@ -157,18 +174,19 @@ def displacement(zone, box, ripple, x, y, z, lean_sign=1.0):
         reach = arch + ARCH_MARGIN
         d = (1.0 - fx) if front else fx       # distância da ponta atingida, em fração do comprimento
         g = falloff(d / reach)
-        depth = (FRONT_CRUSH if front else REAR_CRUSH) * reach * g + TAIL_DEPTH * falloff(d / TAIL_REACH)
+        shape = crush_ramp(d / reach) if front else g   # a frente recua em rampa (mais fundo sem dobrar); a traseira, suave
+        depth = (FRONT_CRUSH if front else REAR_CRUSH) * reach * shape + TAIL_DEPTH * falloff(d / TAIL_REACH)
         wave = wave_factor(ripple(0.5 + 0.5 * sy, hz))
         # batida fora do centro: uma quina recua inteira e a outra um pouco menos (a frente pega a esquerda)
         corner = 1.0 - CORNER_BIAS * (0.5 - 0.5 * sy * (1.0 if front else -1.0))
         dx = (-1.0 if front else 1.0) * depth * box.length * wave * corner
         # dobra em "V" no capô (ou no porta-malas), no meio do balanço: a crista fica mais perto da ponta no meio do carro
         ridge = arch * (0.45 + 0.30 * abs(sy))
-        rise = (HOOD_RISE if front else 0.6 * HOOD_RISE) * box.height
+        rise = (HOOD_RISE if front else REAR_RISE) * box.height
         dz = rise * bump((d - ridge) / (0.35 * arch)) * (1.0 - min(sy * sy, 1.0)) * top * corner
         dy = 0.02 * box.width * sy * g      # a lataria esmagada abre um pouco para os lados
         # vincos em sanfona na região amassada, um pouco tortos (a crista anda com o lado do carro)
-        fold = crest(phase) * g * corner
+        fold = crest(phase) * g * corner * (FRONT_FOLD_GAIN if front else 1.0)
         dz += CREASE_HOOD * box.height * fold * top
         flank = smoothstep((abs(sy) - 0.5) / 0.4) * (1.0 - top)
         dy += CREASE_FENDER * box.width * fold * flank * (1.0 if sy >= 0.0 else -1.0)
