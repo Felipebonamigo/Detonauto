@@ -151,12 +151,14 @@ return c * (1.0 - 0.8 * M.w);
 # Trinca de vidro (lote 18b, docs/regras-pecas.md): só nos vidros (GlassCrack > 0; a carroceria fica com 0). Em volta do centro GC
 # (o ponto da batida mais perto do vidro, no espaço do carro), linhas radiais que serpenteiam e pedaços de anel em polígono (cordas
 # entre duas radiais, como na teia de um para-brisa), num alcance que cresce com a trinca,
-# uma teia densa perto do centro e o miolo esmagado. As linhas são medidas em cm no plano do vidro (base tirada da normal local NL),
-# com ~0,8 cm de largura: visíveis a 3 m em 1080p sem engrossar de longe.
+# uma teia densa perto do centro e o miolo esmagado. As linhas são medidas em cm no plano do vidro (base tirada da normal local NL).
+# Lote 19 (revisão do 18b: "teia desenhada"): a linha não pinta o vidro de branco. Ela é fina (~0,4 cm), fica áspera e inclina a
+# normal, então só brilha onde pega luz, e some na borda. Só o miolo e a teia do centro esbranquiçam. Saída: (linha, miolo,
+# inclinação da normal em x e y no espaço tangente).
 GLASS_CRACK_HLSL = """
 if (Cr <= 0.001)
 {
-    return Col;
+    return float4(0, 0, 0, 0);
 }
 float3 d = P - GC;
 float r = length(d);
@@ -164,7 +166,7 @@ float reach = 20.0 + 140.0 * Cr;
 float fade = 1.0 - smoothstep(0.55 * reach, reach, r);
 if (fade <= 0.0)
 {
-    return Col;
+    return float4(0, 0, 0, 0);
 }
 float3 n = normalize(NL);
 float3 t1 = normalize(cross(n, abs(n.z) < 0.9 ? float3(0, 0, 1) : float3(1, 0, 0)));
@@ -176,21 +178,66 @@ float sector = floor(s);
 float seed = frac(sin(sector * 37.719 + 4.1) * 43758.5453);
 float wobble = 0.12 * sin(r * (0.06 + 0.06 * seed) + seed * 6.2831853);
 float radialCm = abs(frac(s) - 0.5 - wobble) * 6.2831853 * max(r, 0.5) / 16.0;
-float radial = 1.0 - smoothstep(0.22, 0.45, radialCm);
+float radial = 1.0 - smoothstep(0.10, 0.22, radialCm);
 float cell = fmod(floor(s + 0.5), 16.0);
 float cellSeed = frac(sin(cell * 91.137 + 2.3) * 43758.5453);
 float chord = r * cos((frac(s + 0.5) - 0.5) * 6.2831853 / 16.0) + cellSeed * 5.0;
 float ring = floor(chord / 8.0);
 float keep = step(0.40, frac(sin(ring * 78.233 + cell * 12.9898) * 43758.5453));
 float ringCm = abs(chord - (ring + 0.5) * 8.0);
-float rings = (1.0 - smoothstep(0.18, 0.38, ringCm)) * keep * step(4.0, r);
+float rings = (1.0 - smoothstep(0.08, 0.18, ringCm)) * keep * step(4.0, r);
 float b = frac(turn * 48.0);
 float webCm = min(b, 1.0 - b) * 6.2831853 * max(r, 0.5) / 48.0;
-float web = (1.0 - smoothstep(0.15, 0.30, webCm)) * (1.0 - smoothstep(8.0, 18.0, r));
+// a teia do centro em pedaços: cada raio fino aparece em trechos de 3 cm ao acaso (inteira, parecia um sol desenhado)
+float webKeep = step(0.45, frac(sin(floor(turn * 48.0) * 12.9898 + floor(r / 3.0) * 7.31) * 43758.5453));
+float web = (1.0 - smoothstep(0.12, 0.25, webCm)) * (1.0 - smoothstep(8.0, 18.0, r)) * webKeep;
 float core = 1.0 - smoothstep(3.0, 6.0, r);
-float crack = saturate(max(max(radial, rings), max(web, core))) * fade * smoothstep(0.0, 0.3, Cr);
-return lerp(Col, float3(0.72, 0.75, 0.77), 0.9 * crack);
+float strength = fade * smoothstep(0.0, 0.3, Cr);
+float edge = 1.0 - 0.85 * smoothstep(0.15 * reach, reach, r);
+float crackLine = saturate(max(radial, rings)) * edge * strength;  // "line" é palavra reservada do HLSL
+float crackCenter = saturate(max(web, core)) * strength;
+float angle = (radial >= rings ? seed : cellSeed) * 6.2831853;
+return float4(crackLine, crackCenter, 0.55 * cos(angle), 0.55 * sin(angle));
 """
+
+# Lote 19: o vidro trincado a partir da máscara K da trinca. A cor só esbranquiça no miolo; a linha deixa a superfície áspera e
+# sem verniz e inclina a normal (brilha onde pega luz).
+GLASS_CRACK_COLOR_HLSL = "return lerp(Col, float3(0.62, 0.65, 0.67), saturate(0.85 * K.y + 0.08 * K.x));"
+GLASS_CRACK_SURFACE_HLSL = """
+float rough = lerp(lerp(Rgh, 0.5, K.x), 0.8, K.y);
+float coat = Coat * (1.0 - max(K.x, K.y));
+return float3(rough, coat, 0.0);
+"""
+GLASS_CRACK_NORMAL_HLSL = "return normalize(N + float3(K.z, K.w, 0.0) * max(K.x, 0.5 * K.y));"
+
+# Lote 19 (revisão do 18b: o vão era "preto chapado e facetado"): ruído 3D pela posição no carro, sem UV (o vão não tem), só na
+# instância com a chave SurfaceNoise ligada (MI_DNVao). Duas oitavas de ruído de valor em cm: manchas de ~25 cm e grão de ~4 cm.
+SURFACE_NOISE_HLSL = """
+float total = 0.0;
+float amp = 0.65;
+float3 p = P / 25.0;
+for (int o = 0; o < 2; ++o)
+{
+    float3 i = floor(p);
+    float3 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float n000 = frac(sin(dot(i, float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n100 = frac(sin(dot(i + float3(1, 0, 0), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n010 = frac(sin(dot(i + float3(0, 1, 0), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n110 = frac(sin(dot(i + float3(1, 1, 0), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n001 = frac(sin(dot(i + float3(0, 0, 1), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n101 = frac(sin(dot(i + float3(1, 0, 1), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n011 = frac(sin(dot(i + float3(0, 1, 1), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float n111 = frac(sin(dot(i + float3(1, 1, 1), float3(127.1, 311.7, 74.7))) * 43758.5453);
+    float v = lerp(lerp(lerp(n000, n100, f.x), lerp(n010, n110, f.x), f.y), lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
+    total += v * amp;
+    amp = 0.35;
+    p *= 6.0;
+}
+return total;
+"""
+SURFACE_NOISE_COLOR_HLSL = "return Col * (0.65 + 0.7 * N);"
+SURFACE_NOISE_ROUGH_HLSL = "return saturate(Rgh + (N - 0.5) * 0.25);"
 
 # (metálico, aspereza, verniz): primer fosco e sem verniz, metal nu sem verniz, risco tira metade do verniz, fuligem deixa fosco
 WEAR_SURFACE_HLSL = """
@@ -271,6 +318,16 @@ def vector_param(mel, material, name, value, x, y):
     n = node(mel, material, unreal.MaterialExpressionVectorParameter, x, y)
     n.set_editor_property("parameter_name", name)
     n.set_editor_property("default_value", unreal.LinearColor(*value))
+    return n
+
+
+def static_switch(mel, material, name, when_on, when_off, x, y):
+    """Chave estática (desligada por padrão): a instância que liga ganha a própria compilação; nas outras o ramo some."""
+    n = node(mel, material, unreal.MaterialExpressionStaticSwitchParameter, x, y)
+    n.set_editor_property("parameter_name", name)
+    n.set_editor_property("default_value", False)
+    mel.connect_material_expressions(when_on, "", n, "True")
+    mel.connect_material_expressions(when_off, "", n, "False")
     return n
 
 
@@ -522,16 +579,25 @@ def build(dest, report):
     )
     for src, pin in wear_params:
         mel.connect_material_expressions(src, "", wear, pin)
+    # lote 19: o vão (MI_DNVao, chave SurfaceNoise) ganha manchas e grão pela posição; nas outras instâncias a chave some na compilação
+    noise = custom_node(mel, material, SURFACE_NOISE_HLSL, "Ruído de superfície (vão)", ("P",), unreal.CustomMaterialOutputType.CMOT_FLOAT1, 0, 1950)
+    mel.connect_material_expressions(local, "", noise, "P")
+    noisy_color = custom_node(mel, material, SURFACE_NOISE_COLOR_HLSL, "Cor com ruído", ("Col", "N"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 200, 1950)
+    mel.connect_material_expressions(painted, "", noisy_color, "Col")
+    mel.connect_material_expressions(noise, "", noisy_color, "N")
+    color_in = static_switch(mel, material, "SurfaceNoise", noisy_color, painted, 350, 1950)
     worn_color = custom_node(mel, material, WEAR_COLOR_HLSL, "Cor com desgaste", ("Col", "M"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 450, 300)
-    mel.connect_material_expressions(painted, "", worn_color, "Col")
+    mel.connect_material_expressions(color_in, "", worn_color, "Col")
     mel.connect_material_expressions(wear, "", worn_color, "M")
-    # lote 18b: a trinca dos vidros por cima (o carro manda GlassCrack e GlassCrackCenter nos materiais dos vidros)
-    cracked = custom_node(mel, material, GLASS_CRACK_HLSL, "Trinca de vidro", ("Col", "P", "GC", "Cr", "NL"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 650, 300)
+    # lote 18b: a trinca dos vidros por cima (o carro manda GlassCrack e GlassCrackCenter nos materiais dos vidros); lote 19: máscara K
+    crack = custom_node(mel, material, GLASS_CRACK_HLSL, "Trinca de vidro", ("P", "GC", "Cr", "NL"), unreal.CustomMaterialOutputType.CMOT_FLOAT4, 650, 300)
+    mel.connect_material_expressions(local, "", crack, "P")
+    mel.connect_material_expressions(vector_param(mel, material, "GlassCrackCenter", (0.0, 0.0, 0.0, 0.0), 450, 150), "", crack, "GC")
+    mel.connect_material_expressions(scalar_param(mel, material, "GlassCrack", 0.0, 450, 220), "", crack, "Cr")
+    mel.connect_material_expressions(local_n, "", crack, "NL")
+    cracked = custom_node(mel, material, GLASS_CRACK_COLOR_HLSL, "Cor do vidro trincado", ("Col", "K"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 850, 300)
     mel.connect_material_expressions(worn_color, "", cracked, "Col")
-    mel.connect_material_expressions(local, "", cracked, "P")
-    mel.connect_material_expressions(vector_param(mel, material, "GlassCrackCenter", (0.0, 0.0, 0.0, 0.0), 450, 150), "", cracked, "GC")
-    mel.connect_material_expressions(scalar_param(mel, material, "GlassCrack", 0.0, 450, 220), "", cracked, "Cr")
-    mel.connect_material_expressions(local_n, "", cracked, "NL")
+    mel.connect_material_expressions(crack, "", cracked, "K")
     surface = custom_node(mel, material, WEAR_SURFACE_HLSL, "Superfície com desgaste", ("Met", "Rgh", "Coat", "M"),
                           unreal.CustomMaterialOutputType.CMOT_FLOAT3, 450, 600)
     for src, pin in ((metallic, "Met"), (roughness, "Rgh"), (coat, "Coat"), (wear, "M")):
@@ -539,11 +605,25 @@ def build(dest, report):
     worn_metal = channel(mel, material, surface, "r", 650, 550)
     worn_rough = channel(mel, material, surface, "g", 650, 650)
     worn_coat = channel(mel, material, surface, "b", 650, 750)
+    noisy_rough = custom_node(mel, material, SURFACE_NOISE_ROUGH_HLSL, "Aspereza com ruído", ("Rgh", "N"), unreal.CustomMaterialOutputType.CMOT_FLOAT1, 200, 2100)
+    mel.connect_material_expressions(worn_rough, "", noisy_rough, "Rgh")
+    mel.connect_material_expressions(noise, "", noisy_rough, "N")
+    rough_in = static_switch(mel, material, "SurfaceNoise", noisy_rough, worn_rough, 350, 2100)
+    crack_surface = custom_node(mel, material, GLASS_CRACK_SURFACE_HLSL, "Superfície do vidro trincado", ("Rgh", "Coat", "K"),
+                                unreal.CustomMaterialOutputType.CMOT_FLOAT3, 850, 650)
+    mel.connect_material_expressions(rough_in, "", crack_surface, "Rgh")
+    mel.connect_material_expressions(worn_coat, "", crack_surface, "Coat")
+    mel.connect_material_expressions(crack, "", crack_surface, "K")
+    final_rough = channel(mel, material, crack_surface, "r", 1000, 650)
+    final_coat = channel(mel, material, crack_surface, "g", 1000, 750)
+    crack_normal = custom_node(mel, material, GLASS_CRACK_NORMAL_HLSL, "Normal do vidro trincado", ("N", "K"), unreal.CustomMaterialOutputType.CMOT_FLOAT3, 850, 850)
+    mel.connect_material_expressions(body_n, "RGB", crack_normal, "N")
+    mel.connect_material_expressions(crack, "", crack_normal, "K")
 
     # --- tudo pelos atributos de material (é o único caminho do Python para o verniz) ---
-    attrs = node(mel, material, unreal.MaterialExpressionMakeMaterialAttributes, 900, 0)
-    for src, out, pin in ((cracked, "", "BaseColor"), (worn_metal, "", "Metallic"), (worn_rough, "", "Roughness"), (body_n, "RGB", "Normal"),
-                          (offset, "", "WorldPositionOffset"), (worn_coat, "", "ClearCoat"), (coat_rough, "", "ClearCoatRoughness"),
+    attrs = node(mel, material, unreal.MaterialExpressionMakeMaterialAttributes, 1200, 0)
+    for src, out, pin in ((cracked, "", "BaseColor"), (worn_metal, "", "Metallic"), (final_rough, "", "Roughness"), (crack_normal, "", "Normal"),
+                          (offset, "", "WorldPositionOffset"), (final_coat, "", "ClearCoat"), (coat_rough, "", "ClearCoatRoughness"),
                           (mra_tex, "B", "AmbientOcclusion")):
         if not mel.connect_material_expressions(src, out, attrs, pin):
             raise DentError("Ligação de material falhou: %s -> %s" % (src.get_name(), pin))
@@ -568,7 +648,7 @@ def find_asset(name, cls):
     return None
 
 
-def make_instance(dest, name, parent, scalars=None, vectors=None, textures=None):
+def make_instance(dest, name, parent, scalars=None, vectors=None, textures=None, switches=None):
     """Instância de material em <dest>, refeita no mesmo pacote se já existe."""
     mel = unreal.MaterialEditingLibrary
     path = dest + "/" + name
@@ -585,6 +665,11 @@ def make_instance(dest, name, parent, scalars=None, vectors=None, textures=None)
     for k, v in (textures or {}).items():
         if v is not None:
             mel.set_material_instance_texture_parameter_value(mi, k, v)
+    for k, v in (switches or {}).items():
+        # o retorno do set é False mesmo quando liga (5.8, medido num estudo): confere lendo de volta
+        mel.set_material_instance_static_switch_parameter_value(mi, k, v)
+        if mel.get_material_instance_static_switch_parameter_value(mi, k) != v:
+            raise DentError("Chave estática '%s' não ficou em %s em %s" % (k, v, name))
     mel.update_material_instance(mi)
     unreal.EditorAssetLibrary.save_asset(path)
     return mi
@@ -604,6 +689,16 @@ def dress_car(dest, paint, report):
                                {"Base Texture": find_texture("T_SportsCar_Chasis_D", "/Engine/EngineResources/WhiteSquareTexture"),
                                 "MRA": find_texture("T_SportsCar_Chasis_MRA", "/Engine/EngineResources/WhiteSquareTexture"),
                                 "Normal": find_texture("T_SportsCar_Chasis_N", "/Engine/EngineMaterials/DefaultNormal")})
+        # lote 19: o vão das peças (split_car_parts.py põe o slot MI_DNVao): metal escuro áspero com manchas pela posição, sem verniz
+        # e sem lascas (revisão do 18b: albedo ~0,04 a 0,06, aspereza ~0,6, um pouco de ruído). Com metálico 0,3 e aspereza 0,6 o fundo
+        # do vão espalhava o reflexo do céu e saía mais claro que o asfalto (captura do lote 19): sem metálico, 0,75 e 0,04
+        make_instance(dest, "MI_DNVao", paint, {"MetalPaintMetallic": 0.0, "Roughness": 0.75, "ClearCoat": 0.0, "WearPaint": 0.0, "FlakeStrength": 0.0},
+                      {"Paint Tint": (0.04, 0.04, 0.042)},
+                      {"Base Texture": unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"),
+                       "MRA": unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"),
+                       "Normal": unreal.load_asset("/Engine/EngineMaterials/DefaultNormal")},
+                      {"SurfaceNoise": True})
+        report.append("vão: MI_DNVao (metal escuro com ruído)")
         slots = [str(s.material_slot_name) for s in body.get_editor_property("static_materials")]
         for i, slot in enumerate(slots):
             body.set_material(i, pintura if "Body" in slot else chassi)
