@@ -49,6 +49,8 @@ portas, vidros, aerofólio, etc., tipo o que acontece no Wreckfest". Contrato:
 
 ## Lote 19: efeitos de batida (Niagara)
 
+Contrato com os números, o orçamento e a aprovação: `docs/regras-efeitos.md`.
+
 - Faíscas no impacto e quando a carroceria raspa no chão ou na parede.
 - Cacos de vidro e de plástico (farol) no impacto forte.
 - Vidro trincado e cacos: foram para o lote 18b (`docs/regras-pecas.md`). Aqui
