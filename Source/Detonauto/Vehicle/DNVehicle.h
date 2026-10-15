@@ -98,6 +98,9 @@ class DETONAUTO_API ADNVehicle : public AWheeledVehiclePawn
 	TArray<TObjectPtr<UInputAction>> DentActions;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> RestartAction;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;
 
 	/** A carroceria (a que recebe o material de amassado): BodySkin com SK_DNSportsCarBody, os faróis e os 5 alvos de deformação do
@@ -212,6 +215,11 @@ public:
 	/** Tira todos os amassados (e desamassa a carroceria: os alvos de deformação voltam a 0). */
 	void ClearDents();
 
+	/** Tecla R (playtest 2): reinício completo, como numa rodada nova. O carro volta para onde nasceu, parado, sem dano e com as peças,
+	 *  os vidros e o turbo repostos; sai da câmera de batida; o mobiliário quebrado do mundo volta inteiro. Também pelo console. */
+	UFUNCTION(Exec)
+	void DNRestart();
+
 	/** Batida em peça de rua que quebrou (lote 17c): o dano de sempre com a variação de velocidade da regra, sem contar como batida
 	 *  do jogador na rodada de Crash nem para a câmera de batida. */
 	void ApplyPropImpact(float DeltaVMs, const FVector& WorldPoint);
@@ -316,6 +324,7 @@ protected:
 	void CameraKey(const FInputActionValue& Value);
 	void PresetKey(const FInputActionValue& Value, int32 HotkeyIndex);
 	void DentKey(const FInputActionValue& Value, int32 DentIndex);
+	void RestartKey(const FInputActionValue& Value);
 
 	/** Batida real do corpo físico (colisão com a parede, com outros carros...). */
 	UFUNCTION()
@@ -415,6 +424,10 @@ protected:
 	TArray<FVector> GlassCrackCenter;
 	/** Ponto da última batida no espaço do carro (para o centro da trinca e o lado do para-choque) [cm]. */
 	FVector LastImpactLocal = FVector::ZeroVector;
+	/** Onde o carro nasceu (a largada do DNRestart). */
+	FTransform StartTransform = FTransform::Identity;
+	/** Quadros sem o atraso de rotação da câmera depois do DNRestart (a câmera chega junto com o carro). */
+	int32 CameraSnapFrames = 0;
 
 	/** Velocidade com que o turbo entra e sai do campo de visão (o quanto ele soma é TurboFovAddDeg de Data/CameraFx.csv). */
 	static constexpr float TurboFovBlendSpeed = 5.0f;

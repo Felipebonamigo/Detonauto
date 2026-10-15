@@ -6,7 +6,9 @@
     Abre o jogo em janela com o ADNVehicleTestGameMode (Source/Detonauto/Vehicle) sobre /Engine/Maps/Entry, um mapa vazio que já vem
     na engine: nenhum .umap do projeto e nenhum Blueprint. O preset vem de Data/Cars.csv.
     -Play    para o Felipe jogar: W/S acelera e freia, A/D esterça, Espaço = freio de mão, Shift = turbo, 1/2/3/0 = presets
-             (arcade-1/2/3/Padrao), T/Y/U = batida simulada na frente, G/H/J = no lado esquerdo, V = limpa os amassados.
+             (arcade-1/2/3/Padrao), T/Y/U = batida simulada na frente, G/H/J = no lado esquerdo, V = limpa os amassados,
+             R = recomeça na largada (carro inteiro, parado, e o mobiliário quebrado reposto). Na L_Lookdev, -ExtraArgs
+             '-DNWallAheadM=600' põe um muro atravessado na rua (roteiro em docs/roteiro-playtest-2.md).
     Cenários (-Scenario), sem intervenção:
       Sin       acelera e esterça em vai-e-vem (padrão); só confirma que anda
       Accel     acelerador a fundo em linha reta; mostra a velocidade a cada 0,2 s

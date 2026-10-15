@@ -18,6 +18,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/CommandLine.h"
 #include "EnhancedInputComponent.h"
@@ -378,6 +379,7 @@ void ADNVehicle::PreRegisterAllComponents()
 void ADNVehicle::BeginPlay()
 {
 	Super::BeginPlay();
+	StartTransform = GetActorTransform();
 
 	if (bCarLoaded)
 	{
@@ -649,6 +651,10 @@ void ADNVehicle::Tick(float DeltaSeconds)
 			RestoreChaseCamera();
 		}
 	}
+	if (CameraSnapFrames > 0 && --CameraSnapFrames == 0 && !bShotView)
+	{
+		RestoreChaseCamera(); // depois do DNRestart: devolve o atraso de rotação do modo
+	}
 
 	UpdateWheelVisuals();
 	UpdateHud();
@@ -690,6 +696,11 @@ void ADNVehicle::CreateInputAssets()
 		DentActions.Add(Action);
 	}
 
+	// R: reinício completo na largada (DNRestart)
+	RestartAction = NewObject<UInputAction>(this, TEXT("DN_RestartAction"));
+	RestartAction->ValueType = EInputActionValueType::Boolean;
+	MappingContext->MapKey(RestartAction, EKeys::R);
+
 	// 1, 2, 3 e 0 trocam de preset (ver HotkeyRows)
 	const FKey PresetKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Zero };
 	PresetActions.Reset();
@@ -730,6 +741,7 @@ void ADNVehicle::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 		Input->BindAction(TurboAction, ETriggerEvent::Started, this, &ADNVehicle::TurboStart);
 		Input->BindAction(TurboAction, ETriggerEvent::Completed, this, &ADNVehicle::TurboStop);
 		Input->BindAction(CameraAction, ETriggerEvent::Started, this, &ADNVehicle::CameraKey);
+		Input->BindAction(RestartAction, ETriggerEvent::Started, this, &ADNVehicle::RestartKey);
 		for (int32 i = 0; i < PresetActions.Num(); ++i)
 		{
 			Input->BindAction(PresetActions[i], ETriggerEvent::Started, this, &ADNVehicle::PresetKey, i);
@@ -1002,6 +1014,62 @@ void ADNVehicle::ClearDents()
 	}
 	ResetPartsAndGlass();
 	PushWearToMaterial();
+}
+
+void ADNVehicle::DNRestart()
+{
+	// fora da câmera de batida e da câmera lenta
+	CrashCam = FDNCrashCamState();
+	bOrbitPending = false;
+	if (AppliedTimeScale != 1.0f)
+	{
+		UGameplayStatics::SetGlobalTimeDilation(this, 1.0f);
+		AppliedTimeScale = 1.0f;
+	}
+	// o carro na largada, parado e em ponto morto, como ao nascer; a janela de batida aberta não vira dano depois do salto
+	SetActorTransform(StartTransform, false, nullptr, ETeleportType::ResetPhysics);
+	GetMesh()->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	GetMesh()->SetPhysicsAngularVelocityInRadians(FVector::ZeroVector);
+	Chaos()->ResetVehicleState();
+	ImpactGrouper = FDNImpactGrouper();
+	GroupContacts = 0;
+	// dano, alvos, desgaste, peças e vidros
+	ClearDents();
+	Turbo->ResetState();
+	if (bTurboTestMode)
+	{
+		FDNTurboFrameInput Fill; // modo de teste: a barra volta cheia, como no BeginPlay
+		Fill.bTakedown = true;
+		Turbo->Step(Fill);
+	}
+	DentViewSecondsLeft = 0.0f;
+	RestoreChaseCamera();
+	// a câmera chega junto, sem girar devagar da direção da batida até a da largada: o braço guarda a última rotação, e um quadro sem
+	// o atraso de rotação a acerta (o Tick devolve o atraso do modo)
+	CameraBoom->bEnableCameraRotationLag = false;
+	CameraSnapFrames = 2;
+	// o mobiliário quebrado volta inteiro no lugar
+	int32 Props = 0;
+	for (TActorIterator<ADNBreakableProp> It(GetWorld()); It; ++It)
+	{
+		if (It->IsBroken())
+		{
+			It->ResetProp();
+			++Props;
+		}
+	}
+	int32 Attached = 0;
+	for (const ADNCarPart* Part : Parts)
+	{
+		Attached += Part && Part->GetStage() == EDNPartStage::Attached ? 1 : 0;
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("DNRestart: carro na largada %s a %.0f km/h, %d de %d peças presas, %d peça(s) de rua reposta(s); t do jogo %.2f s"),
+		*GetActorLocation().ToCompactString(), SpeedKmh(), Attached, Parts.Num(), Props, GetWorld()->GetTimeSeconds());
+}
+
+void ADNVehicle::RestartKey(const FInputActionValue& Value)
+{
+	DNRestart();
 }
 
 void ADNVehicle::UpdateDamageMorphs(float DeltaSeconds)
