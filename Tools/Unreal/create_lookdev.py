@@ -671,7 +671,8 @@ def plain_texture(name, value, kind):
 
 
 def build_prop_master(name, masked, defaults, report):
-    """Material-pai dos modelos: cor, normal, aspereza (R) e metal (R); o mascarado tem opacidade (R) e duas faces (folhas, vidro)."""
+    """Material-pai dos modelos: cor vezes um tom (Tint, branco = sem mudança), normal, aspereza (R) e metal (R); o mascarado tem
+    opacidade (R) e duas faces (folhas, vidro)."""
     path = PROP_DIR + "/" + name
     mel = unreal.MaterialEditingLibrary
     m = recreate(path, unreal.Material, unreal.MaterialFactoryNew())
@@ -687,7 +688,13 @@ def build_prop_master(name, masked, defaults, report):
     normal = sampler("Normal", unreal.load_asset("/Engine/EngineMaterials/DefaultNormal"), unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, 0)
     rough = sampler("Aspereza", defaults["branco"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, 300)
     metal = sampler("Metal", defaults["preto"], unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, 600)
-    mel.connect_material_property(color, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    tint = expr(m, unreal.MaterialExpressionVectorParameter, -600, -500)
+    tint.set_editor_property("parameter_name", "Tint")
+    tint.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+    tinted = expr(m, unreal.MaterialExpressionMultiply, -300, -350)
+    connect(color, "RGB", tinted, "A")
+    connect(tint, "", tinted, "B")
+    mel.connect_material_property(tinted, "", unreal.MaterialProperty.MP_BASE_COLOR)
     mel.connect_material_property(normal, "RGB", unreal.MaterialProperty.MP_NORMAL)
     mel.connect_material_property(rough, "R", unreal.MaterialProperty.MP_ROUGHNESS)
     mel.connect_material_property(metal, "R", unreal.MaterialProperty.MP_METALLIC)
@@ -701,6 +708,27 @@ def build_prop_master(name, masked, defaults, report):
     unreal.EditorAssetLibrary.save_asset(path)
     report.append("material criado: " + path)
     return m
+
+
+# Tom por instância de material dos modelos (17c, revisão): a folha do jacarandá do Poly Haven tem albedo linear médio
+# (0,18; 0,21; 0,05), luminância 0,19, amarelada: com o sol baixo de frente ela saía creme, quase branca. Folha real fica entre 0,05
+# e 0,15, verde. O tom leva a (0,044; 0,096; 0,024), luminância 0,08 (com 0,30/0,42/0,55 ainda saía verde acinzentado ao sol).
+# Tronco e galhos (0,045 e 0,049) ficam como estão.
+PROP_TINTS = {"jacaranda_tree_leaves": (0.25, 0.45, 0.45)}
+
+
+def apply_prop_tints(report):
+    """Aplica PROP_TINTS nas instâncias que existirem (também quando a malha foi reaproveitada e a instância não foi refeita)."""
+    mel = unreal.MaterialEditingLibrary
+    for key, rgb in PROP_TINTS.items():
+        path = MAT_DIR + "/MI_" + key
+        if not unreal.EditorAssetLibrary.does_asset_exist(path):
+            continue
+        mi = unreal.load_asset(path)
+        mel.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+        mel.update_material_instance(mi)
+        unreal.EditorAssetLibrary.save_asset(path)
+        report.append("tom de MI_%s: %s" % (key, ", ".join("%.2f" % v for v in rgb)))
 
 
 def import_prop_mesh(fbx, name):
@@ -813,6 +841,7 @@ def import_props(models_root, report, reimport=()):
         meshes[ph_id] = mesh
     if "jacaranda_tree_top" in meshes:
         keep_foliage(meshes["jacaranda_tree_top"], "T_jacaranda_tree_leaves_alpha", report)
+    apply_prop_tints(report)
     return meshes
 
 
