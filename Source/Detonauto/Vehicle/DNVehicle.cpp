@@ -557,7 +557,11 @@ void ADNVehicle::Tick(float DeltaSeconds)
 	{
 		const float KickTarget = Turbo->IsActive() ? 1.0f : 0.0f;
 		TurboFovBlend = FMath::FInterpTo(TurboFovBlend, KickTarget, DeltaSeconds, TurboFovBlendSpeed);
-		if (CameraModes.IsValidIndex(CameraIndex))
+		if (bShotView)
+		{
+			Camera->SetFieldOfView(ShotFovDegrees); // vista de foto: o FOV do modo de jogo (95) deixava o carro pequeno no quadro
+		}
+		else if (CameraModes.IsValidIndex(CameraIndex))
 		{
 			Camera->SetFieldOfView(CameraModes[CameraIndex].Config.Fov + TurboFovKickDegrees * TurboFovBlend);
 		}
@@ -1111,6 +1115,7 @@ void ADNVehicle::SetCameraMode(int32 Index)
 		return;
 	}
 	CameraIndex = CameraModes.IsValidIndex(Index) ? Index : 0;
+	bShotView = false;
 	const FDNCameraConfig& C = CameraModes[CameraIndex].Config;
 	CameraBoom->SetRelativeRotation(FRotator(C.PitchDeg, 0.0f, 0.0f));
 	CameraBoom->bEnableCameraRotationLag = C.Smoothing > 0.0f;
@@ -1151,4 +1156,5 @@ void ADNVehicle::SetShotCamera(float YawDegrees)
 	CameraBoom->SetRelativeRotation(FRotator(-12.0f, YawDegrees, 0.0f));
 	CameraBoom->TargetArmLength = 560.0f;
 	CameraBoom->SocketOffset.Z = 60.0f;
+	bShotView = true;
 }

@@ -21,6 +21,8 @@
 #include "HAL/PlatformMisc.h"
 #include "UnrealClient.h"
 #include "Camera/CameraActor.h"
+#include "Engine/DirectionalLight.h"
+#include "Components/LightComponent.h"
 #include "Camera/CameraComponent.h"
 
 ADNVehicleTestGameMode::ADNVehicleTestGameMode()
@@ -124,6 +126,17 @@ void ADNVehicleTestGameMode::StartPlay()
 		FParse::Value(Cmd, TEXT("DNPropStartM="), StartM);
 		FParse::Value(Cmd, TEXT("DNPropSpacingM="), SpacingM);
 		SpawnPropLine(PropLine, StartM, SpacingM);
+	}
+	// -DNSunYaw=<graus>: gira o sol da cena em volta do eixo vertical, só nesta execução (capturas com o sol por trás da câmera)
+	float SunYaw = 0.0f;
+	if (FParse::Value(Cmd, TEXT("DNSunYaw="), SunYaw) && SunYaw != 0.0f)
+	{
+		for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
+		{
+			It->GetLightComponent()->SetMobility(EComponentMobility::Movable);
+			It->SetActorRotation(It->GetActorRotation() + FRotator(0.0f, SunYaw, 0.0f));
+			UE_LOG(LogDetonauto, Display, TEXT("DNSunYaw: %s girado %.0f graus (agora %s)"), *It->GetName(), SunYaw, *It->GetActorRotation().ToString());
+		}
 	}
 	FString PropCamSpec;
 	if (FParse::Value(Cmd, TEXT("DNPropCam="), PropCamSpec, false) && !PropCamSpec.IsEmpty())
@@ -398,7 +411,22 @@ void ADNVehicleTestGameMode::Tick(float DeltaSeconds)
 	{
 		KeyScriptTick(*Vehicle, DeltaSeconds);
 	}
-	if (CruiseKmh > 0.0f)
+	if (CruiseKmh > 0.0f && Vehicle->RealImpactTotal() > 0)
+	{
+		// batida real (parede, carro): o piloto solta tudo e as teclas do roteiro voltam a mandar (ré para enquadrar a frente)
+		if (!bCruiseStopped)
+		{
+			bCruiseStopped = true;
+			UE_LOG(LogDetonauto, Display, TEXT("DNCruise: batida real a %.0f m/s; o piloto solta o acelerador e devolve o carro ao roteiro de teclas"),
+				Vehicle->MaxRealImpactMs());
+			if (UChaosWheeledVehicleMovementComponent* Move = Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovement()))
+			{
+				Move->SetThrottleInput(0.0f);
+				Move->SetSteeringInput(0.0f);
+			}
+		}
+	}
+	else if (CruiseKmh > 0.0f)
 	{
 		// piloto automático do teste (-DNCruiseKmh): mesmo controle do cenário Wall; o log de início diz que o acelerador vem dele
 		if (UChaosWheeledVehicleMovementComponent* Move = Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovement()))

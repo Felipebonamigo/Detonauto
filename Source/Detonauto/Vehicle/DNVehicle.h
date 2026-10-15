@@ -214,8 +214,10 @@ public:
 	float MaxRealImpactMs() const { return MaxRealDeltaVMs; }
 	int32 RealImpactTotal() const { return RealImpactCount; }
 
-	/** Câmera parada olhando o carro de um ângulo (YawDegrees em relação à frente), para as capturas de tela. */
+	/** Câmera parada olhando o carro de um ângulo (YawDegrees em relação à frente), para as capturas de tela, com FOV próprio. */
 	void SetShotCamera(float YawDegrees);
+	bool bShotView = false;
+	static constexpr float ShotFovDegrees = 60.0f;
 
 	/** Volta a câmera ao modo escolhido (Data/Cameras.csv). */
 	void RestoreChaseCamera();

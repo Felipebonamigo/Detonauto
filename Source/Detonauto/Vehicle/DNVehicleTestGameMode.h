@@ -12,6 +12,7 @@
 //   -DNCarProbe -DNCarScenario=Sin|Accel|Turbo|Handbrake|Turn|Switch|Wall [-DNWallKmh=N]   mede e imprime no log "DNCarProbe: ..."
 //   -DNCarShot      acelera, liga o turbo e tira uma captura de tela com o HUD (dn-hud)
 //   -DNShotDent     carro parado, 8 amassados de demonstração e quatro capturas da cena (dn-dent-*)
+//   -DNSunYaw=G     gira o sol da cena G graus em volta do eixo vertical, só nesta execução (sol por trás da câmera)
 // Cenários e capturas encerram o jogo sozinhos.
 
 #pragma once
@@ -97,6 +98,8 @@ protected:
 	/** -DNCruiseKmh=N: piloto automático segura N km/h na reta (o log diz que o acelerador vem dele). */
 	float CruiseKmh = 0.0f;
 	float CruiseLogLeft = 0.0f;
+	/** O piloto parou na primeira batida real (peça de rua não conta): daí em diante, só o roteiro de teclas. */
+	bool bCruiseStopped = false;
 
 	/** Roteiro de teclas (-DNKeys): pressiona e solta teclas REAIS pelo PlayerController, o mesmo caminho do teclado do jogador. */
 	void KeyScriptTick(ADNVehicle& Vehicle, float DeltaSeconds);
