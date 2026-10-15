@@ -646,6 +646,8 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateBreakables(Data.Breakables));
 	Errors.Append(ValidateBreakableSettings(Data.BreakableSettings));
 	Errors.Append(ValidateCameraFx(Data.CameraFx));
+	Errors.Append(ValidateCarParts(Data.CarParts));
+	Errors.Append(ValidateCarGlass(Data.CarGlass));
 	return Errors;
 }
 
@@ -748,6 +750,143 @@ TArray<FString> FDNDataValidation::ValidateBreakableSettings(const TArray<FDNBre
 		CheckRange(BreakableSettingsFile, E.Id, TEXT("SleepAfterS"), R.SleepAfterS, 0.0f, false, 60.0f, true, Errors);
 		CheckRange(BreakableSettingsFile, E.Id, TEXT("PlowFactor"), R.PlowFactor, 1.0f, true, 3.0f, true, Errors);
 		CheckRange(BreakableSettingsFile, E.Id, TEXT("PlowUpMs"), R.PlowUpMs, 0.0f, true, 10.0f, true, Errors);
+	}
+	return Errors;
+}
+
+namespace
+{
+	/** Zona e secundária em texto: a zona conhecida; a secundária vazia ou conhecida e diferente da zona. */
+	void CheckZones(const TCHAR* File, const FString& Id, const FString& Zone, const FString& Secondary, TArray<FString>& Errors)
+	{
+		EDNDamageZone Z = EDNDamageZone::Front;
+		const bool bZone = FDNCarParts::ParseZone(Zone, Z);
+		if (!bZone)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Zone' tem zona desconhecida '%s' (Front, Rear, Left, Right, Roof ou Under)."), File, *Id, *Zone));
+		}
+		if (Secondary.TrimStartAndEnd().IsEmpty())
+		{
+			return;
+		}
+		EDNDamageZone S = EDNDamageZone::Front;
+		if (!FDNCarParts::ParseZone(Secondary, S))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'SecondaryZone' tem zona desconhecida '%s' (vazia = sem secundária)."), File, *Id, *Secondary));
+		}
+		else if (bZone && S == Z)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'SecondaryZone' (%s) é igual à 'Zone'; deixe vazio."), File, *Id, *Secondary));
+		}
+	}
+}
+
+TArray<FString> FDNDataValidation::ValidateCarParts(const TArray<FDNCarPartEntry>& Rows)
+{
+	constexpr const TCHAR* File = TEXT("CarParts.csv");
+	TArray<FString> Errors;
+	if (Rows.IsEmpty())
+	{
+		Errors.Add(FString::Printf(TEXT("%s: nenhuma linha (pelo menos uma peça de um carro)."), File));
+	}
+	CheckIds(File, Rows, Errors);
+	TMap<FString, FString> SeenPart; // "carro/peça" em minúsculas -> id da primeira linha
+	for (const FDNCarPartEntry& E : Rows)
+	{
+		const FDNCarPartRow& R = E.Row;
+		if (R.CarId.TrimStartAndEnd().IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'CarId' está vazio."), File, *E.Id));
+		}
+		EDNDamagePart Part = EDNDamagePart::Hood;
+		if (!FDNCarParts::ParsePart(R.Part, Part))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Part' tem peça desconhecida '%s'."), File, *E.Id, *R.Part));
+		}
+		else
+		{
+			const FString Key = (R.CarId.TrimStartAndEnd() + TEXT("/") + FDNCarParts::PartName(Part)).ToLower();
+			if (const FString* First = SeenPart.Find(Key))
+			{
+				Errors.Add(FString::Printf(TEXT("%s: a peça %s aparece duas vezes no carro '%s' (linhas '%s' e '%s')."), File, FDNCarParts::PartName(Part), *R.CarId, **First, *E.Id));
+			}
+			else
+			{
+				SeenPart.Add(Key, E.Id);
+			}
+		}
+		CheckZones(File, E.Id, R.Zone, R.SecondaryZone, Errors);
+		CheckRange(File, E.Id, TEXT("MassKg"), R.MassKg, 0.0f, false, 500.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("DetachDamage"), R.DetachDamage, 0.0f, false, 1.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("DetachDeltaVMs"), R.DetachDeltaVMs, 0.0f, false, 100.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("HingeDamping"), R.HingeDamping, 0.0f, true, 50.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("LaunchMs"), R.LaunchMs, 0.0f, true, 30.0f, true, Errors);
+		EDNHingeEdge Edge = EDNHingeEdge::None;
+		if (!FDNCarParts::ParseHingeEdge(R.HingeEdge, Edge))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'HingeEdge' tem borda desconhecida '%s' (None, TopRear, TopFront, SideFront ou Lateral)."),
+				File, *E.Id, *R.HingeEdge));
+			continue;
+		}
+		if (Edge == EDNHingeEdge::None)
+		{
+			// sem dobradiça: pula de presa para solta; ângulo e limiares de pendurar em 0, para ninguém achar que valem
+			for (const TPair<const TCHAR*, float>& Field : { TPair<const TCHAR*, float>(TEXT("HingeMaxDeg"), R.HingeMaxDeg),
+				TPair<const TCHAR*, float>(TEXT("HangDamage"), R.HangDamage), TPair<const TCHAR*, float>(TEXT("HangDeltaVMs"), R.HangDeltaVMs) })
+			{
+				if (Field.Value != 0.0f)
+				{
+					Errors.Add(FString::Printf(TEXT("%s, linha '%s': sem dobradiça (HingeEdge None), o campo '%s' precisa ser 0 (veio %g)."), File, *E.Id, Field.Key, Field.Value));
+				}
+			}
+			continue;
+		}
+		CheckRange(File, E.Id, TEXT("HingeMaxDeg"), R.HingeMaxDeg, 0.0f, false, 180.0f, true, Errors);
+		// pendura antes de soltar: os limiares de pendurar ficam abaixo dos de soltar
+		CheckRange(File, E.Id, TEXT("HangDamage"), R.HangDamage, 0.0f, false, FMath::IsFinite(R.DetachDamage) ? R.DetachDamage : 0.0f, false, Errors);
+		CheckRange(File, E.Id, TEXT("HangDeltaVMs"), R.HangDeltaVMs, 0.0f, false, FMath::IsFinite(R.DetachDeltaVMs) ? R.DetachDeltaVMs : 0.0f, false, Errors);
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateCarGlass(const TArray<FDNCarGlassEntry>& Rows)
+{
+	constexpr const TCHAR* File = TEXT("CarGlass.csv");
+	TArray<FString> Errors;
+	if (Rows.IsEmpty())
+	{
+		Errors.Add(FString::Printf(TEXT("%s: nenhuma linha (pelo menos um vidro de um carro)."), File));
+	}
+	CheckIds(File, Rows, Errors);
+	TMap<FString, FString> SeenGlass;
+	for (const FDNCarGlassEntry& E : Rows)
+	{
+		const FDNCarGlassRow& R = E.Row;
+		if (R.CarId.TrimStartAndEnd().IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'CarId' está vazio."), File, *E.Id));
+		}
+		EDNGlass Glass = EDNGlass::Windshield;
+		if (!FDNGlass::ParseGlass(R.Glass, Glass))
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Glass' tem vidro desconhecido '%s'."), File, *E.Id, *R.Glass));
+		}
+		else
+		{
+			const FString Key = (R.CarId.TrimStartAndEnd() + TEXT("/") + FDNGlass::GlassName(Glass)).ToLower();
+			if (const FString* First = SeenGlass.Find(Key))
+			{
+				Errors.Add(FString::Printf(TEXT("%s: o vidro %s aparece duas vezes no carro '%s' (linhas '%s' e '%s')."), File, FDNGlass::GlassName(Glass), *R.CarId, **First, *E.Id));
+			}
+			else
+			{
+				SeenGlass.Add(Key, E.Id);
+			}
+		}
+		CheckZones(File, E.Id, R.Zone, R.SecondaryZone, Errors);
+		CheckRange(File, E.Id, TEXT("CrackFrom"), R.CrackFrom, 0.0f, true, 1.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("BurstDamage"), R.BurstDamage, 0.0f, true, 1.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("BurstDeltaVMs"), R.BurstDeltaVMs, 0.0f, true, 100.0f, true, Errors);
 	}
 	return Errors;
 }

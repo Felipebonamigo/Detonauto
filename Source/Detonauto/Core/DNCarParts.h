@@ -27,10 +27,21 @@ enum class EDNPartStage : uint8
 	Detached
 };
 
+/** Onde fica a dobradiça na peça (o motor acha o ponto e o eixo pela caixa da malha da peça). */
+enum class EDNHingeEdge : uint8
+{
+	None,       // sem dobradiça
+	TopRear,    // borda de trás, em cima, eixo lateral (capô: a borda do para-brisa)
+	TopFront,   // borda da frente, em cima, eixo lateral (tampa traseira)
+	SideFront,  // borda da frente, eixo vertical (porta)
+	Lateral     // uma das pontas, eixo ao longo do carro (para-choque: a ponta longe da batida fica presa)
+};
+
 /** Uma peça do carro: uma linha de Data/CarParts.csv. */
 struct FDNCarPartSpec
 {
 	EDNDamagePart Part = EDNDamagePart::Hood;
+	EDNHingeEdge HingeEdge = EDNHingeEdge::None;
 	EDNDamageZone Zone = EDNDamageZone::Front;
 	bool bHasSecondaryZone = false;
 	EDNDamageZone SecondaryZone = EDNDamageZone::Front;
@@ -62,6 +73,15 @@ struct FDNPartChange
 
 struct FDNCarParts
 {
+	/** Nomes em texto (os do enum, iguais aos dos CSVs e das malhas SK_DN<Carro>_<Nome>) e a leitura, sem diferenciar a caixa.
+	 *  Falso (sem mexer em Out) se o texto não é nenhum deles. */
+	static const TCHAR* PartName(EDNDamagePart Part);
+	static bool ParsePart(const FString& Text, EDNDamagePart& Out);
+	static const TCHAR* ZoneName(EDNDamageZone Zone);
+	static bool ParseZone(const FString& Text, EDNDamageZone& Out);
+	static const TCHAR* HingeEdgeName(EDNHingeEdge Edge);
+	static bool ParseHingeEdge(const FString& Text, EDNHingeEdge& Out);
+
 	/** O maior dano entre a zona e a zona secundária (sem secundária: o da zona). Zona fora do enum vale 0. */
 	static float ZoneDamage(EDNDamageZone Zone, bool bHasSecondary, EDNDamageZone Secondary, const FDNDamageState& Damage);
 
@@ -105,6 +125,10 @@ struct FDNGlassSpec
 
 struct FDNGlass
 {
+	/** Nome em texto (o do enum; a malha é SK_DN<Carro>_Glass_<Nome>) e a leitura, sem diferenciar a caixa. */
+	static const TCHAR* GlassName(EDNGlass Glass);
+	static bool ParseGlass(const FString& Text, EDNGlass& Out);
+
 	/** Força da trinca, de 0 a 1 (P4). */
 	static float Crack(const FDNGlassSpec& Spec, const FDNDamageState& Damage);
 

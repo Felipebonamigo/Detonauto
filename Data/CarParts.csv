@@ -1,0 +1,12 @@
+Id,CarId,Part,Zone,SecondaryZone,MassKg,HangDamage,HangDeltaVMs,DetachDamage,DetachDeltaVMs,HingeEdge,HingeMaxDeg,HingeDamping,LaunchMs
+sportscar-para-choque-dianteiro,SportsCar,BumperFront,Front,,8,0.30,8,0.60,12,Lateral,60,2,4
+sportscar-para-choque-traseiro,SportsCar,BumperRear,Rear,,8,0.30,8,0.60,12,Lateral,60,2,4
+sportscar-capo,SportsCar,Hood,Front,Roof,12,0.35,9,0.75,16,TopRear,55,2,4
+sportscar-tampa-traseira,SportsCar,Trunk,Rear,,10,0.35,9,0.75,16,TopFront,55,2,4
+sportscar-porta-esquerda,SportsCar,DoorLeft,Left,,20,0.35,9,0.80,16,SideFront,70,2,4
+sportscar-porta-direita,SportsCar,DoorRight,Right,,20,0.35,9,0.80,16,SideFront,70,2,4
+sportscar-para-lama-dianteiro-esquerdo,SportsCar,FenderFrontLeft,Front,Left,5,0,0,0.70,14,None,0,2,4
+sportscar-para-lama-dianteiro-direito,SportsCar,FenderFrontRight,Front,Right,5,0,0,0.70,14,None,0,2,4
+sportscar-para-lama-traseiro-esquerdo,SportsCar,FenderRearLeft,Rear,Left,5,0,0,0.70,14,None,0,2,4
+sportscar-para-lama-traseiro-direito,SportsCar,FenderRearRight,Rear,Right,5,0,0,0.70,14,None,0,2,4
+sportscar-aerofolio,SportsCar,Spoiler,Rear,Roof,6,0,0,0.50,10,None,0,2,4

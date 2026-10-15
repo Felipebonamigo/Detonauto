@@ -70,6 +70,11 @@ public:
 	FDNBreakableSettings GetBreakableSettings() const;
 	/** Os valores globais de Data/CameraFx.csv (lote 18), ou o padrão se a tabela é inválida (S1). */
 	FDNCameraFxSettings GetCameraFxSettings() const;
+	/** As peças que soltam do carro CarId (Data/CarParts.csv, lote 18b), na ordem do arquivo; sem diferenciar a caixa. Vazio se o carro
+	 *  não tem linhas ou se a tabela é inválida (nenhuma peça vale o padrão às escondidas: o carro fica com a lataria inteira). */
+	TArray<FDNCarPartSpec> GetCarParts(const FString& CarId) const;
+	/** Os vidros e lentes do carro CarId (Data/CarGlass.csv), na ordem do arquivo; vazio se não tem ou se a tabela é inválida. */
+	TArray<FDNGlassSpec> GetCarGlass(const FString& CarId) const;
 
 private:
 	FDNData Data;
@@ -86,4 +91,6 @@ private:
 	bool bBreakablesValid = false;
 	bool bBreakableSettingsValid = false;
 	bool bCameraFxValid = false;
+	bool bCarPartsValid = false;
+	bool bCarGlassValid = false;
 };

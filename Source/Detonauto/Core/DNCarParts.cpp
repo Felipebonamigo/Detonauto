@@ -112,3 +112,52 @@ TArray<int32> FDNGlass::Evaluate(TConstArrayView<FDNGlassSpec> Specs, TArray<boo
 	}
 	return Now;
 }
+
+
+// ---- nomes em texto: os do enum, iguais aos dos CSVs e das malhas ----
+
+namespace
+{
+	const TCHAR* const PartNames[] = { TEXT("Hood"), TEXT("Trunk"), TEXT("DoorLeft"), TEXT("DoorRight"), TEXT("BumperFront"), TEXT("BumperRear"),
+		TEXT("FenderFrontLeft"), TEXT("FenderFrontRight"), TEXT("FenderRearLeft"), TEXT("FenderRearRight"), TEXT("Spoiler") };
+	static_assert(UE_ARRAY_COUNT(PartNames) == FDNDamageState::PartCount, "um nome por EDNDamagePart");
+
+	const TCHAR* const ZoneNames[] = { TEXT("Front"), TEXT("Rear"), TEXT("Left"), TEXT("Right"), TEXT("Roof"), TEXT("Under") };
+	static_assert(UE_ARRAY_COUNT(ZoneNames) == FDNDamageState::ZoneCount, "um nome por EDNDamageZone");
+
+	const TCHAR* const EdgeNames[] = { TEXT("None"), TEXT("TopRear"), TEXT("TopFront"), TEXT("SideFront"), TEXT("Lateral") };
+
+	const TCHAR* const GlassNames[] = { TEXT("Windshield"), TEXT("SideLeft"), TEXT("SideRight"), TEXT("Rear"), TEXT("HeadlightLeft"),
+		TEXT("HeadlightRight"), TEXT("TaillightLeft"), TEXT("TaillightRight") };
+
+	template <typename EnumType, int32 N>
+	const TCHAR* NameOf(const TCHAR* const (&Names)[N], EnumType Value)
+	{
+		const int32 Index = static_cast<int32>(Value);
+		return Index >= 0 && Index < N ? Names[Index] : TEXT("");
+	}
+
+	template <typename EnumType, int32 N>
+	bool ParseName(const TCHAR* const (&Names)[N], const FString& Text, EnumType& Out)
+	{
+		const FString Trimmed = Text.TrimStartAndEnd();
+		for (int32 i = 0; i < N; ++i)
+		{
+			if (Trimmed.Equals(Names[i], ESearchCase::IgnoreCase))
+			{
+				Out = static_cast<EnumType>(i);
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+const TCHAR* FDNCarParts::PartName(EDNDamagePart Part) { return NameOf(PartNames, Part); }
+bool FDNCarParts::ParsePart(const FString& Text, EDNDamagePart& Out) { return ParseName(PartNames, Text, Out); }
+const TCHAR* FDNCarParts::ZoneName(EDNDamageZone Zone) { return NameOf(ZoneNames, Zone); }
+bool FDNCarParts::ParseZone(const FString& Text, EDNDamageZone& Out) { return ParseName(ZoneNames, Text, Out); }
+const TCHAR* FDNCarParts::HingeEdgeName(EDNHingeEdge Edge) { return NameOf(EdgeNames, Edge); }
+bool FDNCarParts::ParseHingeEdge(const FString& Text, EDNHingeEdge& Out) { return ParseName(EdgeNames, Text, Out); }
+const TCHAR* FDNGlass::GlassName(EDNGlass Glass) { return NameOf(GlassNames, Glass); }
+bool FDNGlass::ParseGlass(const FString& Text, EDNGlass& Out) { return ParseName(GlassNames, Text, Out); }

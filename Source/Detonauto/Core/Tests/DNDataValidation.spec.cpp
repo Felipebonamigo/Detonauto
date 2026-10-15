@@ -651,6 +651,8 @@ void FDNDataAllSpec::Define()
 			Data.Breakables = { DNTest::Entry<FDNBreakableEntry>(DNTest::BreakableRow(), TEXT("poste")) };
 			Data.BreakableSettings = { DNTest::Entry<FDNBreakableSettingsEntry>(DNTest::BreakableSettingsRow()) };
 			Data.CameraFx = { DNTest::Entry<FDNCameraFxEntry>(DNTest::CameraFxRow()) };
+			Data.CarParts = { DNTest::Entry<FDNCarPartEntry>(DNTest::CarPartRow(), TEXT("para-choque")) };
+			Data.CarGlass = { DNTest::Entry<FDNCarGlassEntry>(DNTest::CarGlassRow(), TEXT("vidro")) };
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -681,7 +683,13 @@ void FDNDataAllSpec::Define()
 			Data.BreakableSettings[0].Row.MaxActiveProps = 0;
 			Data.CameraFx = { DNTest::Entry<FDNCameraFxEntry>(DNTest::CameraFxRow()) };
 			Data.CameraFx[0].Row.CrashCamTimeScale = 0.f;
+			Data.CarParts = { DNTest::Entry<FDNCarPartEntry>(DNTest::CarPartRow(), TEXT("para-choque")) };
+			Data.CarParts[0].Row.MassKg = 0.f;
+			Data.CarGlass = { DNTest::Entry<FDNCarGlassEntry>(DNTest::CarGlassRow(), TEXT("vidro")) };
+			Data.CarGlass[0].Row.CrackFrom = 2.f;
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
+			ExpectError(*this, TEXT("pecas do carro"), Errors, { TEXT("CarParts.csv"), TEXT("MassKg") });
+			ExpectError(*this, TEXT("vidros do carro"), Errors, { TEXT("CarGlass.csv"), TEXT("CrackFrom") });
 			ExpectError(*this, TEXT("config da camera"), Errors, { TEXT("CameraFx.csv"), TEXT("CrashCamTimeScale") });
 			ExpectError(*this, TEXT("mobiliario"), Errors, { TEXT("Breakables.csv"), TEXT("MinBreakSpeedKmh") });
 			ExpectError(*this, TEXT("config do mobiliario"), Errors, { TEXT("BreakableSettings.csv"), TEXT("MaxActiveProps") });

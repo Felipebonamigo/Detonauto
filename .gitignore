@@ -63,3 +63,6 @@ desktop.ini
 # Builds empacotadas e capturas
 Packaged/
 Captures/
+
+# cache do Python (scripts do Blender importados como biblioteca)
+__pycache__/

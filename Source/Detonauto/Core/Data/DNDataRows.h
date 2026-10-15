@@ -21,6 +21,9 @@
 //                       de rua por linha)
 //   BreakableSettings.csv Id + os campos de FDNBreakableSettings (uma linha, id "padrao")
 //   CameraFx.csv        Id + os campos de FDNCameraFxSettings (uma linha, id "padrao"; lote 18, docs/regras-camera.md)
+//   CarParts.csv        Id, CarId, Part, Zone, SecondaryZone, MassKg, HangDamage, HangDeltaVMs, DetachDamage, DetachDeltaVMs, HingeEdge,
+//                       HingeMaxDeg, HingeDamping, LaunchMs (uma peça por linha e por carro; lote 18b, docs/regras-pecas.md)
+//   CarGlass.csv        Id, CarId, Glass, Zone, SecondaryZone, CrackFrom, BurstDamage, BurstDeltaVMs (um vidro por linha e por carro)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -38,6 +41,7 @@
 #include "Core/DNCamera.h"
 #include "Core/DNCameraFx.h"
 #include "Core/DNBreakable.h"
+#include "Core/DNCarParts.h"
 #include "DNDataRows.generated.h"
 
 USTRUCT(BlueprintType)
@@ -597,6 +601,90 @@ struct FDNBreakableSettingsRow : public FTableRowBase
 	}
 };
 
+/** Data/CarParts.csv: uma linha por peça que solta e por carro (lote 18b, docs/regras-pecas.md). Significado de cada campo:
+ *  FDNCarPartSpec em Core/DNCarParts.h. Textos: Part (EDNDamagePart), Zone e SecondaryZone (EDNDamageZone; a secundária vazia =
+ *  sem), HingeEdge (EDNHingeEdge). */
+USTRUCT(BlueprintType)
+struct FDNCarPartRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString CarId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Part;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Zone;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString SecondaryZone;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float MassKg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HangDamage = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HangDeltaVMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DetachDamage = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DetachDeltaVMs = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString HingeEdge;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HingeMaxDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float HingeDamping = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LaunchMs = 0.0f;
+
+	/** A peça; falso se algum texto não é válido (Out fica como estava). */
+	bool ToSpec(FDNCarPartSpec& Out) const
+	{
+		FDNCarPartSpec S;
+		if (!FDNCarParts::ParsePart(Part, S.Part) || !FDNCarParts::ParseZone(Zone, S.Zone) || !FDNCarParts::ParseHingeEdge(HingeEdge, S.HingeEdge))
+		{
+			return false;
+		}
+		S.bHasSecondaryZone = !SecondaryZone.TrimStartAndEnd().IsEmpty();
+		if (S.bHasSecondaryZone && !FDNCarParts::ParseZone(SecondaryZone, S.SecondaryZone))
+		{
+			return false;
+		}
+		S.MassKg = MassKg;
+		S.HangDamage = HangDamage;
+		S.HangDeltaVMs = HangDeltaVMs;
+		S.DetachDamage = DetachDamage;
+		S.DetachDeltaVMs = DetachDeltaVMs;
+		S.HingeMaxDeg = HingeMaxDeg;
+		S.HingeDamping = HingeDamping;
+		S.LaunchMs = LaunchMs;
+		Out = S;
+		return true;
+	}
+};
+
+/** Data/CarGlass.csv: uma linha por vidro (ou lente de farol e lanterna) e por carro (lote 18b). Campos: FDNGlassSpec. Textos: Glass
+ *  (EDNGlass), Zone e SecondaryZone (EDNDamageZone; vazia = sem). */
+USTRUCT(BlueprintType)
+struct FDNCarGlassRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString CarId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Glass;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Zone;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString SecondaryZone;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CrackFrom = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float BurstDamage = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float BurstDeltaVMs = 0.0f;
+
+	/** O vidro; falso se algum texto não é válido (Out fica como estava). */
+	bool ToSpec(FDNGlassSpec& Out) const
+	{
+		FDNGlassSpec S;
+		if (!FDNGlass::ParseGlass(Glass, S.Glass) || !FDNCarParts::ParseZone(Zone, S.Zone))
+		{
+			return false;
+		}
+		S.bHasSecondaryZone = !SecondaryZone.TrimStartAndEnd().IsEmpty();
+		if (S.bHasSecondaryZone && !FDNCarParts::ParseZone(SecondaryZone, S.SecondaryZone))
+		{
+			return false;
+		}
+		S.CrackFrom = CrackFrom;
+		S.BurstDamage = BurstDamage;
+		S.BurstDeltaVMs = BurstDeltaVMs;
+		Out = S;
+		return true;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -620,6 +708,8 @@ using FDNCameraConfigEntry = TDNTableEntry<FDNCameraConfigRow>;
 using FDNCameraFxEntry = TDNTableEntry<FDNCameraFxRow>;
 using FDNBreakableEntry = TDNTableEntry<FDNBreakableRow>;
 using FDNBreakableSettingsEntry = TDNTableEntry<FDNBreakableSettingsRow>;
+using FDNCarPartEntry = TDNTableEntry<FDNCarPartRow>;
+using FDNCarGlassEntry = TDNTableEntry<FDNCarGlassRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -639,4 +729,6 @@ struct FDNData
 	TArray<FDNCameraFxEntry> CameraFx;
 	TArray<FDNBreakableEntry> Breakables;
 	TArray<FDNBreakableSettingsEntry> BreakableSettings;
+	TArray<FDNCarPartEntry> CarParts;
+	TArray<FDNCarGlassEntry> CarGlass;
 };

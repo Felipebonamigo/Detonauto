@@ -1,0 +1,9 @@
+Id,CarId,Glass,Zone,SecondaryZone,CrackFrom,BurstDamage,BurstDeltaVMs
+sportscar-para-brisa,SportsCar,Windshield,Front,Roof,0.40,0,0
+sportscar-vidro-lateral-esquerdo,SportsCar,SideLeft,Left,,0.30,0.60,12
+sportscar-vidro-lateral-direito,SportsCar,SideRight,Right,,0.30,0.60,12
+sportscar-vidro-traseiro,SportsCar,Rear,Rear,Roof,0.30,0.65,12
+sportscar-farol-esquerdo,SportsCar,HeadlightLeft,Front,,0.30,0.60,0
+sportscar-farol-direito,SportsCar,HeadlightRight,Front,,0.30,0.60,0
+sportscar-lanterna-esquerda,SportsCar,TaillightLeft,Rear,,0.30,0.60,0
+sportscar-lanterna-direita,SportsCar,TaillightRight,Rear,,0.30,0.60,0

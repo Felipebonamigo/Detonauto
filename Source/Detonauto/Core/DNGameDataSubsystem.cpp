@@ -33,6 +33,8 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bBreakablesValid = FDNDataValidation::ValidateBreakables(Data.Breakables).IsEmpty();
 	bBreakableSettingsValid = FDNDataValidation::ValidateBreakableSettings(Data.BreakableSettings).IsEmpty();
 	bCameraFxValid = FDNDataValidation::ValidateCameraFx(Data.CameraFx).IsEmpty();
+	bCarPartsValid = FDNDataValidation::ValidateCarParts(Data.CarParts).IsEmpty();
+	bCarGlassValid = FDNDataValidation::ValidateCarGlass(Data.CarGlass).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -154,4 +156,40 @@ bool UDNGameDataSubsystem::TryGetCarConfig(const FString& Id, FDNCarConfig& Out)
 	}
 	Out = Entry->Row.ToConfig();
 	return true;
+}
+
+TArray<FDNCarPartSpec> UDNGameDataSubsystem::GetCarParts(const FString& CarId) const
+{
+	TArray<FDNCarPartSpec> Out;
+	if (!bCarPartsValid)
+	{
+		return Out;
+	}
+	for (const FDNCarPartEntry& E : Data.CarParts)
+	{
+		FDNCarPartSpec Spec;
+		if (E.Row.CarId.TrimStartAndEnd().Equals(CarId, ESearchCase::IgnoreCase) && E.Row.ToSpec(Spec))
+		{
+			Out.Add(Spec);
+		}
+	}
+	return Out;
+}
+
+TArray<FDNGlassSpec> UDNGameDataSubsystem::GetCarGlass(const FString& CarId) const
+{
+	TArray<FDNGlassSpec> Out;
+	if (!bCarGlassValid)
+	{
+		return Out;
+	}
+	for (const FDNCarGlassEntry& E : Data.CarGlass)
+	{
+		FDNGlassSpec Spec;
+		if (E.Row.CarId.TrimStartAndEnd().Equals(CarId, ESearchCase::IgnoreCase) && E.Row.ToSpec(Spec))
+		{
+			Out.Add(Spec);
+		}
+	}
+	return Out;
 }

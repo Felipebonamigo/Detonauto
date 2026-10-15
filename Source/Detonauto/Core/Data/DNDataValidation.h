@@ -51,6 +51,20 @@ struct FDNDataValidation
 	/** CameraFx.csv (câmera de velocidade e de batida, docs/regras-camera.md): uma linha, as faixas de cada campo e o fim de cada
 	 *  rampa depois do começo. */
 	static TArray<FString> ValidateCameraFx(const TArray<FDNCameraFxEntry>& Rows);
+	/**
+	 *  CarParts.csv (peças que soltam, lote 18b, docs/regras-pecas.md): pelo menos uma linha; CarId não vazio; Part, Zone e HingeEdge
+	 *  conhecidos; SecondaryZone vazia ou conhecida e diferente da Zone; o par (CarId, Part) único; faixas: MassKg (0, 500],
+	 *  DetachDamage (0, 1], DetachDeltaVMs (0, 100], HingeDamping [0, 50], LaunchMs [0, 30]. Com dobradiça: HingeMaxDeg (0, 180],
+	 *  HangDamage em (0, DetachDamage) e HangDeltaVMs em (0, DetachDeltaVMs). Sem dobradiça (None): HingeMaxDeg, HangDamage e
+	 *  HangDeltaVMs em 0.
+	 */
+	static TArray<FString> ValidateCarParts(const TArray<FDNCarPartEntry>& Rows);
+	/**
+	 *  CarGlass.csv (vidros e lentes, lote 18b): pelo menos uma linha; CarId não vazio; Glass e Zone conhecidos; SecondaryZone vazia ou
+	 *  conhecida e diferente da Zone; o par (CarId, Glass) único; CrackFrom [0, 1], BurstDamage [0, 1] (0 = nunca), BurstDeltaVMs
+	 *  [0, 100] (0 = nunca).
+	 */
+	static TArray<FString> ValidateCarGlass(const TArray<FDNCarGlassEntry>& Rows);
 
 	/**
 	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros

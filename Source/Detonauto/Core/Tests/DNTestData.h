@@ -197,6 +197,42 @@ namespace DNTest
 		return R;
 	}
 
+	/** Uma linha válida de CarParts.csv (lote 18b): por padrão, o para-choque dianteiro do contrato. */
+	inline FDNCarPartRow CarPartRow(const TCHAR* Part = TEXT("BumperFront"), const TCHAR* Zone = TEXT("Front"), const TCHAR* Secondary = TEXT(""),
+		const TCHAR* Edge = TEXT("Lateral"), const TCHAR* CarId = TEXT("SportsCar"))
+	{
+		FDNCarPartRow R;
+		R.CarId = CarId;
+		R.Part = Part;
+		R.Zone = Zone;
+		R.SecondaryZone = Secondary;
+		R.MassKg = 8.0f;
+		R.HangDamage = 0.30f;
+		R.HangDeltaVMs = 8.0f;
+		R.DetachDamage = 0.60f;
+		R.DetachDeltaVMs = 12.0f;
+		R.HingeEdge = Edge;
+		R.HingeMaxDeg = 60.0f;
+		R.HingeDamping = 2.0f;
+		R.LaunchMs = 4.0f;
+		return R;
+	}
+
+	/** Uma linha válida de CarGlass.csv (lote 18b): por padrão, o vidro lateral esquerdo do contrato. */
+	inline FDNCarGlassRow CarGlassRow(const TCHAR* Glass = TEXT("SideLeft"), const TCHAR* Zone = TEXT("Left"), const TCHAR* Secondary = TEXT(""),
+		const TCHAR* CarId = TEXT("SportsCar"))
+	{
+		FDNCarGlassRow R;
+		R.CarId = CarId;
+		R.Glass = Glass;
+		R.Zone = Zone;
+		R.SecondaryZone = Secondary;
+		R.CrackFrom = 0.30f;
+		R.BurstDamage = 0.60f;
+		R.BurstDeltaVMs = 12.0f;
+		return R;
+	}
+
 	template <typename EntryType, typename RowType>
 	EntryType Entry(const RowType& Row, const TCHAR* Id = TEXT("padrao"))
 	{
