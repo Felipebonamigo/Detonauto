@@ -255,6 +255,10 @@ melhor e ele quer cinco modos.
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
 
+**Rumo (16 out, decisão do Felipe):** carros nacionais pausados (Cuiabano em andamento, `Tools/Blender/make_cuiabano.py`); a prioridade
+é uma fatia jogável com carro, pista de cidade, corrida com takedown, Crash, derby e arremesso. Desenho a aprovar em
+`docs/fatia-jogavel.md`.
+
 **Maior buraco visual que resta (revisão do lote 18):** o carro de tráfego é uma caixa
 colorida. Batida no tráfego não dá para o Felipe julgar assim. O carro de verdade vem com o
 City Sample Vehicles (lote 20); o download no Fab é do Felipe.
