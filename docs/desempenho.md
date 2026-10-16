@@ -457,6 +457,8 @@ e +0,6 ms de Game. O contrato pede no máximo +1,5 ms de GPU no p95: está bem d
 **Limites desta medição:**
 - O número junta o dano (peças voando, vidros, restrições) com os efeitos. Para isolar o Niagara, tirei `Content/Detonauto/Effects` do
   caminho e repeti, mas as 4 rodadas foram descartadas pelo próprio script: outro projeto (AgeOfEarth) abriu um Unreal no meio. Os
-  números dessas rodadas não valem e ficaram de fora. Repetir com o PC livre.
+  números dessas rodadas não valem e ficaram de fora. Uma segunda tentativa, alternando com e sem os assets, também saiu distorcida
+  (Frame de 8 a 14 ms, outro Unreal abrindo e fechando). Repetir com o PC livre, e de preferência por uma chave no jogo em vez de
+  mover a pasta de assets.
 - Não entram a fumaça de pneu do jogador, a câmera de batida dentro da fumaça (item 7 do contrato) nem faíscas (só disparam em batida
   real, não pelo `DNZone`). A GPU de uma batida real com faíscas e a câmera dentro da fumaça segue sem medida.
