@@ -255,6 +255,10 @@ melhor e ele quer cinco modos.
    é o caminho para a cidade e o carro finais (`docs/lookdev.md`). O carro dele
    passa pelo `Tools/Unreal/damage-body.ps1` para ganhar os alvos.
 
+**Carros nacionais (16 out, decisão do Felipe):** o Speed Tchê faz primeiro os mesmos carros, com desenho parecido ao do Detonauto, só que
+cartunizado (aqui é realismo). Esperar o desenho de lá e reaproveitar o que for comum (proporções, nomes, divisão em peças, moldes no
+`acervo-3d`) em vez de modelar às cegas. O Cuiabano daqui fica parado no que já foi commitado.
+
 **Rumo (16 out, decisão do Felipe):** carros nacionais pausados (Cuiabano em andamento, `Tools/Blender/make_cuiabano.py`); a prioridade
 é uma fatia jogável com carro, pista de cidade, corrida com takedown, Crash, derby e arremesso. Desenho a aprovar em
 `docs/fatia-jogavel.md`.
