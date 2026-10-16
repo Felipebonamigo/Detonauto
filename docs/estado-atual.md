@@ -266,6 +266,16 @@ Pendências de design (decidir com playtest, não fazer agora):
   (prata). O modo do tráfego não pode decidir a medalha. Investigar de onde vem a
   diferença: massa efetiva do Rail acordado, atrito, tempo para acordar e quanto dano
   cada carro recebe. Igualar, ou explicar e escolher um modo só para o Crash.
+  - **Leitura do código (16 out; hipótese, não medida):** os eventos de impacto são parecidos
+    (10 962 no Rail, 9 625 no Physics), então a diferença está no dano por impacto, não na
+    contagem. O `Physics` de todos mantém a velocidade de cada carro a cada quadro até o
+    primeiro contato (`bMaintainSpeed`, `ADNTrafficVehicle::Tick`) e **ignora o "seguir o
+    carro da frente"** (`FollowSpeed`, só no Rail). No relatório, os carros acordados andam a
+    29,7 m/s no Physics e a 7,7 m/s no Rail. Velocidade de aproximação maior dá Δv maior e
+    dano (e pontos) muito maiores. Massa e atrito são os mesmos nos dois (a massa vem do mesmo
+    `MassKg` no acordar). Se for isso, o Physics de todos nunca foi um modo de jogo, só um teste
+    de custo, e o Rail é o que vale para o Crash; falta provar com um log por carro (Δv do
+    primeiro impacto e pontos, por modo) antes de fixar as medalhas.
 
 - A 130 km/h a rodada rende MENOS que a 100 (o carro é desviado no primeiro
   impacto): o contrário do que um arcade quer. Alavanca provável: proporção de
