@@ -96,13 +96,19 @@ def new_mesh_object(name, bm, mats):
 
 
 def box_grid(nx, ny, nz):
-    """Caixa de [-1,1] x [-1,1] x [0,1] com nx x ny x nz divisões (u, s, v), como bmesh."""
+    """Caixa de [-1,1] x [-1,1] x [0,1] com nx x ny x nz divisões (u, s, v), como bmesh. Cada eixo tem a sua contagem: o corte dos arcos
+    das rodas pede malha fina ao longo do carro (X) e da altura (Z) e grossa na largura (Y)."""
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=2.0)
     for v in bm.verts:
         v.co.z = (v.co.z + 1.0) * 0.5
-    cuts = max(nx, ny, nz) - 1
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=cuts, use_grid_fill=True)
+    for axis, n in ((0, nx), (1, ny), (2, nz)):
+        if n < 2:
+            continue
+        # arestas paralelas ao eixo: as que só mudam nessa coordenada
+        edges = [e for e in bm.edges if abs(e.verts[0].co[axis] - e.verts[1].co[axis]) > 1e-6
+                 and all(abs(e.verts[0].co[o] - e.verts[1].co[o]) < 1e-6 for o in range(3) if o != axis)]
+        bmesh.ops.subdivide_edges(bm, edges=edges, cuts=n - 1, use_grid_fill=True)
     return bm
 
 
@@ -129,7 +135,7 @@ def body_halfwidth(x, v):
 def build_lower_body():
     p = PARAMS
     half = p["length"] / 2.0
-    bm = box_grid(34, 12, 12)
+    bm = box_grid(60, 10, 14)
     for v in bm.verts:
         u, s, t = v.co.x, v.co.y, v.co.z
         x = u * half
@@ -142,7 +148,7 @@ def build_lower_body():
 
 def build_cabin():
     p = PARAMS
-    bm = box_grid(26, 10, 10)
+    bm = box_grid(30, 10, 10)
     z0 = p["belt"] - 0.01
     for v in bm.verts:
         u, s, t = v.co.x, v.co.y, v.co.z
@@ -155,8 +161,15 @@ def build_cabin():
     return bm
 
 
-def bevel_sharp(bm, width=0.04, segments=2, angle_deg=35.0):
-    sharp = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0.0) > math.radians(angle_deg)]
+def near_arch(co, margin=0.07):
+    """Perto de um arco de roda (no plano X-Z): o chanfro não mexe aí, o friso de para-lama cobre a borda."""
+    p = PARAMS
+    return any((co.x - xc) ** 2 + (co.z - p["wheel_r"]) ** 2 < (p["arch_r"] + margin) ** 2 for xc in (p["wheel_x_front"], p["wheel_x_rear"]))
+
+
+def bevel_sharp(bm, width=0.04, segments=2, angle_deg=35.0, skip_arches=False):
+    sharp = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0.0) > math.radians(angle_deg)
+             and not (skip_arches and near_arch((e.verts[0].co + e.verts[1].co) / 2))]
     bmesh.ops.bevel(bm, geom=sharp, offset=width, segments=segments, profile=0.6, affect="EDGES")
 
 
@@ -184,7 +197,8 @@ def make_windows(bm, mat_index_glass):
             glass.append(f)
     for f in glass:
         f.material_index = mat_index_glass
-    ret = bmesh.ops.inset_region(bm, faces=glass, thickness=0.045, depth=-0.006, use_even_offset=True)
+    # use_even_offset estica espetos nos cantos pontudos do para-brisa (visto na captura); sem ele o recorte fica reto
+    ret = bmesh.ops.inset_region(bm, faces=glass, thickness=0.045, depth=-0.006, use_even_offset=False)
     return glass
 
 
@@ -229,6 +243,26 @@ def ribbon(name, points, width, mat, lift=0.0015):
     return new
 
 
+def tube(name, points, radius, sides, mat):
+    """Tubo redondo ao longo de uma linha (o friso de plástico do para-lama). Anéis perpendiculares à linha, com as pontas fechadas."""
+    bm = bmesh.new()
+    rings = []
+    pts = [Vector(q) for q in points]
+    for i, a in enumerate(pts):
+        d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+        ref = Vector((0, 1, 0)) if abs(d.y) < 0.9 else Vector((1, 0, 0))
+        n1 = d.cross(ref).normalized()
+        n2 = d.cross(n1).normalized()
+        rings.append([bm.verts.new(a + (n1 * math.cos(2 * math.pi * k / sides) + n2 * math.sin(2 * math.pi * k / sides)) * radius) for k in range(sides)])
+    for i in range(len(rings) - 1):
+        for k in range(sides):
+            bm.faces.new((rings[i][k], rings[i][(k + 1) % sides], rings[i + 1][(k + 1) % sides], rings[i + 1][k]))
+    bm.faces.new(rings[0])
+    bm.faces.new(rings[-1][::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return new_mesh_object(name, bm, [mat])
+
+
 def side_line(x_of_v, z0, z1, sign, steps=14):
     """Pontos sobre a lateral da carroceria baixa: x constante em cada altura (função x_of_v) de z0 a z1."""
     p = PARAMS
@@ -269,13 +303,13 @@ def wheel_wells():
         zc = p["wheel_r"]
         for sgn in (1, -1):
             pts = []
-            for i in range(25):
-                a = math.radians(lerp(8.0, 172.0, i / 24))
-                x = xc + math.cos(a) * (p["arch_r"] + 0.028)
-                z = zc + math.sin(a) * (p["arch_r"] + 0.028)
+            for i in range(33):
+                a = math.radians(lerp(2.0, 178.0, i / 32))
+                x = xc + math.cos(a) * (p["arch_r"] + 0.012)
+                z = zc + math.sin(a) * (p["arch_r"] + 0.012)
                 v = (z - p["ground"]) / max(1e-6, body_top(x) - p["ground"])
-                pts.append((x, sgn * (body_halfwidth(x, min(1.0, v)) + 0.011), z))  # a fórmula erra a superfície real por alguns mm (chanfro, corte)
-            out.append(ribbon("friso_arco", pts, 0.062, "Chassi", lift=0.0))
+                pts.append((x, sgn * (body_halfwidth(x, min(1.0, v)) - 0.004), z))  # o tubo afunda um pouco na lataria: a emenda some
+            out.append(tube("friso_arco", pts, 0.021, 8, "Chassi"))
         # fundo do arco: meio cilindro (parte de cima) entre a roda e a carroceria, aberto
         bm = bmesh.new()
         segs = 24
@@ -364,7 +398,7 @@ def main():
     # o booleano deixa lascas e faces quase sem área nas bordas dos arcos: some com elas antes do chanfro
     bmesh.ops.dissolve_degenerate(lb, dist=0.004, edges=lb.edges[:])
     bmesh.ops.remove_doubles(lb, verts=lb.verts[:], dist=0.0015)
-    bevel_sharp(lb, 0.045, 2)
+    bevel_sharp(lb, 0.045, 2, skip_arches=True)
     bmesh.ops.recalc_face_normals(lb, faces=lb.faces[:])
     lb.to_mesh(body_obj.data)
     lb.free()
