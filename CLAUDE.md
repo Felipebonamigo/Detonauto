@@ -98,6 +98,13 @@ Nenhum asset entra no projeto sem uma linha em `docs/licencas.csv`.
   Meshy gratuito com crédito, e o que o Felipe criar.
 - **Proibido:** licenças NC ou ND, carros ou logos de marcas reais, silhuetas
   famosas copiadas e música gerada por IA.
+  - **Exceção decidida pelo Felipe (16/10/2026):** os carros de tráfego "nacionais"
+    (nomes do Speed Tchê: Cuiabano, Tupiniquim, Caipora...) podem ter a silhueta
+    **parecida de propósito** com carros brasileiros conhecidos. Continua proibido o
+    resto: nome de marca ou de modelo real, logo, emblema, grade com o desenho de
+    marca, placa real e qualquer texto de marca. Os nomes no jogo são sempre os
+    próprios. Se algum dia um carro chegar perto demais de um modelo real num detalhe
+    de assinatura (faróis, grade, vincos), mude o detalhe.
 - Marque `gerado_por_ia` em todo conteúdo gerado por IA que o jogador vê. A
   Steam exige essa declaração. Código escrito com o Claude não precisa.
 - Os pacotes completos do City Sample são enormes. Nunca adicione o pacote
