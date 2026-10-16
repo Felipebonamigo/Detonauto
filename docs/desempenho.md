@@ -454,6 +454,13 @@ peças e vidros (cacos), a frente passa a soltar fumaça escura e fogo. É o pio
 **Leitura:** contra os intactos, os destruídos com efeitos custam +0,44 a +0,48 ms de Frame, +0,09 a +0,10 ms de GPU (p95 +0,04 a +0,05 ms)
 e +0,6 ms de Game. O contrato pede no máximo +1,5 ms de GPU no p95: está bem dentro. As duas execuções ficaram a 0,04 ms uma da outra.
 
+**Niagara isolado (16 out, com o Age of Earth aberto, autorizado pelo Felipe):** mesmo cenário, 4 pares alternados com e sem
+`Content/Detonauto/Effects`. O outro Unreal ficou aberto o tempo todo, então o script marca todas as rodadas como descartadas e o
+Frame (7 a 15 ms) varia muito; duas rodadas "sem" deram GPU de 11 a 14 ms (placa dividida) e ficaram de fora. A GPU das demais: com
+efeitos 5,72 / 5,81 / 5,54 / 5,38 ms (média 5,61); sem efeitos 5,58 / 5,68 ms (média 5,63). **Leitura: o custo de GPU do Niagara
+nesse cenário é indistinguível do ruído (cerca de ±0,15 ms).** Combina com o +0,09 a +0,10 ms da medição limpa acima, que junta dano e
+efeitos, mas não prova um número menor. Evidência fraca; repetir com o PC livre se o custo vier a importar.
+
 **Limites desta medição:**
 - O número junta o dano (peças voando, vidros, restrições) com os efeitos. Para isolar o Niagara, tirei `Content/Detonauto/Effects` do
   caminho e repeti, mas as 4 rodadas foram descartadas pelo próprio script: outro projeto (AgeOfEarth) abriu um Unreal no meio. Os
