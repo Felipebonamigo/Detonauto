@@ -438,3 +438,25 @@ provisórias. Relatório completo em `Saved/Measure/20261015-022749/relatorio.tx
 2. Anote os quatro números parado e depois em velocidade.
 3. Repita com o carro novo da Sprint 4.
 4. Preencha a primeira linha da tabela acima e me mande.
+
+## Lote 19: efeitos de batida, 6 carros (16 out 2026)
+
+`lookdev-measure.ps1 -Scenario parado -Warmup 14 -Measure 6` (janela de 14 a 20 s), perfil `DN_AlvoPS5`, 1920x1080, o jogador mais 6
+estacionados com peças (`-DNParkedCars=6`). O dano entra a 14,5 s (`-DNParkedDamageAtS=14.5`, as 5 zonas em 1,0): cada carro solta
+peças e vidros (cacos), a frente passa a soltar fumaça escura e fogo. É o pior caso de efeitos do contrato, sem a câmera de batida.
+
+| Cenário | Frame média / p95 | Game média / p95 | GPU média / p95 | Física, linha do jogo | Quadros |
+|---|---|---|---|---|---|
+| 6 intactos (`-DNParkedDamage=0`) | 5,74 / 6,39 ms | 3,42 / 4,12 ms | 5,13 / 5,69 ms | 0,37 / 0,52 ms | 1046 em 6 s |
+| 6 destruídos aos 14,5 s, com os 9 sistemas (1) | 6,18 / 6,39 ms | 4,10 / 4,50 ms | 5,22 / 5,74 ms | 0,36 / 0,74 ms | 971 em 6 s |
+| idem (2) | 6,22 / 6,44 ms | 4,04 / 4,62 ms | 5,23 / 5,73 ms | 0,34 / 0,61 ms | 965 em 6 s |
+
+**Leitura:** contra os intactos, os destruídos com efeitos custam +0,44 a +0,48 ms de Frame, +0,09 a +0,10 ms de GPU (p95 +0,04 a +0,05 ms)
+e +0,6 ms de Game. O contrato pede no máximo +1,5 ms de GPU no p95: está bem dentro. As duas execuções ficaram a 0,04 ms uma da outra.
+
+**Limites desta medição:**
+- O número junta o dano (peças voando, vidros, restrições) com os efeitos. Para isolar o Niagara, tirei `Content/Detonauto/Effects` do
+  caminho e repeti, mas as 4 rodadas foram descartadas pelo próprio script: outro projeto (AgeOfEarth) abriu um Unreal no meio. Os
+  números dessas rodadas não valem e ficaram de fora. Repetir com o PC livre.
+- Não entram a fumaça de pneu do jogador, a câmera de batida dentro da fumaça (item 7 do contrato) nem faíscas (só disparam em batida
+  real, não pelo `DNZone`). A GPU de uma batida real com faíscas e a câmera dentro da fumaça segue sem medida.

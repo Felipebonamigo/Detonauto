@@ -1,8 +1,8 @@
 # Lote 19: efeitos de batida (Niagara)
 
 Contrato: [`regras-efeitos.md`](regras-efeitos.md). Em andamento desde 15 out 2026. Feito na sessão local: as notas da revisão do
-18b (trinca e vão), as regras puras, o CSV, a ligação no C++ e os 9 sistemas Niagara (seção "Montagem pelo MCP", no fim). **Falta o custo**
-com 6 carros e o Felipe jogar.
+18b (trinca e vão), as regras puras, o CSV, a ligação no C++ e os 9 sistemas Niagara (seção "Montagem pelo MCP", no fim). **Falta isolar o custo do Niagara**
+e o Felipe jogar (6 carros destruídos: +0,1 ms de GPU).
 
 ## O que existe
 
@@ -110,9 +110,9 @@ Capturas (sol por trás, 1920, sem HUD, exceto onde dito): `docs/img/efeitos-lot
 Lascas e cacos da primeira ao muro estão em quadros pequenos da folha `muro-100kmh-faiscas-cacos`.
 
 **O que não está feito:**
-- **Custo** com 6 carros no `DN_AlvoPS5` (item 7 do contrato). O `lookdev-measure.ps1` recusa com outro Unreal aberto e o Felipe estava
-  com o projeto Zombie aberto. Rodar quando o PC estiver livre: `-DNParkedCars=6` com `-DNParkedDamage=1` e `-DNParkedDamageAtS`.
-  Os efeitos ainda não têm número.
+- **Custo isolado do Niagara** e com a câmera de batida dentro da fumaça (item 7 do contrato). Medi 6 carros destruídos com os efeitos:
+  +0,09 a +0,10 ms de GPU contra 6 intactos (meta: até +1,5 ms no p95), mas o número inclui o dano e outro Unreal abriu no meio das
+  rodadas sem efeitos (`docs/desempenho.md`, lote 19). Repetir com o PC livre.
 - Captura do **raspão** do para-choque (só o log) e das **lascas** isoladas.
 - Texturas do Starter Content / Content Examples: não estão no PC. Usei a `T_soft_smoke` da própria engine (cópia
   `T_DNSoftSmoke`, linha em `licencas.csv`). Perguntar ao Felipe se quer baixar algo melhor.
