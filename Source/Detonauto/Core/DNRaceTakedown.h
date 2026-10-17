@@ -2,8 +2,8 @@
 // Core/Tests/DNRaceTakedown.spec.cpp. A qualificação e o tipo do takedown são de Core/DNTakedown (FDNTakedown).
 //
 // Decisões:
-//  W1 um rival está "batido" (condição 2 do takedown) quando o dano dele passa a destruído (FDNDamage, D12) dentro da janela depois do
-//     contato; o contato é do jogador no rival;
+//  W1 um rival está "batido" (condição 2 do takedown) quando o dano total dele (FDNDamage::TotalDamage) sobe pelo menos MinGain desde o
+//     contato do jogador, ou quando ele fica destruído (D12); dano não finito não conta;
 //  W2 o rival derrubado fica parado, destroçado, por WreckSeconds; passado esse tempo volta à pista, inteiro, no ponto da linha onde
 //     estava (o Step devolve verdadeiro uma vez, no quadro em que ele volta);
 //  W3 um novo derrubar enquanto já está destroçado não reinicia a contagem;
@@ -21,6 +21,9 @@ struct FDNWreckState
 
 struct FDNRaceTakedown
 {
+	/** W1: o dano total do rival subiu MinGain ou mais entre o contato (DamageBefore) e agora (DamageNow). */
+	static bool RivalCrashed(float DamageBefore, float DamageNow, bool bDestroyed, float MinGain);
+
 	/** W2 a W4: anda um quadro. bWreckNow marca o instante em que o rival foi derrubado. Devolve verdadeiro no quadro em que ele volta à pista. */
 	static bool Step(FDNWreckState& State, float DeltaS, bool bWreckNow, float WreckSeconds);
 };

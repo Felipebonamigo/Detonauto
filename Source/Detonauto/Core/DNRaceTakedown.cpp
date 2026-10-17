@@ -1,5 +1,18 @@
 #include "Core/DNRaceTakedown.h"
 
+bool FDNRaceTakedown::RivalCrashed(float DamageBefore, float DamageNow, bool bDestroyed, float MinGain)
+{
+	if (bDestroyed)
+	{
+		return true;
+	}
+	if (!FMath::IsFinite(DamageBefore) || !FMath::IsFinite(DamageNow) || !FMath::IsFinite(MinGain))
+	{
+		return false;
+	}
+	return DamageNow - DamageBefore >= MinGain;
+}
+
 bool FDNRaceTakedown::Step(FDNWreckState& State, float DeltaS, bool bWreckNow, float WreckSeconds)
 {
 	// W3: já destroçado, um novo takedown não reinicia a contagem

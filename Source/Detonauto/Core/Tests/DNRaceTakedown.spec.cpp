@@ -13,6 +13,37 @@ END_DEFINE_SPEC(FDNRaceTakedownSpec)
 
 void FDNRaceTakedownSpec::Define()
 {
+	Describe("Rival batido (W1)", [this]()
+	{
+		It("o dano total subiu o minimo desde o contato", [this]()
+		{
+			TestTrue("exato 0,25", FDNRaceTakedown::RivalCrashed(0.1f, 0.35f, false, 0.25f));
+			TestTrue("mais", FDNRaceTakedown::RivalCrashed(0.0f, 0.6f, false, 0.25f));
+			TestFalse("menos", FDNRaceTakedown::RivalCrashed(0.1f, 0.34f, false, 0.25f));
+			TestFalse("sem ganho", FDNRaceTakedown::RivalCrashed(0.3f, 0.3f, false, 0.25f));
+		});
+
+		It("destruido vale mesmo sem ganho medido", [this]()
+		{
+			TestTrue("destruido", FDNRaceTakedown::RivalCrashed(0.5f, 0.5f, true, 0.25f));
+		});
+
+		It("dano que desce (carro reposto) nao conta como ganho", [this]()
+		{
+			TestFalse("desceu", FDNRaceTakedown::RivalCrashed(0.6f, 0.0f, false, 0.25f));
+		});
+
+		It("valor nao finito nao conta", [this]()
+		{
+			TestFalse("antes NaN", FDNRaceTakedown::RivalCrashed(NaNf, 0.9f, false, 0.25f));
+			TestFalse("agora NaN", FDNRaceTakedown::RivalCrashed(0.0f, NaNf, false, 0.25f));
+			TestFalse("minimo NaN", FDNRaceTakedown::RivalCrashed(0.0f, 0.9f, false, NaNf));
+			TestFalse("antes -infinito", FDNRaceTakedown::RivalCrashed(-std::numeric_limits<float>::infinity(), 0.1f, false, 0.25f));
+			TestFalse("agora infinito", FDNRaceTakedown::RivalCrashed(0.0f, std::numeric_limits<float>::infinity(), false, 0.25f));
+			TestFalse("minimo -infinito", FDNRaceTakedown::RivalCrashed(0.0f, 0.1f, false, -std::numeric_limits<float>::infinity()));
+		});
+	});
+
 	Describe("Rival destrocado (W2 a W4)", [this]()
 	{
 		It("sem derrubar, nada acontece", [this]()

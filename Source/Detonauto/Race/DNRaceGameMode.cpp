@@ -4,6 +4,9 @@
 #include "Vehicle/DNVehicleArena.h"
 #include "Core/DNCourse.h"
 #include "Core/DNRivalDriver.h"
+#include "Core/DNTakedown.h"
+#include "Core/DNDamage.h"
+#include "Vehicle/DNTurboComponent.h"
 #include "Core/DNGameDataSubsystem.h"
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -41,6 +44,12 @@ void ADNRaceGameMode::InitGame(const FString& MapName, const FString& Options, F
 	FParse::Value(Cmd, TEXT("DNRivals="), RivalLimit);
 	FParse::Value(Cmd, TEXT("DNRaceCountdownS="), CountdownS);
 	bAuto = FParse::Param(Cmd, TEXT("DNRaceAuto"));
+	bHunt = FParse::Param(Cmd, TEXT("DNRaceHunt"));
+	if (bHunt)
+	{
+		AutoDriver.StraightKmh = 200.0f;
+		AutoDriver.CornerKmh = 80.0f;
+	}
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const UDNGameDataSubsystem* Data = GameInstance ? GameInstance->GetSubsystem<UDNGameDataSubsystem>() : nullptr;
@@ -140,6 +149,15 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 		return;
 	}
 	RaceTime += DeltaSeconds;
+	if (!bPlayerHitBound)
+	{
+		bPlayerHitBound = true;
+		Vehicle->GetMesh()->OnComponentHit.AddUniqueDynamic(this, &ADNRaceGameMode::OnPlayerHit);
+		if (const UDNGameDataSubsystem* Data = GetGameInstance() ? GetGameInstance()->GetSubsystem<UDNGameDataSubsystem>() : nullptr)
+		{
+			TakedownConfig = Data->GetTakedownConfig();
+		}
+	}
 	const FVector Pos = Vehicle->GetActorLocation();
 	const float Progress = FDNCourse::Progress(Course->GetPoints(), Pos, Player.ProgressCm, WindowBackCm, WindowAheadCm);
 	const bool bJustFinished = FDNRace::Step(Player, Progress, RaceTime, Course->GetLengthCm());
@@ -195,6 +213,7 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 		}
 	}
 	TickRivals(DeltaSeconds);
+	TickTakedowns(*Vehicle);
 	UpdateHud(*Vehicle);
 }
 
@@ -206,6 +225,25 @@ void ADNRaceGameMode::TickRivals(float DeltaSeconds)
 		ADNVehicle* Car = R.Car.Get();
 		if (!Car)
 		{
+			continue;
+		}
+		// destroçado (dano passou do limite, D12): fica parado por WreckSeconds e volta à pista, inteiro, no ponto da linha onde estava
+		if (FDNRaceTakedown::Step(R.Wreck, DeltaSeconds, Car->GetDamage().bDestroyed || R.bWreckNow, WreckSeconds))
+		{
+			const FVector Back = FDNCourse::LocationAt(Points, R.State.ProgressCm);
+			const FVector Dir = (FDNCourse::LocationAt(Points, R.State.ProgressCm + 100.0f) - Back).GetSafeNormal2D();
+			Car->RestartAt(FTransform(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.0f), FVector(Back.X, Back.Y, 120.0f)));
+			UE_LOG(LogDetonauto, Display, TEXT("DNRace: rival %s volta à pista aos %.1f s no ponto %.0f m"), *R.Name, RaceTime, R.State.ProgressCm / 100.0f);
+		}
+		R.bWreckNow = false;
+		if (R.Wreck.bWrecked)
+		{
+			if (UChaosWheeledVehicleMovementComponent* Hold = Cast<UChaosWheeledVehicleMovementComponent>(Car->GetVehicleMovement()))
+			{
+				Hold->SetThrottleInput(0.0f);
+				Hold->SetBrakeInput(0.3f);
+				Hold->SetSteeringInput(0.0f);
+			}
 			continue;
 		}
 		const FVector Pos = Car->GetActorLocation();
@@ -270,8 +308,29 @@ void ADNRaceGameMode::DriveAuto(ADNVehicle& Vehicle) const
 	const float LookAheadCm = FDNRivalDriver::LookAheadCm(SpeedKmh, AutoDriver);
 	const FVector Pos = Vehicle.GetActorLocation();
 	const FVector Forward = Vehicle.GetActorForwardVector();
-	const float Near = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, Player.ProgressCm + LookAheadCm));
-	const float Far = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, Player.ProgressCm + 2.0f * LookAheadCm));
+	FVector NearTarget = FDNCourse::LocationAt(Points, Player.ProgressCm + LookAheadCm);
+	FVector FarTarget = FDNCourse::LocationAt(Points, Player.ProgressCm + 2.0f * LookAheadCm);
+	if (bHunt)
+	{
+		// só para provar o takedown: mira no rival mais perto, à frente e a menos de 80 m, em vez de seguir a linha
+		double Best = 8000.0;
+		for (const FRival& R : Rivals)
+		{
+			const ADNVehicle* Car = R.Car.Get();
+			if (!Car || R.Wreck.bWrecked || R.State.ProgressCm <= Player.ProgressCm)
+			{
+				continue;
+			}
+			const double D = FVector::Dist2D(Car->GetActorLocation(), Pos);
+			if (D < Best)
+			{
+				Best = D;
+				NearTarget = FarTarget = Car->GetActorLocation();
+			}
+		}
+	}
+	const float Near = FDNCourse::HeadingErrorDeg(Pos, Forward, NearTarget);
+	const float Far = FDNCourse::HeadingErrorDeg(Pos, Forward, FarTarget);
 	const FDNDriveCommand Cmd = FDNRivalDriver::Command(Near, Far, SpeedKmh, AutoDriver);
 	Move->SetSteeringInput(FMath::Clamp(Cmd.Steer * Vehicle.AppliedSteeringGain, -1.0f, 1.0f));
 	Move->SetThrottleInput(Cmd.Throttle);
@@ -295,6 +354,100 @@ void ADNRaceGameMode::UpdateHud(const ADNVehicle& Vehicle) const
 		All.Add(R.State);
 	}
 	GEngine->AddOnScreenDebugMessage(9303, 0.0f, FColor::Cyan, FString::Printf(TEXT("Posicao: %d / %d"), FDNRace::Position(All, 0), All.Num()), false, FVector2D(Scale));
+	GEngine->AddOnScreenDebugMessage(9304, 0.0f, FColor::Orange, FString::Printf(TEXT("Takedowns: %d     Turbo: %.0f"), Takedowns, Vehicle.GetTurbo() ? Vehicle.GetTurbo()->GetBar() : 0.0f), false, FVector2D(Scale));
+	if (GetWorld()->GetTimeSeconds() - LastTakedownAt < 3.0)
+	{
+		GEngine->AddOnScreenDebugMessage(9305, 0.0f, FColor::Red, LastTakedownText, false, FVector2D(3.0f));
+	}
 	GEngine->AddOnScreenDebugMessage(9302, 0.0f, FColor::Yellow,
 		FString::Printf(TEXT("Percurso: %.0f de %.0f m (%.0f%%)     Ponto %d/%d"), Player.ProgressCm / 100.0f, Length / 100.0f, Length > 0.0f ? 100.0f * Player.ProgressCm / Length : 0.0f, NextMark, Course->GetMarks().Num() - 1), false, FVector2D(Scale));
+}
+
+void ADNRaceGameMode::OnPlayerHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	const ADNVehicle* PlayerCar = FindVehicle();
+	if (!PlayerCar || !OtherActor)
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (int32 i = 0; i < Rivals.Num(); ++i)
+	{
+		if (Rivals[i].Car.Get() != OtherActor || Rivals[i].Wreck.bWrecked)
+		{
+			continue;
+		}
+		// um toque só abre uma janela; os contatos seguintes da mesma batida (quadros seguidos) não abrem outra
+		for (const FPendingContact& P : Pending)
+		{
+			if (P.RivalIndex == i && Now - P.Time < TakedownConfig.RivalCrashWindowSeconds)
+			{
+				return;
+			}
+		}
+		const FVector RivalVelocity = PrevRivalVelocity.IsValidIndex(i) ? PrevRivalVelocity[i] : OtherActor->GetVelocity();
+		FPendingContact C;
+		C.RivalIndex = i;
+		C.Time = Now;
+		C.RelativeSpeedKmh = static_cast<float>((PrevPlayerVelocity - RivalVelocity).Size()) * 0.036f;
+		C.RivalDamageBefore = FDNDamage::TotalDamage(Rivals[i].Car->GetDamage());
+		C.Classify.PlayerForward = PlayerCar->GetActorForwardVector();
+		C.Classify.RivalForward = OtherActor->GetActorForwardVector();
+		C.Classify.ContactNormal = (OtherActor->GetActorLocation() - PlayerCar->GetActorLocation()).GetSafeNormal2D();
+		C.Classify.PlayerHeightAboveRivalCm = static_cast<float>(PlayerCar->GetActorLocation().Z - OtherActor->GetActorLocation().Z);
+		C.Classify.bPlayerFalling = PlayerCar->GetVelocity().Z < -50.0f;
+		Pending.Add(C);
+		UE_LOG(LogDetonauto, Display, TEXT("DNRace: toque no rival %s a %.0f km/h de velocidade relativa"), *Rivals[i].Name, C.RelativeSpeedKmh);
+		return;
+	}
+}
+
+void ADNRaceGameMode::TickTakedowns(ADNVehicle& Vehicle)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (int32 k = Pending.Num() - 1; k >= 0; --k)
+	{
+		const FPendingContact& C = Pending[k];
+		const ADNVehicle* Rival = Rivals.IsValidIndex(C.RivalIndex) ? Rivals[C.RivalIndex].Car.Get() : nullptr;
+		const float Since = static_cast<float>(Now - C.Time);
+		if (Rival && FDNRaceTakedown::RivalCrashed(C.RivalDamageBefore, FDNDamage::TotalDamage(Rival->GetDamage()), Rival->GetDamage().bDestroyed, MinCrashDamageGain))
+		{
+			FDNTakedownContact Contact;
+			Contact.RelativeSpeedKmh = C.RelativeSpeedKmh;
+			Contact.bRivalCrashed = true;
+			Contact.RivalCrashSecondsAfterContact = Since;
+			Contact.bPlayerDestroyed = Vehicle.GetDamage().bDestroyed;
+			Contact.PlayerDestroyedSecondsAfterContact = Since;
+			if (FDNTakedown::Qualifies(TakedownConfig, Contact))
+			{
+				const EDNTakedownType Type = FDNTakedown::Classify(TakedownConfig, C.Classify);
+				++Takedowns;
+				LastTakedownAt = Now;
+				Rivals[C.RivalIndex].bWreckNow = true;
+				LastTakedownText = FString::Printf(TEXT("TAKEDOWN! %s (%s)"), *Rivals[C.RivalIndex].Name, FDNTakedown::ToString(Type));
+				if (UDNTurboComponent* Turbo = Vehicle.GetTurbo())
+				{
+					FDNTurboFrameInput Fill;
+					Fill.bTakedown = true;
+					Turbo->Step(Fill);
+				}
+				UE_LOG(LogDetonauto, Display, TEXT("DNRace: TAKEDOWN %d: %s, tipo %s, %.0f km/h relativos, %.2f s depois do toque; turbo %.0f"), Takedowns, *Rivals[C.RivalIndex].Name, FDNTakedown::ToString(Type), C.RelativeSpeedKmh, Since, Vehicle.GetTurbo() ? Vehicle.GetTurbo()->GetBar() : 0.0f);
+				Pending.RemoveAt(k);
+				continue;
+			}
+			UE_LOG(LogDetonauto, Display, TEXT("DNRace: rival %s bateu mas o takedown não vale (relativa %.0f km/h, mínimo %.0f; jogador destruído: %d)"), *Rivals[C.RivalIndex].Name, C.RelativeSpeedKmh, TakedownConfig.MinRelativeSpeedKmh, Vehicle.GetDamage().bDestroyed ? 1 : 0);
+			Pending.RemoveAt(k);
+			continue;
+		}
+		if (Since > TakedownConfig.RivalCrashWindowSeconds)
+		{
+			Pending.RemoveAt(k);
+		}
+	}
+	PrevPlayerVelocity = Vehicle.GetVelocity();
+	PrevRivalVelocity.SetNum(Rivals.Num());
+	for (int32 i = 0; i < Rivals.Num(); ++i)
+	{
+		PrevRivalVelocity[i] = Rivals[i].Car.IsValid() ? Rivals[i].Car->GetVelocity() : FVector::ZeroVector;
+	}
 }

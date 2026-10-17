@@ -1047,6 +1047,11 @@ void ADNVehicle::ClearDents()
 
 void ADNVehicle::DNRestart()
 {
+	RestartAt(StartTransform);
+}
+
+void ADNVehicle::RestartAt(const FTransform& Where)
+{
 	// fora da câmera de batida e da câmera lenta
 	CrashCam = FDNCrashCamState();
 	bOrbitPending = false;
@@ -1056,7 +1061,7 @@ void ADNVehicle::DNRestart()
 		AppliedTimeScale = 1.0f;
 	}
 	// o carro na largada, parado e em ponto morto, como ao nascer; a janela de batida aberta não vira dano depois do salto
-	SetActorTransform(StartTransform, false, nullptr, ETeleportType::ResetPhysics);
+	SetActorTransform(Where, false, nullptr, ETeleportType::ResetPhysics);
 	GetMesh()->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	GetMesh()->SetPhysicsAngularVelocityInRadians(FVector::ZeroVector);
 	Chaos()->ResetVehicleState();

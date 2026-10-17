@@ -17,6 +17,8 @@
 #include "Vehicle/DNVehicleTestGameMode.h"
 #include "Core/DNRace.h"
 #include "Core/DNRivalDriver.h"
+#include "Core/DNRaceTakedown.h"
+#include "Core/DNTakedown.h"
 #include "DNRaceGameMode.generated.h"
 
 class ADNCourseActor;
@@ -40,6 +42,11 @@ protected:
 private:
 	void DriveAuto(ADNVehicle& Vehicle) const;
 	void TickRivals(float DeltaSeconds);
+	void TickTakedowns(ADNVehicle& Vehicle);
+
+	/** O jogador tocou em algo: se foi num rival, abre uma janela de takedown (FDNTakedown). */
+	UFUNCTION()
+	void OnPlayerHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 	void LogStandings(const TCHAR* Why) const;
 	void UpdateHud(const ADNVehicle& Vehicle) const;
 
@@ -60,7 +67,36 @@ private:
 		FString Name;
 		FDNRivalConfig Config;
 		FDNRacerState State;
+		FDNWreckState Wreck;
+		/** Um takedown acabou de derrubá-lo: o próximo quadro o põe em destroço. */
+		bool bWreckNow = false;
 	};
+
+	/** Um toque do jogador num rival, esperando ele ser derrubado dentro da janela (condição 2 do takedown). */
+	struct FPendingContact
+	{
+		int32 RivalIndex = -1;
+		double Time = 0.0;
+		float RelativeSpeedKmh = 0.0f;
+		/** Dano total do rival no instante do toque: o takedown pede que ele suba MinCrashDamageGain dentro da janela. */
+		float RivalDamageBefore = 0.0f;
+		FDNTakedownClassifyInput Classify;
+	};
+	TArray<FPendingContact> Pending;
+	FDNTakedownConfig TakedownConfig;
+	/** Velocidades do quadro anterior: no contato a física já mexeu nas atuais. */
+	FVector PrevPlayerVelocity = FVector::ZeroVector;
+	TArray<FVector> PrevRivalVelocity;
+	bool bPlayerHitBound = false;
+	int32 Takedowns = 0;
+	double LastTakedownAt = -100.0;
+	FString LastTakedownText;
+	/** Quanto tempo o rival derrubado fica destroçado antes de voltar (W2). */
+	float WreckSeconds = 3.0f;
+	// atalho: o dano que "bate" o rival (W1) é uma constante; vai para Data/Takedown.csv se o playtest pedir ajuste
+	float MinCrashDamageGain = 0.05f; // dano total é a média de 5 zonas: 0,05 é uma zona com ~0,25 de dano
+	/** -DNRaceHunt: o piloto automático do jogador corre mais que os rivais (200 km/h na reta), para bater neles e provar o takedown. */
+	bool bHunt = false;
 	TArray<FRival> Rivals;
 	/** Quantos rivais correm (-DNRivals=N, até o número de linhas de Data/Rivals.csv; padrão todos). */
 	int32 RivalLimit = 99;

@@ -234,6 +234,9 @@ public:
 	UFUNCTION(Exec)
 	void DNRestart();
 
+	/** O mesmo reinício, mas no ponto dado (o rival derrubado volta à pista no ponto da linha onde estava). */
+	void RestartAt(const FTransform& Where);
+
 	/** Batida em peça de rua que quebrou (lote 17c): o dano de sempre com a variação de velocidade da regra, sem contar como batida
 	 *  do jogador na rodada de Crash nem para a câmera de batida. */
 	void ApplyPropImpact(float DeltaVMs, const FVector& WorldPoint);
