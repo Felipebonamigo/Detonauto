@@ -33,6 +33,9 @@ public:
 	/** Onde e virado para onde o carro nasce: no início da linha, de frente para o primeiro trecho. */
 	FTransform StartTransform(float HeightCm) const;
 
+	/** A vaga Slot da grade de largada: atrás da linha de largada, uma fileira a cada 6 m, em duas colunas (±3 m), vaga 0 na frente. */
+	FTransform GridTransform(int32 Slot, float HeightCm) const;
+
 private:
 	/** Calçada e meio-fio do City Sample dos dois lados da pista, em peças retas ao longo da linha (passo a2). Sem os assets: nada. */
 	void AddSidewalks();
@@ -47,6 +50,9 @@ private:
 	TArray<FVector> Points;
 	float WidthCm = 0.0f;
 	float LengthCm = 0.0f;
+	/** A linha da geometria: a do jogo com um trecho de 40 m antes da largada, onde fica a grade. O progresso e as marcas usam Points. */
+	TArray<FVector> GeoPoints;
+	float GeoLengthCm = 0.0f;
 	TArray<float> Marks;
 
 	UPROPERTY(VisibleAnywhere, Category="Percurso")

@@ -20,6 +20,7 @@
 #include "DNRaceGameMode.generated.h"
 
 class ADNCourseActor;
+class ADNVehicle;
 
 UCLASS()
 class DETONAUTO_API ADNRaceGameMode : public ADNVehicleTestGameMode
@@ -38,6 +39,8 @@ protected:
 
 private:
 	void DriveAuto(ADNVehicle& Vehicle) const;
+	void TickRivals(float DeltaSeconds);
+	void LogStandings(const TCHAR* Why) const;
 	void UpdateHud(const ADNVehicle& Vehicle) const;
 
 	UPROPERTY(Transient)
@@ -49,6 +52,21 @@ private:
 	/** Como o piloto automático dirige (hoje os valores padrão; os níveis dos rivais vêm de Data/Rivals.csv). */
 	FDNRivalConfig AutoDriver;
 	float MaxSeconds = 240.0f;
+
+	/** Um rival: o carro, o nível do piloto (Data/Rivals.csv) e o estado na corrida. */
+	struct FRival
+	{
+		TWeakObjectPtr<ADNVehicle> Car;
+		FString Name;
+		FDNRivalConfig Config;
+		FDNRacerState State;
+	};
+	TArray<FRival> Rivals;
+	/** Quantos rivais correm (-DNRivals=N, até o número de linhas de Data/Rivals.csv; padrão todos). */
+	int32 RivalLimit = 99;
+	/** Segundos entre o começo e a largada (-DNRaceCountdownS): ninguém acelera antes. */
+	float CountdownS = 3.0f;
+	float SinceStartS = 0.0f;
 
 	FDNRacerState Player;
 	float RaceTime = 0.0f;

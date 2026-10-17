@@ -131,10 +131,15 @@ void ADNCourseActor::Build(const TArray<FVector>& InPoints, float InWidthCm, flo
 	{
 		return;
 	}
+	// trecho antes da largada para a grade (40 m, na direÃ§Ã£o do primeiro trecho, ao contrÃ¡rio)
+	constexpr float RunUpCm = 4000.0f;
+	GeoPoints = Points;
+	GeoPoints.Insert(Points[0] - (Points[1] - Points[0]).GetSafeNormal2D() * RunUpCm, 0);
+	GeoLengthCm = FDNCourse::Length(GeoPoints);
 
 	// chão: cobre a caixa da linha com uma margem, com o atrito do piso da arena de teste (os presets do carro foram medidos nele)
-	FVector Min = Points[0], Max = Points[0];
-	for (const FVector& P : Points)
+	FVector Min = GeoPoints[0], Max = GeoPoints[0];
+	for (const FVector& P : GeoPoints)
 	{
 		Min = Min.ComponentMin(P);
 		Max = Max.ComponentMax(P);
@@ -153,10 +158,10 @@ void ADNCourseActor::Build(const TArray<FVector>& InPoints, float InWidthCm, flo
 	}
 
 	// asfalto: uma caixa por trecho da linha
-	for (int32 i = 1; i < Points.Num(); ++i)
+	for (int32 i = 1; i < GeoPoints.Num(); ++i)
 	{
-		const FVector A = Points[i - 1];
-		const FVector B = Points[i];
+		const FVector A = GeoPoints[i - 1];
+		const FVector B = GeoPoints[i];
 		const FVector Mid = (A + B) * 0.5f;
 		const float Len = static_cast<float>(FVector::Dist2D(A, B));
 		const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(B.Y - A.Y, B.X - A.X));
@@ -238,11 +243,11 @@ void ADNCourseActor::AddSidewalks()
 		const float LocalYawFix = bAlongX ? 0.0f : -90.0f;
 		for (const float Sign : { -1.0f, 1.0f })
 		{
-			for (float S = 0.0f; S < LengthCm; S += PieceLen)
+			for (float S = 0.0f; S < GeoLengthCm; S += PieceLen)
 			{
-				const float Mid = FMath::Min(S + PieceLen * 0.5f, LengthCm);
-				const FVector P = FDNCourse::LocationAt(Points, Mid);
-				const FVector Dir = (FDNCourse::LocationAt(Points, Mid + 50.0f) - FDNCourse::LocationAt(Points, FMath::Max(Mid - 50.0f, 0.0f))).GetSafeNormal2D();
+				const float Mid = FMath::Min(S + PieceLen * 0.5f, GeoLengthCm);
+				const FVector P = FDNCourse::LocationAt(GeoPoints, Mid);
+				const FVector Dir = (FDNCourse::LocationAt(GeoPoints, Mid + 50.0f) - FDNCourse::LocationAt(GeoPoints, FMath::Max(Mid - 50.0f, 0.0f))).GetSafeNormal2D();
 				const FVector Side(-Dir.Y, Dir.X, 0.0f);
 				const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)) + LocalYawFix + ((bFlipOutside && Sign > 0.0f) || (!bFlipOutside && Sign < 0.0f) ? 180.0f : 0.0f);
 				const FRotator Rot(0.0f, Yaw, 0.0f);
@@ -282,7 +287,7 @@ void ADNCourseActor::AddBuildings()
 		float S = 0.0f;
 		float BuildingLeftCm = 0.0f; // largura que falta para o prédio atual acabar; o número de andares vale para o prédio todo
 		int32 Floors = 5;
-		while (S < LengthCm)
+		while (S < GeoLengthCm)
 		{
 			if (BuildingLeftCm <= 0.0f)
 			{
@@ -298,9 +303,9 @@ void ADNCourseActor::AddBuildings()
 			{
 				break;
 			}
-			const float Mid = FMath::Min(S + Len * 0.5f, LengthCm);
-			const FVector P = FDNCourse::LocationAt(Points, Mid);
-			const FVector Dir = (FDNCourse::LocationAt(Points, Mid + 50.0f) - FDNCourse::LocationAt(Points, FMath::Max(Mid - 50.0f, 0.0f))).GetSafeNormal2D();
+			const float Mid = FMath::Min(S + Len * 0.5f, GeoLengthCm);
+			const FVector P = FDNCourse::LocationAt(GeoPoints, Mid);
+			const FVector Dir = (FDNCourse::LocationAt(GeoPoints, Mid + 50.0f) - FDNCourse::LocationAt(GeoPoints, FMath::Max(Mid - 50.0f, 0.0f))).GetSafeNormal2D();
 			const FVector Side(-Dir.Y, Dir.X, 0.0f);
 			const float AlignYaw = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)) + (bAlongX ? 0.0f : -90.0f);
 			const float Yaw = AlignYaw + (Sign > 0.0f ? 180.0f : 0.0f); // a frente da peça (palpite: -Y local) olha para a pista
@@ -328,4 +333,14 @@ void ADNCourseActor::AddBuildings()
 		const FBoxSphereBounds B = Ism->GetStaticMesh()->GetBounds();
 		UE_LOG(LogTemp, Display, TEXT("DNCourse: fachada '%s' mede %.0f x %.0f x %.0f cm, centro local (%.0f, %.0f, %.0f), %d instâncias"), *Ism->GetStaticMesh()->GetName(), 2.0f * B.BoxExtent.X, 2.0f * B.BoxExtent.Y, 2.0f * B.BoxExtent.Z, B.Origin.X, B.Origin.Y, B.Origin.Z, Ism->GetNumInstances());
 	}
+}
+
+FTransform ADNCourseActor::GridTransform(int32 Slot, float HeightCm) const
+{
+	const FTransform Start = StartTransform(HeightCm);
+	const FVector Forward = Start.GetRotation().GetForwardVector();
+	const FVector Right = Start.GetRotation().GetRightVector();
+	const float BackCm = 600.0f * (Slot / 2 + 1);
+	const float SideCm = (Slot % 2 == 0 ? -300.0f : 300.0f);
+	return FTransform(Start.GetRotation(), Start.GetLocation() - Forward * BackCm + Right * SideCm);
 }
