@@ -279,6 +279,8 @@ cartunizado (aqui é realismo). Esperar o desenho de lá e reaproveitar o que fo
 
 **Visual da corrida, rodada 1 (17 out):** a rua ganhou fachadas de cores e alturas variadas, calçada de lajotas e meio-fio do City Sample (o branco estourado era o material liso de teste, não o do City Sample), postes, jacarandás e bancos destrutíveis pela calçada, e o HUD nítido. Capturas novas em `docs/img/corrida-1/` (olhadas): a cena lê como rua de cidade, com sombras e profundidade. **Diversão:** as árvores e os postes viram obstáculos que quebram, dão o que bater. **Visual:** salto grande sobre a rodada anterior; ainda faltam quinas, faixas no asfalto, nuvens, vitrines e o hidrante. Custo (quadros) não remedido depois desta rodada.
 
+**Prova da hipótese Rail × Physics (17 out): refutada.** Em 3 sementes do C-130-40, o Δv médio na primeira batida é maior no Rail (9,7 m/s) que no Physics (3,8 m/s) e os pontos por carro são parecidos; a diferença de 5 vezes vem da quantidade de carros atingidos (Rail: 2 a 6 em 6 a 12 s; Physics: 19 a 29 em 25 a 30 s, com dezenas de milhares de eventos de impacto, a cascata). Tabela e consequências para o contrato do lote 20 em `docs/prova-crash-rail-physics.md`; script em `Tools/Unreal/crash-prova-lote20.ps1`.
+
 **Maior buraco visual que resta (revisão do lote 18):** o carro de tráfego é uma caixa
 colorida. Batida no tráfego não dá para o Felipe julgar assim. O carro de verdade vem com o
 City Sample Vehicles (lote 20); o download no Fab é do Felipe.

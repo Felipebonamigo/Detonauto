@@ -265,11 +265,11 @@ void ADNTrafficVehicle::FlushImpacts(double Now)
 		Body->SetPhysMaterialOverride(nullptr);
 	}
 	static int32 Logged = 0;
-	if (Logged < 40)
+	if (Logged < 400)
 	{
 		++Logged;
-		UE_LOG(LogDetonauto, Display, TEXT("DNTraffic: batida em '%s' (valor %d): variacao de velocidade %.1f m/s, zona %d, dano da zona +%.2f, total %.2f%s"),
-			*GetName(), ValueCash, Group.DeltaVMs, static_cast<int32>(Impact.Zone), Result.AddedZoneDamage, FDNDamage::TotalDamage(DamageState), Result.bJustDestroyed ? TEXT(" | DESTRUIDO") : TEXT(""));
+		UE_LOG(LogDetonauto, Display, TEXT("DNTraffic: batida em '%s' (valor %d): velocidade antes %.1f m/s, variacao de velocidade %.1f m/s, zona %d, dano da zona +%.2f, total %.2f%s"),
+			*GetName(), ValueCash, VelocityBeforeStepCmS.Size() / 100.0, Group.DeltaVMs, static_cast<int32>(Impact.Zone), Result.AddedZoneDamage, FDNDamage::TotalDamage(DamageState), Result.bJustDestroyed ? TEXT(" | DESTRUIDO") : TEXT(""));
 	}
 	if (Result.bJustDestroyed)
 	{

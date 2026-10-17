@@ -85,6 +85,9 @@ private:
 	float MeasureSeconds = 0.0f;
 
 	bool bPlayerLinked = false;
+	/** Prova da decisão 2 do lote 20: pontos e dano por carro de tráfego, para comparar Rail e Physics. */
+	TMap<FString, int32> PointsByCar;
+	TMap<FString, float> DamageByCar;
 	bool bLaunched = false;
 	bool bEnded = false;
 	bool bRecordRegistered = false;

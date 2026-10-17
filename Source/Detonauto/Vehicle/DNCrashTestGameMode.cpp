@@ -139,6 +139,8 @@ void ADNCrashTestGameMode::HandleDamaged(ADNTrafficVehicle* Vehicle, int32 Value
 		return;
 	}
 	const int32 Points = CrashRound->RegisterDamage(Vehicle->GetLedger(), ValueCash, AddedTotalDamage, bDestroyed);
+	PointsByCar.FindOrAdd(Vehicle->GetName()) += Points;
+	DamageByCar.FindOrAdd(Vehicle->GetName()) += AddedTotalDamage;
 	static int32 Logged = 0;
 	if (Logged < 60)
 	{
@@ -178,6 +180,18 @@ void ADNCrashTestGameMode::HandleRoundEnded(int32 FinalScore)
 
 void ADNCrashTestGameMode::LogResult()
 {
+	{
+		// prova da decisão 2 do lote 20: quantos carros renderam pontos, quanto cada um e o dano médio
+		int32 Sum = 0;
+		float Damage = 0.0f;
+		for (const TPair<FString, int32>& P : PointsByCar)
+		{
+			Sum += P.Value;
+			Damage += DamageByCar.FindRef(P.Key);
+			UE_LOG(LogDetonauto, Display, TEXT("DNCrashCarro: carro=%s pontos=%d dano_total=%.3f"), *P.Key, P.Value, DamageByCar.FindRef(P.Key));
+		}
+		UE_LOG(LogDetonauto, Display, TEXT("DNCrashCarros: carros_com_pontos=%d soma=%d media_por_carro=%.1f dano_medio=%.3f"), PointsByCar.Num(), Sum, PointsByCar.Num() > 0 ? static_cast<float>(Sum) / PointsByCar.Num() : 0.0f, PointsByCar.Num() > 0 ? Damage / PointsByCar.Num() : 0.0f);
+	}
 	const FDNCrashState& S = CrashRound->GetState();
 	const FDNTrafficStats& T = Traffic->GetStats();
 	UE_LOG(LogDetonauto, Display,
