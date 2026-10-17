@@ -2,19 +2,30 @@
 #include "Race/DNRaceGameMode.h"
 #include "Core/DNRaceFormat.h"
 #include "Engine/Canvas.h"
+#include "Engine/Font.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
 
+ADNRaceHUD::ADNRaceHUD()
+{
+	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Engine/EngineFonts/RobotoDistanceField.RobotoDistanceField"));
+	if (Font.Succeeded())
+	{
+		HudFont = Font.Object;
+	}
+}
+
 void ADNRaceHUD::Text(const FString& Value, float X, float Y, float Scale, const FLinearColor& Color, bool bCenter, bool bRight)
 {
-	UFont* Font = GEngine ? GEngine->GetLargeFont() : nullptr;
+	UFont* Font = HudFont ? HudFont.Get() : (GEngine ? GEngine->GetLargeFont() : nullptr);
 	if (!Canvas || !Font)
 	{
 		return;
 	}
 	// a fonte grande da engine é pequena em 1080p: os tamanhos do HUD valem em múltiplos desta escala base
-	Scale *= 2.4f;
+	Scale *= HudFont ? 1.45f : 2.4f;
 	float W = 0.0f, H = 0.0f;
 	Canvas->TextSize(Font, Value, W, H, Scale, Scale);
 	const float Left = bCenter ? X - W * 0.5f : (bRight ? X - W : X);
@@ -89,7 +100,13 @@ void ADNRaceHUD::DrawHUD()
 	}
 
 	// tela de resultado ou de destruição
-	if (D.bFinished || D.bPlayerWrecked)
+	if (D.bPlayerWrecked)
+	{
+		Text(TEXT("CARRO DESTRU\u00cdDO"), W * 0.5f, H * 0.42f, 3.0f * U, Red, true);
+		Text(FString::Printf(TEXT("voltando \u00e0 pista em %.0f"), FMath::CeilToFloat(D.PlayerWreckLeftS)), W * 0.5f, H * 0.42f + 90.0f * U, 1.4f * U, White, true);
+	}
+
+	if (D.bFinished)
 	{
 		const float PanelW = 760.0f * U;
 		const float RowH = 64.0f * U;
@@ -97,7 +114,7 @@ void ADNRaceHUD::DrawHUD()
 		const float PX = (W - PanelW) * 0.5f;
 		const float PY2 = H * 0.5f - PanelH * 0.5f;
 		DrawRect(FLinearColor(0, 0, 0, 0.72f), PX, PY2, PanelW, PanelH);
-		Text(D.bFinished ? TEXT("CHEGADA") : TEXT("CARRO DESTRUÍDO"), W * 0.5f, PY2 + 20.0f * U, 2.2f * U, D.bFinished ? Green : Red, true);
+		Text(TEXT("CHEGADA"), W * 0.5f, PY2 + 20.0f * U, 2.2f * U, Green, true);
 		float Y = PY2 + 110.0f * U;
 		for (const FDNRaceHudRow& Row : D.Rows)
 		{

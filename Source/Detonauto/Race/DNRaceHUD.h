@@ -39,6 +39,8 @@ struct FDNRaceHudData
 	float CountdownLeftS = 0.0f;
 	bool bFinished = false;
 	bool bPlayerWrecked = false;
+	/** Segundos que faltam para o carro renascer na linha. */
+	float PlayerWreckLeftS = 0.0f;
 	TArray<FDNRaceHudRow> Rows;
 	/** Distância desde o jogador ate o checkpoint seguinte ou a chegada [m]; negativa = não mostrar. */
 	float ToNextMarkM = -1.0f;
@@ -50,8 +52,13 @@ class DETONAUTO_API ADNRaceHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+	ADNRaceHUD();
 	virtual void DrawHUD() override;
 
 private:
+	/** Fonte de contorno por distância da engine: fica nítida em qualquer tamanho (a fonte bitmap grande, ampliada, borrava). */
+	UPROPERTY(Transient)
+	TObjectPtr<UFont> HudFont;
+
 	void Text(const FString& Value, float X, float Y, float Scale, const FLinearColor& Color, bool bCenter = false, bool bRight = false);
 };

@@ -180,6 +180,30 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 		LastAdvanceAtS = RaceTime;
 	}
 
+	// jogador destruído: naufrágio por PlayerWreckSeconds e renasce na linha, inteiro, com o turbo zerado; a corrida não acaba por isso
+	{
+		const bool bPlayerDestroyed = Vehicle->GetDamage().bDestroyed;
+		const double NowS = GetWorld()->GetTimeSeconds();
+		if (bPlayerDestroyed && PlayerDestroyedAtS < 0.0)
+		{
+			PlayerDestroyedAtS = NowS;
+		}
+		if (FDNRaceTakedown::Step(PlayerWreck, DeltaSeconds, bPlayerDestroyed, PlayerWreckSeconds))
+		{
+			const TArray<FVector>& Pts = Course->GetPoints();
+			const FVector Back = FDNCourse::LocationAt(Pts, Player.ProgressCm);
+			const FVector Dir = (FDNCourse::LocationAt(Pts, Player.ProgressCm + 100.0f) - Back).GetSafeNormal2D();
+			Vehicle->RestartAt(FTransform(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.0f), FVector(Back.X, Back.Y, 120.0f)));
+			if (UDNTurboComponent* Turbo = Vehicle->GetTurbo())
+			{
+				Turbo->ResetState();
+			}
+			PlayerDestroyedAtS = -1.0;
+			LastAdvanceAtS = RaceTime;
+			UE_LOG(LogDetonauto, Display, TEXT("DNRace: o jogador renasce na linha aos %.1f s no ponto %.0f m, inteiro e com o turbo zerado."), RaceTime, Player.ProgressCm / 100.0f);
+		}
+	}
+
 	// quanto o carro está fora da linha central
 	MaxOffsetCm = FMath::Max(MaxOffsetCm, static_cast<float>(FVector::Dist2D(Pos, FDNCourse::LocationAt(Course->GetPoints(), Player.ProgressCm))));
 	MaxSpeedKmh = FMath::Max(MaxSpeedKmh, Vehicle->SpeedKmh());
@@ -206,7 +230,10 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 	{
 		if (!bFinishedLogged && RaceTime <= MaxSeconds && RaceTime - LastAdvanceAtS <= 20.0f)
 		{
-			DriveAuto(*Vehicle);
+			if (!PlayerWreck.bWrecked)
+			{
+				DriveAuto(*Vehicle);
+			}
 		}
 		else if (!bFinishedLogged)
 		{
@@ -274,8 +301,22 @@ void ADNRaceGameMode::TickRivals(float DeltaSeconds)
 		const float SpeedKmh = Car->SpeedKmh();
 		const float LookAheadCm = FDNRivalDriver::LookAheadCm(SpeedKmh, R.Config);
 		const FVector Forward = Car->GetActorForwardVector();
-		const float Near = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, R.State.ProgressCm + LookAheadCm));
-		const float Far = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, R.State.ProgressCm + 2.0f * LookAheadCm));
+		float Near = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, R.State.ProgressCm + LookAheadCm));
+		float Far = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, R.State.ProgressCm + 2.0f * LookAheadCm));
+		// W6: tocado, o rival revida por AngerSeconds mirando no jogador; se o jogador está atrás dele (mais de 100 graus), segue a linha
+		R.AngerLeftS = FDNRaceTakedown::AngerStep(R.AngerLeftS, DeltaSeconds, R.bTouched, AngerSeconds);
+		R.bTouched = false;
+		if (R.AngerLeftS > 0.0f)
+		{
+			if (const ADNVehicle* Target = FindVehicle())
+			{
+				const float ToPlayer = FDNCourse::HeadingErrorDeg(Pos, Forward, Target->GetActorLocation());
+				if (FMath::Abs(ToPlayer) <= 100.0f)
+				{
+					Near = Far = ToPlayer;
+				}
+			}
+		}
 		const FDNDriveCommand Cmd = FDNRivalDriver::Command(Near, Far, SpeedKmh, R.Config);
 		Move->SetSteeringInput(FMath::Clamp(Cmd.Steer * Car->AppliedSteeringGain, -1.0f, 1.0f));
 		Move->SetThrottleInput(Cmd.Throttle);
@@ -363,6 +404,7 @@ void ADNRaceGameMode::OnPlayerHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 		{
 			continue;
 		}
+		Rivals[i].bTouched = true; // W6: o rival tocado revida
 		// um toque só abre uma janela; os contatos seguintes da mesma batida (quadros seguidos) não abrem outra
 		for (const FPendingContact& P : Pending)
 		{
@@ -402,8 +444,10 @@ void ADNRaceGameMode::TickTakedowns(ADNVehicle& Vehicle)
 			Contact.RelativeSpeedKmh = C.RelativeSpeedKmh;
 			Contact.bRivalCrashed = true;
 			Contact.RivalCrashSecondsAfterContact = Since;
-			Contact.bPlayerDestroyed = Vehicle.GetDamage().bDestroyed;
-			Contact.PlayerDestroyedSecondsAfterContact = Since;
+			// W5: o jogador só desqualifica se se destruiu antes de o rival ser batido; empate vale o detona
+			const float PlayerDestroyedSince = PlayerDestroyedAtS >= 0.0 ? static_cast<float>(PlayerDestroyedAtS - C.Time) : -1.0f;
+			Contact.bPlayerDestroyed = FDNRaceTakedown::PlayerDestroyedFirst(PlayerDestroyedSince, Since);
+			Contact.PlayerDestroyedSecondsAfterContact = PlayerDestroyedSince;
 			if (FDNTakedown::Qualifies(TakedownConfig, Contact))
 			{
 				const EDNTakedownType Type = FDNTakedown::Classify(TakedownConfig, C.Classify);
@@ -451,6 +495,8 @@ void ADNRaceGameMode::ResetRace()
 	FinishedAt = -1.0f;
 	Takedowns = 0;
 	LastTakedownAt = -100.0;
+	PlayerWreck = FDNWreckState();
+	PlayerDestroyedAtS = -1.0;
 	Pending.Reset();
 	for (int32 i = 0; i < Rivals.Num(); ++i)
 	{
@@ -458,6 +504,8 @@ void ADNRaceGameMode::ResetRace()
 		R.State = FDNRacerState();
 		R.Wreck = FDNWreckState();
 		R.bWreckNow = false;
+		R.bTouched = false;
+		R.AngerLeftS = 0.0f;
 		if (ADNVehicle* Car = R.Car.Get())
 		{
 			Car->RestartAt(Course->GridTransform(i, 120.0f));
@@ -500,8 +548,9 @@ FDNRaceHudData ADNRaceGameMode::BuildHudData() const
 	D.PlayerProgress = Player.ProgressCm / Length;
 	D.CountdownLeftS = FMath::Max(CountdownS - SinceStartS, 0.0f);
 	D.bFinished = bFinishedLogged;
-	D.bPlayerWrecked = Vehicle->GetDamage().bDestroyed && !bFinishedLogged;
-	if (D.bFinished || D.bPlayerWrecked)
+	D.bPlayerWrecked = PlayerWreck.bWrecked && !bFinishedLogged;
+	D.PlayerWreckLeftS = PlayerWreck.LeftS;
+	if (D.bFinished)
 	{
 		const TArray<int32> Order = FDNRace::Order(All);
 		for (int32 Place = 0; Place < Order.Num(); ++Place)

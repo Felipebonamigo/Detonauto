@@ -22,7 +22,7 @@ Responda em frases curtas; o que não conseguir testar, pule. Capturas do que vo
 | C | troca a câmera |
 | R | recomeça a corrida inteira (grade, rivais, contagem) |
 
-**Como a corrida funciona:** você larga em último, atrás dos 3 rivais, depois de uma contagem de 3 s. Bater num rival com força (e sem destruir o seu carro) é um **detona**:
+**Como a corrida funciona:** você larga em último, atrás dos 3 rivais, depois de uma contagem de 3 s. Bater num rival com força é um **detona** (mesmo que o seu carro também se destrua, desde que o rival tenha sido batido primeiro):
 aparece "DETONOU!", o seu turbo enche e o rival fica parado uns 3 s e volta à pista. Ao cruzar a chegada aparece a classificação; R recomeça.
 
 ## 1. Largar e correr (5 min)
@@ -41,8 +41,8 @@ Chegue por trás num rival e bata com força, a 40 ou 50 km/h a mais que ele.
 - O detona é **satisfatório**? O aviso "DETONOU!", o rival destroçado e o turbo cheio vendem a ideia?
 - O turbo **recompensa**? Dá vontade de caçar o próximo rival com ele?
 - Os 3 s do rival parado são pouco ou muito? Ele devia voltar mais longe, ou ficar fora de vez?
-- Depois de um detona, **o seu carro ficou destruído também**? Aconteceu muito? Se sim, é frustrante ou parte da graça?
-- Faltou alguma coisa: o rival bater de volta, desviar, ou ser empurrado para a parede?
+- Se o seu carro for destruído (num detona forte, ou batendo na parede), ele vira naufrágio por ~2,5 s e **renasce na linha**, inteiro e com o turbo zerado; a corrida só acaba na chegada. Essa pausa dói demais, de menos, ou é boa? Aconteceu muito num detona?
+- O rival que você toca **revida**: por ~2 s ele mira no seu carro (se você está ao lado ou à frente dele). É divertido, injusto, ou nem dá para perceber? Falta ele desviar, ou ser empurrado para a parede?
 
 ## 3. Chegada e resultado (2 min)
 

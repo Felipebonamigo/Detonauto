@@ -76,6 +76,10 @@ private:
 		FDNWreckState Wreck;
 		/** Um takedown acabou de derrubá-lo: o próximo quadro o põe em destroço. */
 		bool bWreckNow = false;
+		/** O jogador tocou nele neste quadro: liga a braveza (W6). */
+		bool bTouched = false;
+		/** Quanto falta para ele deixar de revidar [s]; enquanto > 0 ele mira no jogador. */
+		float AngerLeftS = 0.0f;
 	};
 
 	/** Um toque do jogador num rival, esperando ele ser derrubado dentro da janela (condição 2 do takedown). */
@@ -99,6 +103,13 @@ private:
 	FString LastTakedownText;
 	/** Quanto tempo o rival derrubado fica destroçado antes de voltar (W2). */
 	float WreckSeconds = 3.0f;
+	/** O jogador destruído vira naufrágio por este tempo e renasce na linha, inteiro, com o turbo zerado; a corrida só acaba na chegada. */
+	float PlayerWreckSeconds = 2.5f;
+	FDNWreckState PlayerWreck;
+	/** Instante do jogo em que o jogador ficou destruído (-1 = inteiro): a regra W5 compara com o do rival. */
+	double PlayerDestroyedAtS = -1.0;
+	/** Quanto tempo o rival tocado revida [s] (W6). */
+	float AngerSeconds = 2.0f;
 	// atalho: o dano que "bate" o rival (W1) é uma constante; vai para Data/Takedown.csv se o playtest pedir ajuste
 	float MinCrashDamageGain = 0.05f; // dano total é a média de 5 zonas: 0,05 é uma zona com ~0,25 de dano
 	/** -DNRaceHunt: o piloto automático do jogador corre mais que os rivais (200 km/h na reta), para bater neles e provar o takedown. */
