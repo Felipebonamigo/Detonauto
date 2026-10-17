@@ -112,8 +112,9 @@ Nenhum asset entra no projeto sem uma linha em `docs/licencas.csv`.
 
 ## Marcas de terceiros
 
-Os nomes de modos herdados do Burnout (Road Rage, Crashbreaker, Impact Time,
-Aftertouch) são só referência de trabalho. Nunca use esses nomes, nem Burnout
+Os nomes de modos e mecânicas herdados do Burnout (Road Rage, Crashbreaker, Impact Time,
+Aftertouch, Takedown) são só referência de trabalho. **Takedown** passa a se chamar
+**Detona** (decisão do Felipe, 17/10/2026): aviso "DETONOU!" na tela e "detonas" no HUD. Nunca use esses nomes, nem Burnout
 ou EA, em textos, telas ou na página da loja. Os nomes finais serão próprios.
 
 ## Estrutura planejada
