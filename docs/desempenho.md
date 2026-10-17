@@ -469,3 +469,24 @@ efeitos, mas não prova um número menor. Evidência fraca; repetir com o PC liv
   mover a pasta de assets.
 - Não entram a fumaça de pneu do jogador, a câmera de batida dentro da fumaça (item 7 do contrato) nem faíscas (só disparam em batida
   real, não pelo `DNZone`). A GPU de uma batida real com faíscas e a câmera dentro da fumaça segue sem medida.
+
+## Marco 1 da fatia jogável: a corrida no percurso 1 (17 out 2026)
+
+`Tools/Unreal/race-measure.ps1` (piloto automático, perfil `DN_AlvoPS5`, 1920x1080, VSync desligado, `t.MaxFPS 0`, aquecimento de 10 s e medição de 30 s: o carro corre
+retas e curvas; nenhum outro Unreal aberto). Rua de prédios do City Sample (asfalto, calçada, meio-fio, fachadas de 4 a 10 andares, céu e névoa), HUD de Canvas e, no
+segundo cenário, 3 rivais. Média / p95 em ms:
+
+| Cenário | Frame | Game | Draw | GPU |
+|---|---|---|---|---|
+| sem rivais (1 carro) | 7,94 / 13,00 | 2,27 / 3,45 | 7,93 / 12,98 | 7,34 / 12,14 |
+| com 3 rivais (4 carros) | 7,24 / 12,14 | 3,09 / 4,12 | 7,23 / 12,14 | 6,82 / 11,90 |
+
+(Uma primeira rodada de 20 s só com o jogador, ainda compilando shaders, deu 7,22 / 8,80. A diferença entre os dois cenários no Frame é ruído de rota: o p95 depende de
+quanto tempo o carro passa com o sol de frente e olhando as retas longas.)
+
+- **Cabe nos 16,6 ms**, com folga na média (7 a 8 ms) e no p95 (12 a 13 ms). É **GPU-bound** (Draw e GPU acompanham o Frame); o Game thread fica em 2 a 3 ms.
+- **Cada rival custa ~0,27 ms de Game** (3,09 contra 2,27 ms em média): o carro com física Chaos, as 11 peças e a regra do piloto.
+- **Ressalva de sempre:** esta placa (RTX 4070 Ti) é bem mais forte que a de um PS5; os números são otimistas para "o nível do PS5". A margem de ~2x na média ainda deixaria
+  o p95 por volta do limite. Medir de novo quando houver um PC de referência mais fraco, ou reduzir o custo da cena antes de empilhar mais prédios.
+- **Não medido:** memória de vídeo e o *streaming* das texturas (as de City Sample vieram em 8K, ~1,5 GB no disco). Reduzir para 2k continua na fila (regra do lote 20); depende de um
+  passo de reimportação no editor que ainda não existe.
