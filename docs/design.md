@@ -6,14 +6,14 @@ Versão inicial, outubro de 2026. Atualizar ao fim de cada checkpoint.
 
 Detonauto é um jogo de corrida arcade em que dirigir perigosamente é a única
 forma de ganhar turbo, derrubar o rival é recompensa e a batida é espetáculo.
-A referência de sensação é Burnout 3: Takedown, com gráficos realistas e
+A referência de sensação é Burnout 3: Detona, com gráficos realistas e
 destruição como diferencial. O modo Crash é o coração do jogo.
 
 ## Pilares
 
 1. **Turbo ganho por risco.** A barra só enche na contramão, passando raspando
    no tráfego, derrapando e no ar.
-2. **Takedown como objetivo.** Jogar o rival na parede ou no tráfego recarrega
+2. **Detona como objetivo.** Jogar o rival na parede ou no tráfego recarrega
    o turbo, dispara câmera lenta e mostra um replay curto.
 3. **A batida é espetáculo.** Depois de bater, o tempo desacelera, o jogador
    controla os destroços e pode explodir o carro para atingir o que estiver em
@@ -45,15 +45,15 @@ Vehicles com uma camada própria de controle por cima.
 | Passar raspando no tráfego | carga por evento |
 | Derrapar | carga contínua |
 | Salto | carga por tempo no ar |
-| Takedown | barra cheia |
+| Detona | barra cheia |
 
 Usar a barra inteira sem soltar concede um bônus de barra extra.
 
-### Takedown
+### Detona
 
 Acontece quando o rival bate por causa do jogador. Tipos previstos: lateral,
 por trás, em T, por cima e com os destroços depois da própria batida. Cada
-takedown dá turbo, câmera dedicada e entra na contagem do evento.
+detona dá turbo, câmera dedicada e entra na contagem do evento.
 
 ### Batida
 
@@ -80,8 +80,8 @@ precisa de IA complexa: precisa parecer vivo e explodir bem.
 | Modo | Entra em | Resumo |
 |---|---|---|
 | Crash | Acesso Antecipado | Cruzamento curto, uma largada, pontuação pelo valor destruído, multiplicadores no chão e medalhas de bronze, prata e ouro |
-| Road Rage | Atualização 2 | Fazer o máximo de takedowns antes que o carro aguente o limite de dano |
-| Corrida | Atualização 3 | Rotas pelo distrito com rivais e tráfego. Takedown dá turbo, bater custa segundos |
+| Road Rage | Atualização 2 | Fazer o máximo de detonas antes que o carro aguente o limite de dano |
+| Corrida | Atualização 3 | Rotas pelo distrito com rivais e tráfego. Detona dá turbo, bater custa segundos |
 
 Os nomes Road Rage e os termos da batida são de trabalho, herdados do Burnout.
 Os nomes finais serão próprios.

@@ -50,6 +50,11 @@ void ADNRaceGameMode::InitGame(const FString& MapName, const FString& Options, F
 	FParse::Value(Cmd, TEXT("DNRaceCountdownS="), CountdownS);
 	bAuto = FParse::Param(Cmd, TEXT("DNRaceAuto"));
 	bHunt = FParse::Param(Cmd, TEXT("DNRaceHunt"));
+	float AutoKmh = 0.0f;
+	if (FParse::Value(Cmd, TEXT("DNRaceAutoKmh="), AutoKmh) && AutoKmh > AutoDriver.CornerKmh)
+	{
+		AutoDriver.StraightKmh = AutoKmh; // velocidade do piloto automático na reta (capturas a uma velocidade escolhida)
+	}
 	if (bHunt)
 	{
 		AutoDriver.StraightKmh = 200.0f;
@@ -405,7 +410,7 @@ void ADNRaceGameMode::TickTakedowns(ADNVehicle& Vehicle)
 				++Takedowns;
 				LastTakedownAt = Now;
 				Rivals[C.RivalIndex].bWreckNow = true;
-				LastTakedownText = FString::Printf(TEXT("TAKEDOWN! %s (%s)"), *Rivals[C.RivalIndex].Name, FDNTakedown::ToString(Type));
+				LastTakedownText = FString::Printf(TEXT("DETONOU! %s (%s)"), *Rivals[C.RivalIndex].Name, FDNTakedown::ToString(Type));
 				if (UDNTurboComponent* Turbo = Vehicle.GetTurbo())
 				{
 					FDNTurboFrameInput Fill;

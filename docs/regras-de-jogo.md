@@ -1,7 +1,7 @@
 # Regras de jogo do Detonauto (valores iniciais)
 
 Especificação das regras que não dependem de física nem de gráficos: turbo,
-pontuação do modo Crash, medalhas e classificação do takedown. Servem de
+pontuação do modo Crash, medalhas e classificação do detona. Servem de
 contrato para o código em `Source/Detonauto/Core/` e para os testes
 automáticos.
 
@@ -11,7 +11,7 @@ struct de configuração, nunca espalhados pelo código, e depois migram para
 `Data/*.csv`. Unidades: segundos, unidades de turbo, centímetros e graus,
 como no Unreal.
 
-**Nomes.** "Takedown" é nome de trabalho. Nenhum nome da lista proibida no
+**Nomes.** "Detona" é nome de trabalho. Nenhum nome da lista proibida no
 `CLAUDE.md` aparece no código. A barra extra do turbo chama-se "turbo
 prolongado".
 
@@ -27,13 +27,13 @@ A barra vai de 0 a 100 unidades e começa em 0.
 | Passada raspando | Distância lateral abaixo de 150 cm de um veículo de tráfego em movimento, velocidade acima de 60 km/h, uma vez por veículo | 6 por evento |
 | Derrapada | Ângulo de deslizamento entre 15 e 70 graus, velocidade acima de 60 km/h | 8 por segundo |
 | Salto | Depois de 0,3 s no ar | 10 por segundo, no máximo 20 por salto |
-| Takedown | Quando acontece | A barra vai a 100 |
+| Detona | Quando acontece | A barra vai a 100 |
 
 **Cadeia de passadas raspando:** passadas dentro de 2,0 s da anterior
 multiplicam o ganho do evento por 1,0, 1,25, 1,5, 1,75 e 2,0, nessa ordem.
 Passadas separadas por mais de 2,0 s reiniciam a cadeia.
 
-O ganho nunca passa de 100. Com o turbo ligado, só o takedown dá ganho.
+O ganho nunca passa de 100. Com o turbo ligado, só o detona dá ganho.
 
 ### Uso
 
@@ -44,7 +44,7 @@ O ganho nunca passa de 100. Com o turbo ligado, só o takedown dá ganho.
 - Desliga ao soltar o botão ou quando a barra chega a 0.
 - Por consequência, depois de a barra zerar com o botão ainda apertado, o
   turbo só volta a ligar com um novo aperto (soltar e apertar de novo). Isso
-  evita um turbo que religa sozinho quando o takedown recarrega a barra ou
+  evita um turbo que religa sozinho quando o detona recarrega a barra ou
   quando os ganhos enchem a barra com o botão segurado.
 
 ### Turbo prolongado
@@ -121,9 +121,9 @@ Limites devem ser **maiores que zero e estritamente crescentes**. Uma
 configuração que não respeite isso é inválida e o teste de dados a recusa.
 Alcançar um limite significa pontuação maior ou igual a ele.
 
-## 4. Takedown
+## 4. Detona
 
-Um takedown acontece quando **todas** as condições valem:
+Um detona acontece quando **todas** as condições valem:
 
 1. O jogador toca num rival e a velocidade relativa no contato é de pelo menos
    20 km/h.
@@ -131,7 +131,7 @@ Um takedown acontece quando **todas** as condições valem:
    contato.
 3. O jogador não destruiu a si mesmo no mesmo intervalo.
 
-### Tipo do takedown
+### Tipo do detona
 
 Entradas: direção da frente do jogador `A`, direção da frente do rival `V`,
 normal do contato, altura relativa e se o jogador está caindo.
@@ -214,11 +214,11 @@ comentário no código e um teste que fica fácil de trocar se a decisão mudar.
 |---|---|
 | M1. Limites | Estritamente crescentes **e maiores que zero**. Alcançar significa maior ou igual |
 
-**Takedown**
+**Detona**
 
 | Ponto | Decisão |
 |---|---|
-| K1. Zona de contato | Convenção e limites na seção do takedown acima |
+| K1. Zona de contato | Convenção e limites na seção do detona acima |
 | K2. Limites | "Entre 60 e 120", "pelo menos 100 cm" e "pelo menos 20 km/h" são inclusivos |
 | K3. Condição 2 e 3 | "Em até 1,5 s" é inclusivo e conta do instante do contato |
 
@@ -226,14 +226,14 @@ comentário no código e um teste que fica fácil de trocar se a decisão mudar.
 
 | Ponto | Decisão |
 |---|---|
-| O5. Barra no quadro do aperto | Vale a barra depois dos ganhos e do takedown daquele quadro |
+| O5. Barra no quadro do aperto | Vale a barra depois dos ganhos e do detona daquele quadro |
 | D1. Limites de medalha inválidos | `Evaluate` devolve nenhuma medalha, em vez de adivinhar |
 | D2. Pontos de uma destruição | `RegisterDestruction` devolve os pontos efetivamente somados. Se saturar, a diferença |
 | D3. Velocidade inválida (NaN) no fim da rodada | Conta como em movimento, para não encerrar a rodada por engano |
 | D4. Multiplicador fora de 1 a 8 | É limitado ao intervalo |
-| E1. Vetor inválido (zero ou NaN) no takedown | A zona é lateral e a classificação é geral. O tipo vertical não depende dos vetores e continua valendo |
+| E1. Vetor inválido (zero ou NaN) no detona | A zona é lateral e a classificação é geral. O tipo vertical não depende dos vetores e continua valendo |
 | E2. Vetores sem comprimento 1 | São normalizados. Os que já têm comprimento 1 passam intactos, para o limite ficar exato |
-| E3. Condição 3 do takedown | O jogador só é desqualificado se se destruir de 0 a 1,5 s depois do contato. Antes, depois ou NaN não desqualificam |
+| E3. Condição 3 do detona | O jogador só é desqualificado se se destruir de 0 a 1,5 s depois do contato. Antes, depois ou NaN não desqualificam |
 | E4. Altura NaN | Nunca vira vertical |
 
 
@@ -249,12 +249,12 @@ deriva garante que o CSV e o padrão da struct pura são iguais. Ainda não são
 | V1. Turbo, limites e janelas | `MaxBar`, `NearMissMaxLateralCm`, `NearMissChainWindowSeconds` e `ConsumptionPerSecond` maiores que zero |
 | V2. Turbo, velocidades e ganhos | Velocidades mínimas, ganhos, `AirTimeThresholdSeconds`, `AirMaxGainPerJump` e `ExtendedBonus` maiores ou iguais a zero |
 | V3. Turbo, derrapada | `0 <= DriftMinAngleDeg < DriftMaxAngleDeg <= 90` (acima de 90 o carro anda de ré, não derrapa) |
-| V4. Turbo, takedown | `TakedownSetsBarTo` em `(0, MaxBar]` |
+| V4. Turbo, detona | `TakedownSetsBarTo` em `(0, MaxBar]` |
 | V5. Turbo, cadeia de quase batidas | `NearMissChainMultipliers` não vazio, cada valor finito e maior que zero. Não exige ordem crescente nem primeiro valor 1,0 |
 | V6. Crash, multiplicador e bônus | `MaxMultiplier >= 1`; `ChainBonusPercentPerLink` e `ChainBonusMaxPercent` maiores ou iguais a zero |
 | V7. Crash, tempos | `ChainWindowSeconds`, `QuietSecondsToEnd` e `MaxSecondsAfterFirstImpact` maiores que zero; `QuietSpeedMetersPerSecond >= 0` |
 | V8. Crash, fim da rodada | `QuietSecondsToEnd <= MaxSecondsAfterFirstImpact` (senão o silêncio nunca encerra a rodada) |
-| V9. Takedown, velocidade, janela e altura | `MinRelativeSpeedKmh >= 0`; `RivalCrashWindowSeconds` e `VerticalMinHeightCm` maiores que zero |
-| V10. Takedown, ângulos | `BehindMaxAngleDegrees` e `SideMaxAngleDegrees` em `(0, 180]`; `0 <= TBoneMinAngleDegrees < TBoneMaxAngleDegrees <= 180` |
-| V11. Takedown, lateral e T | `SideMaxAngleDegrees <= TBoneMinAngleDegrees`: sem sobreposição; um vão entre as duas é permitido |
-| V12. Takedown, zonas | `ZoneHalfAngleDegrees` em `(0, 90)`, estrito |
+| V9. Detona, velocidade, janela e altura | `MinRelativeSpeedKmh >= 0`; `RivalCrashWindowSeconds` e `VerticalMinHeightCm` maiores que zero |
+| V10. Detona, ângulos | `BehindMaxAngleDegrees` e `SideMaxAngleDegrees` em `(0, 180]`; `0 <= TBoneMinAngleDegrees < TBoneMaxAngleDegrees <= 180` |
+| V11. Detona, lateral e T | `SideMaxAngleDegrees <= TBoneMinAngleDegrees`: sem sobreposição; um vão entre as duas é permitido |
+| V12. Detona, zonas | `ZoneHalfAngleDegrees` em `(0, 90)`, estrito |

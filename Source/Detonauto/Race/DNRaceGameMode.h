@@ -8,6 +8,7 @@
 //   -DNCourse=<id>     percurso de Data/CoursePoints.csv (padrão percurso1)
 //   -DNCheckpointM=M   metros entre os pontos de verificação (padrão 250)
 //   -DNRaceAuto        o carro dirige sozinho pela linha (mira um ponto à frente) e o jogo fecha ao chegar; imprime "DNRace: ..."
+//   -DNRaceAutoKmh=K   velocidade do piloto automático na reta (padrão 100)
 //   -DNRaceMaxS=S      tempo máximo da corrida automática (padrão 240 s)
 // As teclas e capturas do ADNVehicleTestGameMode (-DNKeys=SHOT@t;QUIT@t) valem aqui.
 

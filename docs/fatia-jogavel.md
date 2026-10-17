@@ -1,7 +1,7 @@
 # Fatia jogável: o primeiro jogo completo
 
 Decisão do Felipe, 16 out 2026: antes de refinar carros, ter **rodando no jogo** um carro completo, uma pista completa, um desafio de
-explosão e um modo estilo destruição, "e por aí vai". Referência de trabalho (nunca nomes, textos ou telas): a corrida com **takedowns**
+explosão e um modo estilo destruição, "e por aí vai". Referência de trabalho (nunca nomes, textos ou telas): a corrida com **detonas**
 em ruas de cidade e o modo de explosão em cruzamento dos Burnout clássicos; o modo de destruição do Wreckfest e o arremesso do FlatOut.
 A regra de ouro do estúdio vale: **divertido e bonito, com realismo e gráficos atuais**.
 
@@ -11,7 +11,7 @@ Este documento é o **desenho para aprovar**. Substitui o lote 20 isolado do `fa
 
 | # | Modo | O que é | O que já existe |
 |---|---|---|---|
-| 1 | **Corrida takedown** (principal) | Corrida ponto a ponto em ruas de cidade, contra 3 rivais, com tráfego. Derrubar rival (takedown) enche o turbo; chegar em primeiro ganha. | carro, turbo, takedown (regra pura), tráfego em trilho, dano, câmeras |
+| 1 | **Corrida detona** (principal) | Corrida ponto a ponto em ruas de cidade, contra 3 rivais, com tráfego. Derrubar rival (detona) enche o turbo; chegar em primeiro ganha. | carro, turbo, detona (regra pura), tráfego em trilho, dano, câmeras |
 | 2 | **Crash** (explosão) | Cruzamento com tráfego: o carro entra a ~120 km/h e causa o maior estrago; pontos, multiplicador e medalha. | rodada, pontuação por dano, medalhas, câmera de batida |
 | 3 | **Derby de destruição** | Arena fechada, vários carros batendo até sobrar um. Estilo Wreckfest. | dano, peças, efeitos |
 | 4 | **Arremesso do piloto** (stunt) | O piloto é lançado do carro na batida e mira em alvos. Estilo FlatOut. | nada (piloto e boneco de física são novos) |
@@ -24,17 +24,17 @@ Este documento é o **desenho para aprovar**. Substitui o lote 20 isolado do `fa
   largada e chegada, pontos de verificação, trilho para a IA e o tráfego. Os prédios e o asfalto finais dependem do City Sample.
 - **Rivais de corrida (a maior peça nova):** IA que segue a pista, pega curva, desvia do tráfego, bate de volta e usa turbo. É o que mais
   pesa em tempo e em risco.
-- **Regras de corrida:** posição, voltas ou chegada, tempo, takedown contra rival com pontuação, tela de resultado. Pelo `FDNTakedown` já
+- **Regras de corrida:** posição, voltas ou chegada, tempo, detona contra rival com pontuação, tela de resultado. Pelo `FDNTakedown` já
   existente, mais regras puras novas com teste.
-- **Menu e HUD:** escolher modo e pista, HUD de corrida (posição, tempo, turbo, takedowns), tela de fim. Hoje só há o HUD de depuração.
+- **Menu e HUD:** escolher modo e pista, HUD de corrida (posição, tempo, turbo, detonas), tela de fim. Hoje só há o HUD de depuração.
 - **Som e música:** lote 21 (rotina `som-livre` e `gerar-som`).
 - **Tráfego:** hoje são caixas. Pelo menos um modelo de carro de tráfego decente (o Cuiabano está pausado, em andamento no git) e a
   decisão `Rail` contra `Physics` (hipótese em `estado-atual.md`).
 
 ## Ordem proposta
 
-1. **Corrida takedown, primeiro percurso** (peça mais longa). Marcos: (a) percurso com curvas e pontos de verificação, só o jogador;
-   (b) rivais que correm o percurso; (c) takedown e turbo na corrida; (d) HUD e tela de resultado.
+1. **Corrida detona, primeiro percurso** (peça mais longa). Marcos: (a) percurso com curvas e pontos de verificação, só o jogador;
+   (b) rivais que correm o percurso; (c) detona e turbo na corrida; (d) HUD e tela de resultado.
 2. **Crash no cruzamento** (o lote 20): reaproveita o tráfego e a rodada que já existem.
 3. **Menu mínimo** ligando os modos 1 e 2.
 4. **Derby** (arena e rivais que batem).

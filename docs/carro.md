@@ -44,10 +44,10 @@ Significado de cada coluna, o que cada preset muda e o roteiro de teste: [`prese
 ## Turbo (por enquanto só consome)
 
 - Shift é o botão do turbo; a barra é a do `FDNTurbo` (0 a 100, consumo e turbo prolongado do `Data/Turbo.csv`).
-- Os ganhos reais (contramão, raspão, derrapada, tempo no ar, takedown) **só entram quando houver os eventos** que os produzem;
+- Os ganhos reais (contramão, raspão, derrapada, tempo no ar, detona) **só entram quando houver os eventos** que os produzem;
   o carro repassa ao Core só o botão e a velocidade, e deixa os outros campos do quadro como "não aconteceu".
 - **Modo de teste** (`bTurboTestMode`, ligado por padrão): a barra começa cheia e **enche de novo 2 s depois de esvaziar**, para
-  dar para testar sem fim. O enchimento usa o evento de takedown do Core (um quadro com `bTakedown`), sem mexer no estado do Core.
+  dar para testar sem fim. O enchimento usa o evento de detona do Core (um quadro com `bTakedown`), sem mexer no estado do Core.
   Não é regra de jogo: sai quando houver ganhos de verdade.
 - `NitroAccelMps2` (coluna de `Cars.csv`) é a aceleração extra enquanto o turbo está ativo; 0 desliga o empurrão naquele preset.
   As colunas `NitroDrainPerSecond` e `NitroRegenPerSecond` do protótipo **não existem mais**: o gasto vem do Core.
@@ -99,6 +99,6 @@ Bugs de rodas, amassado e curva, a assistência de derrapagem, o turbo e as cinc
 
 ## O que ainda não existe
 
-- Ganhos reais do turbo (eventos de contramão, raspão, derrapada, ar e takedown), e a UI da barra.
+- Ganhos reais do turbo (eventos de contramão, raspão, derrapada, ar e detona), e a UI da barra.
 - Reação do carro a ser destruído (peças soltando): o amassado visual é só o material; `FDNDamage` já devolve as peças, o carro ainda não as usa.
 - Controle (gamepad) e remapeamento de teclas.

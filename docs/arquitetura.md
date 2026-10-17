@@ -140,7 +140,7 @@ folga, não medidos.
 3. Física do carro: Chaos Vehicles com camada própria de forças ou um modelo
    arcade próprio. Primeiro diagnóstico no fim deste documento. Falta o
    Felipe jogar o carro de teste antes de decidir.
-4. Como guardar o replay do takedown sem custo alto de memória.
+4. Como guardar o replay do detona sem custo alto de memória.
 5. Se o tráfego usa física completa ou um modelo simplificado até a batida.
    A primeira medição aponta para o modelo simplificado (ver a seção abaixo).
 

@@ -51,7 +51,7 @@ void ADNRaceHUD::DrawHUD()
 	Text(TEXT("km/h"), W - Margin, Margin + 90.0f * U, 1.0f * U, FLinearColor(0.8f, 0.8f, 0.8f, 1), false, true);
 
 	// takedowns, embaixo à esquerda
-	Text(FString::Printf(TEXT("Takedowns  %d"), D.Takedowns), Margin, H - Margin - 160.0f * U, 1.2f * U, Orange);
+	Text(FString::Printf(TEXT("Detonas  %d"), D.Takedowns), Margin, H - Margin - 160.0f * U, 1.2f * U, Orange);
 
 	// turbo: barra embaixo no centro
 	const float BarW = 520.0f * U, BarH = 22.0f * U;
@@ -107,6 +107,6 @@ void ADNRaceHUD::DrawHUD()
 			Text(Row.Value, PX + PanelW - 40.0f * U, Y, 1.3f * U, C, false, true);
 			Y += RowH;
 		}
-		Text(FString::Printf(TEXT("Takedowns: %d     R: recomecar"), D.Takedowns), W * 0.5f, PY2 + PanelH - 60.0f * U, 1.0f * U, FLinearColor(0.85f, 0.85f, 0.85f, 1), true);
+		Text(FString::Printf(TEXT("Detonas: %d     R: recomecar"), D.Takedowns), W * 0.5f, PY2 + PanelH - 60.0f * U, 1.0f * U, FLinearColor(0.85f, 0.85f, 0.85f, 1), true);
 	}
 }
