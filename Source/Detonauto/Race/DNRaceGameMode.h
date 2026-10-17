@@ -16,6 +16,7 @@
 #include "CoreMinimal.h"
 #include "Vehicle/DNVehicleTestGameMode.h"
 #include "Core/DNRace.h"
+#include "Core/DNRivalDriver.h"
 #include "DNRaceGameMode.generated.h"
 
 class ADNCourseActor;
@@ -45,6 +46,8 @@ private:
 	FString CourseId = TEXT("percurso1");
 	float CheckpointM = 250.0f;
 	bool bAuto = false;
+	/** Como o piloto automático dirige (hoje os valores padrão; os níveis dos rivais vêm de Data/Rivals.csv). */
+	FDNRivalConfig AutoDriver;
 	float MaxSeconds = 240.0f;
 
 	FDNRacerState Player;

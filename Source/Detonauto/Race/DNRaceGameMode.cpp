@@ -3,6 +3,7 @@
 #include "Vehicle/DNVehicle.h"
 #include "Vehicle/DNVehicleArena.h"
 #include "Core/DNCourse.h"
+#include "Core/DNRivalDriver.h"
 #include "Core/DNGameDataSubsystem.h"
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -14,14 +15,6 @@
 
 namespace
 {
-	// atalho: piloto automático de um passo só (mira um ponto à frente na linha, ganho fixo); serve para provar o percurso. Rivais de
-	// verdade (marco 1b) trocam isto por IA com níveis em CSV.
-	constexpr float LookAheadMinCm = 1500.0f;
-	constexpr float LookAheadPerKmhCm = 40.0f;
-	constexpr float SteerFullDeg = 30.0f;
-	constexpr float AutoStraightKmh = 100.0f;
-	constexpr float CornerKmh = 45.0f;
-	constexpr float CornerFullDeg = 40.0f;
 	constexpr float WindowBackCm = 2000.0f;
 	constexpr float WindowAheadCm = 6000.0f;
 }
@@ -154,19 +147,15 @@ void ADNRaceGameMode::DriveAuto(ADNVehicle& Vehicle) const
 	}
 	const TArray<FVector>& Points = Course->GetPoints();
 	const float SpeedKmh = Vehicle.SpeedKmh();
-	const float LookAheadCm = LookAheadMinCm + SpeedKmh * LookAheadPerKmhCm;
+	const float LookAheadCm = FDNRivalDriver::LookAheadCm(SpeedKmh, AutoDriver);
 	const FVector Pos = Vehicle.GetActorLocation();
 	const FVector Forward = Vehicle.GetActorForwardVector();
 	const float Near = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, Player.ProgressCm + LookAheadCm));
 	const float Far = FDNCourse::HeadingErrorDeg(Pos, Forward, FDNCourse::LocationAt(Points, Player.ProgressCm + 2.0f * LookAheadCm));
-
-	// o erro de rumo positivo (alvo à direita) tem o mesmo sinal do esterço. Ganho menor em alta: a 100 km/h o volante cheio faz o
-	// carro oscilar (o mesmo ajuste do piloto automático -DNCruiseKmh do ADNVehicleTestGameMode)
-	const float Gain = FMath::Clamp(15.0f / FMath::Max(SpeedKmh / 3.6f, 1.0f), 0.2f, 1.0f);
-	Move->SetSteeringInput(FMath::Clamp(Near / SteerFullDeg * Gain * Vehicle.AppliedSteeringGain, -1.0f, 1.0f));
-	const float Target = FMath::GetMappedRangeValueClamped(FVector2D(0.0f, CornerFullDeg), FVector2D(AutoStraightKmh, CornerKmh), FMath::Abs(Far));
-	Move->SetThrottleInput(FMath::Clamp(0.4f + (Target - SpeedKmh) * 0.08f, 0.0f, 1.0f));
-	Move->SetBrakeInput(SpeedKmh > Target + 10.0f ? FMath::Clamp((SpeedKmh - Target) * 0.04f, 0.0f, 1.0f) : 0.0f);
+	const FDNDriveCommand Cmd = FDNRivalDriver::Command(Near, Far, SpeedKmh, AutoDriver);
+	Move->SetSteeringInput(FMath::Clamp(Cmd.Steer * Vehicle.AppliedSteeringGain, -1.0f, 1.0f));
+	Move->SetThrottleInput(Cmd.Throttle);
+	Move->SetBrakeInput(Cmd.Brake);
 }
 
 void ADNRaceGameMode::UpdateHud(const ADNVehicle& Vehicle) const
