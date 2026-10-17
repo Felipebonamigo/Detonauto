@@ -313,6 +313,20 @@ namespace DNTest
 		return { CoursePoint(TEXT("rua"), 2, 1000.f, 500.f), CoursePoint(TEXT("rua"), 0, 0.f, 0.f), CoursePoint(TEXT("rua"), 1, 1000.f, 0.f) };
 	}
 
+	/** Uma linha válida de Rivals.csv. */
+	inline FDNRivalEntry RivalEntry(const TCHAR* Id = TEXT("rival-1"), const TCHAR* Name = TEXT("Rival Um"), float Straight = 110.f, float Corner = 50.f)
+	{
+		FDNRivalRow R;
+		R.Name = Name;
+		R.StraightKmh = Straight;
+		R.CornerKmh = Corner;
+		R.CornerFullDeg = 40.f;
+		R.SteerFullDeg = 30.f;
+		R.LookAheadMinCm = 1500.f;
+		R.LookAheadPerKmhCm = 40.f;
+		return Entry<FDNRivalEntry>(R, Id);
+	}
+
 	inline FDNTurboConfigEntry TurboEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTurboConfigEntry>(TurboRow(), Id); }
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }

@@ -38,6 +38,7 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bEffectsValid = FDNDataValidation::ValidateEffects(Data.Effects, Data.Breakables).IsEmpty();
 	bEffectsSettingsValid = FDNDataValidation::ValidateEffectsSettings(Data.EffectsSettings).IsEmpty();
 	bCoursesValid = FDNDataValidation::ValidateCoursePoints(Data.CoursePoints).IsEmpty();
+	bRivalsValid = FDNDataValidation::ValidateRivals(Data.Rivals).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -246,4 +247,18 @@ bool UDNGameDataSubsystem::GetCourse(const FString& CourseId, TArray<FVector>& O
 	}
 	OutWidthCm = Rows[0]->WidthCm;
 	return true;
+}
+
+TArray<TPair<FString, FDNRivalConfig>> UDNGameDataSubsystem::GetRivals() const
+{
+	TArray<TPair<FString, FDNRivalConfig>> Out;
+	if (!bRivalsValid)
+	{
+		return Out;
+	}
+	for (const FDNRivalEntry& E : Data.Rivals)
+	{
+		Out.Emplace(E.Row.Name.TrimStartAndEnd(), E.Row.ToConfig());
+	}
+	return Out;
 }

@@ -651,6 +651,7 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateEffects(Data.Effects, Data.Breakables));
 	Errors.Append(ValidateEffectsSettings(Data.EffectsSettings));
 	Errors.Append(ValidateCoursePoints(Data.CoursePoints));
+	Errors.Append(ValidateRivals(Data.Rivals));
 	return Errors;
 }
 
@@ -1053,6 +1054,36 @@ TArray<FString> FDNDataValidation::ValidateCoursePoints(const TArray<FDNCoursePo
 				Errors.Add(FString::Printf(TEXT("%s, linha '%s': o ponto fica a menos de 100 cm do anterior no percurso '%s'."), File, *Points[i]->Id, *Pair.Key));
 			}
 		}
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateRivals(const TArray<FDNRivalEntry>& Rows)
+{
+	constexpr const TCHAR* File = TEXT("Rivals.csv");
+	TArray<FString> Errors;
+	if (Rows.IsEmpty())
+	{
+		Errors.Add(FString::Printf(TEXT("%s: nenhuma linha (pelo menos um rival)."), File));
+	}
+	else if (Rows.Num() > 7)
+	{
+		Errors.Add(FString::Printf(TEXT("%s: no maximo 7 rivais (veio %d)."), File, Rows.Num()));
+	}
+	CheckIds(File, Rows, Errors);
+	for (const FDNRivalEntry& E : Rows)
+	{
+		const FDNRivalRow& R = E.Row;
+		if (R.Name.TrimStartAndEnd().IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Name' está vazio."), File, *E.Id));
+		}
+		CheckRange(File, E.Id, TEXT("StraightKmh"), R.StraightKmh, 20.0f, false, 400.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("CornerKmh"), R.CornerKmh, 5.0f, false, FMath::IsFinite(R.StraightKmh) ? R.StraightKmh : 400.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("CornerFullDeg"), R.CornerFullDeg, 1.0f, false, 180.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("SteerFullDeg"), R.SteerFullDeg, 1.0f, false, 180.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("LookAheadMinCm"), R.LookAheadMinCm, 100.0f, true, 10000.0f, true, Errors);
+		CheckRange(File, E.Id, TEXT("LookAheadPerKmhCm"), R.LookAheadPerKmhCm, 0.0f, true, 200.0f, true, Errors);
 	}
 	return Errors;
 }

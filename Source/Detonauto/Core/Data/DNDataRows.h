@@ -28,6 +28,8 @@
 //                       SpeedMinMs, SpeedMaxMs, PoolMax, Props (um efeito por linha, cada um uma vez; lote 19, docs/regras-efeitos.md)
 //   EffectsSettings.csv Id + os campos de FDNEffectsSettings (uma linha, id "padrao")
 //   CoursePoints.csv    Id, Course, Order, XCm, YCm, ZCm, WidthCm (um ponto da linha central de um percurso por linha; docs/percurso-1.md)
+//   Rivals.csv          Id, Name, StraightKmh, CornerKmh, CornerFullDeg, SteerFullDeg, LookAheadMinCm, LookAheadPerKmhCm (um rival de corrida por
+//                       linha, na ordem da grade; os campos de FDNRivalConfig)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -39,6 +41,7 @@
 #include "Core/DNTraffic.h"
 #include "Core/DNTurbo.h"
 #include "Core/DNCrash.h"
+#include "Core/DNRivalDriver.h"
 #include "Core/DNTakedown.h"
 #include "Core/DNDamage.h"
 #include "Core/DNCar.h"
@@ -793,6 +796,33 @@ struct FDNCoursePointRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WidthCm = 0.0f;
 };
 
+/** Data/Rivals.csv: um rival de corrida por linha (o nível do piloto, marco 1b), na ordem da grade de largada. Campos: FDNRivalConfig. */
+USTRUCT(BlueprintType)
+struct FDNRivalRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Name;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float StraightKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CornerKmh = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float CornerFullDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SteerFullDeg = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LookAheadMinCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float LookAheadPerKmhCm = 0.0f;
+
+	FDNRivalConfig ToConfig() const
+	{
+		FDNRivalConfig C;
+		C.StraightKmh = StraightKmh;
+		C.CornerKmh = CornerKmh;
+		C.CornerFullDeg = CornerFullDeg;
+		C.SteerFullDeg = SteerFullDeg;
+		C.LookAheadMinCm = LookAheadMinCm;
+		C.LookAheadPerKmhCm = LookAheadPerKmhCm;
+		return C;
+	}
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -821,6 +851,7 @@ using FDNCarGlassEntry = TDNTableEntry<FDNCarGlassRow>;
 using FDNEffectEntry = TDNTableEntry<FDNEffectRow>;
 using FDNEffectsSettingsEntry = TDNTableEntry<FDNEffectsSettingsRow>;
 using FDNCoursePointEntry = TDNTableEntry<FDNCoursePointRow>;
+using FDNRivalEntry = TDNTableEntry<FDNRivalRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -845,4 +876,5 @@ struct FDNData
 	TArray<FDNEffectEntry> Effects;
 	TArray<FDNEffectsSettingsEntry> EffectsSettings;
 	TArray<FDNCoursePointEntry> CoursePoints;
+	TArray<FDNRivalEntry> Rivals;
 };

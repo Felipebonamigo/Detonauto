@@ -1,0 +1,4 @@
+Id,Name,StraightKmh,CornerKmh,CornerFullDeg,SteerFullDeg,LookAheadMinCm,LookAheadPerKmhCm
+rival-1,Veloz,120,55,40,30,1500,40
+rival-2,Firme,110,50,40,30,1500,40
+rival-3,Cauteloso,100,46,40,30,1500,40

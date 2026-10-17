@@ -83,6 +83,11 @@ struct FDNDataValidation
 	 *  [400, 3000] e igual em todos os pontos do percurso; pontos vizinhos (na ordem) a pelo menos 100 cm um do outro.
 	 */
 	static TArray<FString> ValidateCoursePoints(const TArray<FDNCoursePointEntry>& Rows);
+	/**
+	 *  Rivals.csv (rivais de corrida, marco 1b): de 1 a 7 linhas; Name não vazio; StraightKmh (20, 400]; CornerKmh (5, StraightKmh];
+	 *  CornerFullDeg (1, 180]; SteerFullDeg (1, 180]; LookAheadMinCm [100, 10 000]; LookAheadPerKmhCm [0, 200].
+	 */
+	static TArray<FString> ValidateRivals(const TArray<FDNRivalEntry>& Rows);
 
 	/**
 	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros

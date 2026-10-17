@@ -82,6 +82,8 @@ public:
 	/** A linha central do percurso CourseId (Data/CoursePoints.csv), na ordem de Order, e a largura da pista [cm]; sem diferenciar a caixa.
 	 *  Falso, sem mexer nas saídas, se o percurso não existe ou se a tabela é inválida. */
 	bool GetCourse(const FString& CourseId, TArray<FVector>& OutPoints, float& OutWidthCm) const;
+	/** Os rivais de corrida (Data/Rivals.csv) na ordem da grade: nome e nível do piloto. Vazio se a tabela é inválida. */
+	TArray<TPair<FString, FDNRivalConfig>> GetRivals() const;
 
 private:
 	FDNData Data;
@@ -103,4 +105,5 @@ private:
 	bool bEffectsValid = false;
 	bool bEffectsSettingsValid = false;
 	bool bCoursesValid = false;
+	bool bRivalsValid = false;
 };
