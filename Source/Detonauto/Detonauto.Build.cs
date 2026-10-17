@@ -15,7 +15,7 @@ public class Detonauto : ModuleRules
 		// (Vehicle/DNVehicle); PhysicsCore dá o tipo do corpo físico que o Chaos usa.
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "Json", "InputCore", "EnhancedInput", "ChaosVehicles", "PhysicsCore" });
 		// Niagara (lote 19, docs/regras-efeitos.md): os efeitos de batida (Effects/UDNEffectsSubsystem, Vehicle/UDNCarEffectsComponent)
-		PrivateDependencyModuleNames.Add("Niagara");
+		PrivateDependencyModuleNames.AddRange(new string[] { "Niagara", "RenderCore" });
 
 		// Um módulo só, com subpastas (Core, Vehicle, Damage...): os includes são "Core/DNScore.h" etc.
 		PublicIncludePaths.Add(ModuleDirectory);

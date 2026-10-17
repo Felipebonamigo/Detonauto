@@ -6,6 +6,7 @@
 #include "Components/SkyLightComponent.h"
 #include "Components/PostProcessComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
@@ -66,6 +67,7 @@ ADNCourseActor::ADNCourseActor()
 		return Ism;
 	};
 	Road = MakeInstances(TEXT("Road"));
+	Markings = MakeInstances(TEXT("Markings"));
 	Posts = MakeInstances(TEXT("Posts"));
 
 	// acabamento do City Sample (docs/percurso-1.md, passo a2); se os assets não estão no projeto, fica a pista cinza
@@ -98,8 +100,10 @@ ADNCourseActor::ADNCourseActor()
 	UDirectionalLightComponent* Sun = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Sun"));
 	Sun->SetupAttachment(Root);
 	Sun->SetMobility(EComponentMobility::Movable);
-	Sun->SetRelativeRotation(FRotator(-50.0f, -35.0f, 0.0f));
-	Sun->SetIntensity(6.0f);
+	// luz de fim de tarde: sol mais baixo e quente (o céu da atmosfera segue o ângulo)
+	Sun->SetRelativeRotation(FRotator(-24.0f, -35.0f, 0.0f));
+	Sun->SetIntensity(7.0f);
+	Sun->SetLightColor(FLinearColor(1.0f, 0.86f, 0.70f));
 	Sun->ForwardShadingPriority = 1;
 	Sun->SetAtmosphereSunLight(true);
 
@@ -113,6 +117,14 @@ ADNCourseActor::ADNCourseActor()
 	// céu e névoa: o mapa vazio é um fundo preto sem eles
 	USkyAtmosphereComponent* Atmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("Atmosphere"));
 	Atmosphere->SetupAttachment(Root);
+	// nuvens: material simples de nuvens volumétricas da própria engine
+	UVolumetricCloudComponent* Clouds = CreateDefaultSubobject<UVolumetricCloudComponent>(TEXT("Clouds"));
+	Clouds->SetupAttachment(Root);
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CloudMat(TEXT("/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst.m_SimpleVolumetricCloud_Inst"));
+	if (CloudMat.Succeeded())
+	{
+		Clouds->SetMaterial(CloudMat.Object);
+	}
 	UExponentialHeightFogComponent* Fog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("Fog"));
 	Fog->SetupAttachment(Root);
 	Fog->SetFogDensity(0.004f);
@@ -189,6 +201,7 @@ void ADNCourseActor::Build(const TArray<FVector>& InPoints, float InWidthCm, flo
 	{
 		Color->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.02f, 0.02f, 0.025f));
 	}
+	AddRoadMarkings();
 	AddSidewalks();
 	AddBuildings();
 
@@ -398,4 +411,38 @@ FTransform ADNCourseActor::GridTransform(int32 Slot, float HeightCm) const
 	const float BackCm = 600.0f * (Slot / 2 + 1);
 	const float SideCm = (Slot % 2 == 0 ? -300.0f : 300.0f);
 	return FTransform(Start.GetRotation(), Start.GetLocation() - Forward * BackCm + Right * SideCm);
+}
+
+void ADNCourseActor::AddRoadMarkings()
+{
+	// linha central tracejada (3 m de traço, 5 m de vão) e bordas contínuas a 60 cm da borda do asfalto; 12 cm de largura, 0,6 cm de espessura
+	constexpr float LineWidthCm = 12.0f;
+	constexpr float LineThickCm = 0.6f;
+	constexpr float DashCm = 300.0f;
+	constexpr float PeriodCm = 800.0f;
+	constexpr float EdgeStepCm = 400.0f;
+	const float EdgeOffset = WidthCm * 0.5f - 60.0f;
+	for (float S = 0.0f; S < GeoLengthCm; S += PeriodCm)
+	{
+		const float Mid = FMath::Min(S + DashCm * 0.5f, GeoLengthCm);
+		const FVector P = FDNCourse::LocationAt(GeoPoints, Mid);
+		const FVector Dir = (FDNCourse::LocationAt(GeoPoints, Mid + 50.0f) - FDNCourse::LocationAt(GeoPoints, FMath::Max(Mid - 50.0f, 0.0f))).GetSafeNormal2D();
+		Markings->AddInstance(FTransform(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.0f), FVector(P.X, P.Y, LineThickCm * 0.5f), FVector(DashCm, LineWidthCm, LineThickCm) / CubeCm), true);
+	}
+	for (float S = 0.0f; S < GeoLengthCm; S += EdgeStepCm)
+	{
+		const float Mid = FMath::Min(S + EdgeStepCm * 0.5f, GeoLengthCm);
+		const FVector P = FDNCourse::LocationAt(GeoPoints, Mid);
+		const FVector Dir = (FDNCourse::LocationAt(GeoPoints, Mid + 50.0f) - FDNCourse::LocationAt(GeoPoints, FMath::Max(Mid - 50.0f, 0.0f))).GetSafeNormal2D();
+		const FVector Side(-Dir.Y, Dir.X, 0.0f);
+		for (const float Sign : { -1.0f, 1.0f })
+		{
+			const FVector Q = P + Side * (Sign * EdgeOffset);
+			Markings->AddInstance(FTransform(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.0f), FVector(Q.X, Q.Y, LineThickCm * 0.5f), FVector(EdgeStepCm + 30.0f, LineWidthCm, LineThickCm) / CubeCm), true);
+		}
+	}
+	if (UMaterialInstanceDynamic* Paint = Markings->CreateAndSetMaterialInstanceDynamic(0))
+	{
+		Paint->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.62f, 0.60f, 0.52f)); // tinta gasta, não branco puro
+	}
 }

@@ -40,6 +40,9 @@ private:
 	/** Calçada e meio-fio do City Sample dos dois lados da pista, em peças retas ao longo da linha (passo a2). Sem os assets: nada. */
 	void AddSidewalks();
 
+	/** Faixas no asfalto: linha central tracejada e bordas contínuas, em caixas finas ao longo da linha. */
+	void AddRoadMarkings();
+
 	/** Fachadas de prédio do City Sample (kit CH/C L10_A) dos dois lados, atrás da calçada, com a ordem das peças sorteada por uma semente
 	 *  fixa (o percurso é sempre igual); passo a3. Sem os assets: nada. */
 	void AddBuildings();
@@ -63,6 +66,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="Percurso")
 	TObjectPtr<UInstancedStaticMeshComponent> Posts;
+
+	UPROPERTY(VisibleAnywhere, Category="Percurso")
+	TObjectPtr<UInstancedStaticMeshComponent> Markings;
 
 	UPROPERTY(VisibleAnywhere, Category="Percurso")
 	TObjectPtr<UInstancedStaticMeshComponent> Sidewalk;

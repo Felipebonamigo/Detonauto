@@ -490,3 +490,14 @@ quanto tempo o carro passa com o sol de frente e olhando as retas longas.)
   o p95 por volta do limite. Medir de novo quando houver um PC de referência mais fraco, ou reduzir o custo da cena antes de empilhar mais prédios.
 - **Não medido:** memória de vídeo e o *streaming* das texturas (as de City Sample vieram em 8K, ~1,5 GB no disco). Reduzir para 2k continua na fila (regra do lote 20); depende de um
   passo de reimportação no editor que ainda não existe.
+
+### Remedição depois do visual da corrida (17 out 2026, rodadas 1 a 3)
+
+Mesma ferramenta e perfil (`race-measure.ps1`, `DN_AlvoPS5`, 1080p, 10 s de aquecimento e 30 s de medição, nenhum outro Unreal aberto), agora com fachadas em 6 cores, calçada e meio-fio do City Sample, postes, jacarandás e bancos destrutíveis, faixas no asfalto, nuvens volumétricas, pós-processamento e o HUD com barra segmentada. Média / p95 em ms:
+
+| Cenário | Frame | Game | Draw | GPU |
+|---|---|---|---|---|
+| sem rivais (1 carro) | 7,16 / 7,86 | 1,75 / 1,97 | 7,15 / 7,85 | 6,78 / 7,29 |
+| com 3 rivais (4 carros) | 7,40 / 8,06 | 2,60 / 2,88 | 7,39 / 8,04 | 7,01 / 7,53 |
+
+Continua **GPU-bound e sob os 16,6 ms** com folga (p95 de 8 ms). Os p95 da medição anterior (12 a 13 ms) vinham de ruído: havia outros Unreal abertos em parte das rodadas; esta rodada ficou limpa. Os rivais custam ~0,85 ms de Game no conjunto (0,28 ms cada). As nuvens volumétricas e as 5 variantes de material das fachadas não pesaram visivelmente. A ressalva de sempre: a RTX 4070 Ti é mais forte que o alvo; VRAM e streaming das texturas (8K do City Sample) seguem sem medir.

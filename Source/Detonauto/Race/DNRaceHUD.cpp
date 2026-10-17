@@ -2,6 +2,8 @@
 #include "Race/DNRaceGameMode.h"
 #include "Core/DNRaceFormat.h"
 #include "Engine/Canvas.h"
+#include "CanvasItem.h"
+#include "RenderUtils.h"
 #include "Engine/Font.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/Engine.h"
@@ -68,19 +70,41 @@ void ADNRaceHUD::DrawHUD()
 	const float BarW = 520.0f * U, BarH = 22.0f * U;
 	const float BarX = (W - BarW) * 0.5f, BarY = H - Margin - 110.0f * U;
 	const float Turbo = D.TurboMax > 0.0f ? FMath::Clamp(D.TurboBar / D.TurboMax, 0.0f, 1.0f) : 0.0f;
-	DrawRect(FLinearColor(0, 0, 0, 0.6f), BarX - 3.0f, BarY - 3.0f, BarW + 6.0f, BarH + 6.0f);
-	DrawRect(Turbo >= 0.999f ? Yellow : Orange, BarX, BarY, BarW * Turbo, BarH);
+	// 20 segmentos inclinados (paralelogramos): cheios da esquerda até o nível do turbo; a cor sobe de laranja a amarelo
+	constexpr int32 Segments = 20;
+	const float Slant = 10.0f * U;
+	const float SegW = (BarW - Slant) / Segments;
+	for (int32 i = 0; i < Segments; ++i)
+	{
+		const bool bOn = (i + 1) <= FMath::CeilToInt(Turbo * Segments - 0.001f) && Turbo > 0.0f;
+		const FLinearColor C = bOn ? FLinearColor::LerpUsingHSV(Orange, Yellow, static_cast<float>(i) / (Segments - 1)) : FLinearColor(0.08f, 0.08f, 0.08f, 0.75f);
+		const float X0 = BarX + i * SegW;
+		const float W0 = SegW - 3.0f * U;
+		FCanvasTriangleItem T1(FVector2D(X0 + Slant, BarY), FVector2D(X0 + Slant + W0, BarY), FVector2D(X0, BarY + BarH), GWhiteTexture);
+		FCanvasTriangleItem T2(FVector2D(X0 + Slant + W0, BarY), FVector2D(X0 + W0, BarY + BarH), FVector2D(X0, BarY + BarH), GWhiteTexture);
+		T1.SetColor(C);
+		T2.SetColor(C);
+		Canvas->DrawItem(T1);
+		Canvas->DrawItem(T2);
+	}
 	Text(TEXT("TURBO"), BarX, BarY - 36.0f * U, 0.8f * U, FLinearColor(0.85f, 0.85f, 0.85f, 1));
 
 	// progresso: barra fina embaixo, com uma marca por rival e a do jogador
 	const float PW = W - 2.0f * Margin, PY = H - Margin - 40.0f * U;
 	DrawRect(FLinearColor(0, 0, 0, 0.6f), Margin - 3.0f, PY - 3.0f, PW + 6.0f, 14.0f * U + 6.0f);
 	DrawRect(FLinearColor(0.25f, 0.25f, 0.25f, 1), Margin, PY, PW, 14.0f * U);
+	// marcas em triângulo apontando para a barra: vermelhas pequenas (rivais) e a verde grande (o jogador)
+	auto Marker = [this, PY, U](float X, float Size, const FLinearColor& C)
+	{
+		FCanvasTriangleItem T(FVector2D(X - Size, PY - Size * 1.6f), FVector2D(X + Size, PY - Size * 1.6f), FVector2D(X, PY - 1.0f * U), GWhiteTexture);
+		T.SetColor(C);
+		Canvas->DrawItem(T);
+	};
 	for (const float P : D.RivalProgress)
 	{
-		DrawRect(FLinearColor(0.9f, 0.3f, 0.3f, 1), Margin + PW * FMath::Clamp(P, 0.0f, 1.0f) - 4.0f * U, PY - 6.0f * U, 8.0f * U, 26.0f * U);
+		Marker(Margin + PW * FMath::Clamp(P, 0.0f, 1.0f), 7.0f * U, FLinearColor(0.95f, 0.3f, 0.25f, 1));
 	}
-	DrawRect(Green, Margin + PW * FMath::Clamp(D.PlayerProgress, 0.0f, 1.0f) - 5.0f * U, PY - 10.0f * U, 10.0f * U, 34.0f * U);
+	Marker(Margin + PW * FMath::Clamp(D.PlayerProgress, 0.0f, 1.0f), 11.0f * U, Green);
 
 	// contagem de largada
 	if (D.CountdownLeftS > 0.0f)
