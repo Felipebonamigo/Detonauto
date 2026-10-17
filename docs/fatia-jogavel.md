@@ -58,3 +58,11 @@ sobre o que mudou **na diversão e no visual**.
 2. **O percurso da corrida:** ponto a ponto (largada a chegada) ou **circuito de voltas** pelas ruas? Sugestão: ponto a ponto, mais
    curto e mais fácil de ler.
 3. **Quando baixar o City Sample no Fab** (prédios, mobiliário, veículos), para os gráficos finais.
+
+## City Sample: onde está e quanto entra (17/10/2026)
+
+- Cópia de trabalho do City Sample em `D:\CitySample` (fora do repositório, 104 GB; o build do editor dele passou com `-NoUBA -MaxParallelActions=4`,
+  porque o acelerador estourou a memória virtual, erro 1455).
+- **Orçamento decidido pelo Felipe: até 3 GB de City Sample no repositório (LFS)**; hoje o LFS do jogo tem ~0,4 GB. Passou de 3 GB: parar e perguntar.
+- Migrar só o que o trecho de corrida usa (kit de rua e calçada, prédios, mobiliário, árvores, 3 carros de tráfego), texturas em 2k onde der;
+  cada grupo migrado ganha linha em `docs/licencas.csv`.
