@@ -69,6 +69,61 @@ void FDNCourseSpec::Define()
 		});
 	});
 
+	Describe("Marcas (C5)", [this]()
+	{
+		It("a cada espacamento, e a ultima e a chegada", [this]()
+		{
+			const TArray<float> M = FDNCourse::Marks(1000.f, 300.f);
+			TestTrue("300, 600, 900, 1000", M.Num() == 4 && M[0] == 300.f && M[1] == 600.f && M[2] == 900.f && M[3] == 1000.f);
+		});
+
+		It("comprimento multiplo: a chegada nao repete", [this]()
+		{
+			const TArray<float> M = FDNCourse::Marks(900.f, 300.f);
+			TestTrue("300, 600, 900", M.Num() == 3 && M[2] == 900.f);
+		});
+
+		It("espacamento maior que o percurso: so a chegada", [this]()
+		{
+			const TArray<float> M = FDNCourse::Marks(500.f, 800.f);
+			TestTrue("500", M.Num() == 1 && M[0] == 500.f);
+		});
+
+		It("entradas invalidas", [this]()
+		{
+			TestEqual("espacamento 0: so a chegada", FDNCourse::Marks(500.f, 0.f).Num(), 1);
+			TestEqual("espacamento NaN: so a chegada", FDNCourse::Marks(500.f, NaNf).Num(), 1);
+			TestEqual("comprimento 0: nada", FDNCourse::Marks(0.f, 100.f).Num(), 0);
+			TestEqual("comprimento NaN: nada", FDNCourse::Marks(NaNf, 100.f).Num(), 0);
+		});
+	});
+
+	Describe("Erro de rumo (C6)", [this]()
+	{
+		It("alvo a esquerda e positivo, a direita negativo, em frente zero, atras 180", [this]()
+		{
+			const FVector P(0, 0, 0), F(1, 0, 0);
+			TestEqual("frente", FDNCourse::HeadingErrorDeg(P, F, FVector(100, 0, 0)), 0.f, 0.01f);
+			TestEqual("esquerda (+Y)", FDNCourse::HeadingErrorDeg(P, F, FVector(0, 100, 0)), 90.f, 0.01f);
+			TestEqual("direita (-Y)", FDNCourse::HeadingErrorDeg(P, F, FVector(0, -100, 0)), -90.f, 0.01f);
+			TestEqual("45 a esquerda", FDNCourse::HeadingErrorDeg(P, F, FVector(100, 100, 0)), 45.f, 0.01f);
+			TestEqual("atras", FMath::Abs(FDNCourse::HeadingErrorDeg(P, F, FVector(-100, 0, 0))), 180.f, 0.01f);
+		});
+
+		It("ignora a altura e vale com a frente nao normalizada e a posicao fora da origem", [this]()
+		{
+			TestEqual("Z ignorado", FDNCourse::HeadingErrorDeg(FVector(10, 10, 5), FVector(0, 7, 3), FVector(10, 10, 900)), 0.f, 0.01f);
+			TestEqual("frente +Y, alvo -X: esquerda", FDNCourse::HeadingErrorDeg(FVector(10, 10, 0), FVector(0, 7, 0), FVector(-90, 10, 0)), 90.f, 0.01f);
+		});
+
+		It("degenerado: zero", [this]()
+		{
+			TestEqual("frente zero", FDNCourse::HeadingErrorDeg(FVector::ZeroVector, FVector::ZeroVector, FVector(1, 0, 0)), 0.f);
+			TestEqual("alvo na posicao", FDNCourse::HeadingErrorDeg(FVector(5, 5, 0), FVector(1, 0, 0), FVector(5, 5, 9)), 0.f);
+			TestEqual("NaN", FDNCourse::HeadingErrorDeg(FVector::ZeroVector, FVector(1, 0, 0), FVector(NaNf, 0, 0)), 0.f);
+		});
+	});
+
 	Describe("Ponto no progresso", [this]()
 	{
 		It("interpola e prende", [this]()

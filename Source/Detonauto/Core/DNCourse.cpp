@@ -87,3 +87,32 @@ FVector FDNCourse::LocationAt(TConstArrayView<FVector> Points, float ProgressCm)
 	}
 	return Points.Last();
 }
+
+TArray<float> FDNCourse::Marks(float LengthCm, float SpacingCm)
+{
+	TArray<float> Out;
+	if (!FMath::IsFinite(LengthCm) || LengthCm <= 0.0f)
+	{
+		return Out;
+	}
+	if (FMath::IsFinite(SpacingCm) && SpacingCm > 0.0f)
+	{
+		for (int32 k = 1; k * static_cast<double>(SpacingCm) < LengthCm; ++k)
+		{
+			Out.Add(static_cast<float>(k * static_cast<double>(SpacingCm)));
+		}
+	}
+	Out.Add(LengthCm);
+	return Out;
+}
+
+float FDNCourse::HeadingErrorDeg(const FVector& Position, const FVector& Forward, const FVector& Target)
+{
+	const FVector2D F(Forward.X, Forward.Y);
+	const FVector2D T(Target.X - Position.X, Target.Y - Position.Y);
+	if (!FMath::IsFinite(F.X + F.Y + T.X + T.Y) || F.SizeSquared() < UE_DOUBLE_SMALL_NUMBER || T.SizeSquared() < UE_DOUBLE_SMALL_NUMBER)
+	{
+		return 0.0f;
+	}
+	return static_cast<float>(FMath::RadiansToDegrees(FMath::Atan2(F.X * T.Y - F.Y * T.X, F.X * T.X + F.Y * T.Y)));
+}
