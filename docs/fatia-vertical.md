@@ -66,6 +66,8 @@ Contrato com os números, o orçamento e a aprovação: `docs/regras-efeitos.md`
 
 ## Lote 20: o primeiro cruzamento
 
+Contrato atualizado (17 out, depois da corrida): `docs/regras-crash-cruzamento.md`.
+
 - Mapa `L_Cruzamento01` criado por script: cruzamento de duas avenidas, 4
   aproximações com 2 ou 3 faixas, semáforos simples (ciclo fixo), calçadas,
   mobiliário da cena de aparência, rampa ou reta de largada para o jogador
