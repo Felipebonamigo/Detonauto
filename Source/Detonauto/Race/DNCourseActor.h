@@ -11,6 +11,7 @@
 class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
 class UPhysicalMaterial;
+class UMaterialInterface;
 
 UCLASS()
 class DETONAUTO_API ADNCourseActor : public AActor
@@ -33,6 +34,13 @@ public:
 	FTransform StartTransform(float HeightCm) const;
 
 private:
+	/** Calçada e meio-fio do City Sample dos dois lados da pista, em peças retas ao longo da linha (passo a2). Sem os assets: nada. */
+	void AddSidewalks();
+
+	/** Fachadas de prédio do City Sample (kit CH/C L10_A) dos dois lados, atrás da calçada, com a ordem das peças sorteada por uma semente
+	 *  fixa (o percurso é sempre igual); passo a3. Sem os assets: nada. */
+	void AddBuildings();
+
 	/** Um pórtico (dois postes e uma viga) atravessando a pista no progresso dado. */
 	void AddGantry(float ProgressCm, float HeightCm, float BeamHeightCm);
 
@@ -49,6 +57,23 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="Percurso")
 	TObjectPtr<UInstancedStaticMeshComponent> Posts;
+
+	UPROPERTY(VisibleAnywhere, Category="Percurso")
+	TObjectPtr<UInstancedStaticMeshComponent> Sidewalk;
+
+	UPROPERTY(VisibleAnywhere, Category="Percurso")
+	TObjectPtr<UInstancedStaticMeshComponent> Curb;
+
+	/** O miolo de cada prédio, atrás da fachada: sem ele as janelas mostram o chão do outro lado (a peça é só a casca). */
+	UPROPERTY(VisibleAnywhere, Category="Percurso")
+	TObjectPtr<UInstancedStaticMeshComponent> BuildingMass;
+
+	/** Uma instância por variante da fachada (cada peça tem a própria malha e o próprio comprimento). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> Facades;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> AsphaltMaterial;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPhysicalMaterial> GroundMaterial;
