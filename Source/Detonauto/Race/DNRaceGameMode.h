@@ -19,6 +19,7 @@
 #include "Core/DNRivalDriver.h"
 #include "Core/DNRaceTakedown.h"
 #include "Core/DNTakedown.h"
+#include "Race/DNRaceHUD.h"
 #include "DNRaceGameMode.generated.h"
 
 class ADNCourseActor;
@@ -36,6 +37,9 @@ public:
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	virtual void Tick(float DeltaSeconds) override;
 
+	/** Os números do HUD deste quadro (ADNRaceHUD). */
+	FDNRaceHudData BuildHudData() const;
+
 protected:
 	virtual void StartPlay() override;
 
@@ -48,7 +52,8 @@ private:
 	UFUNCTION()
 	void OnPlayerHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 	void LogStandings(const TCHAR* Why) const;
-	void UpdateHud(const ADNVehicle& Vehicle) const;
+	/** Tecla R: a corrida recomeça (a grade, os estados, os rivais); o carro do jogador volta pelo próprio DNRestart. */
+	void ResetRace();
 
 	UPROPERTY(Transient)
 	TObjectPtr<ADNCourseActor> Course;

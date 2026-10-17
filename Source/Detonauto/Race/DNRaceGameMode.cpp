@@ -11,6 +11,10 @@
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Engine/Engine.h"
+#include "Core/DNRaceFormat.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerController.h"
+#include "InputCoreTypes.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerStart.h"
 #include "Misc/CommandLine.h"
@@ -25,6 +29,7 @@ namespace
 ADNRaceGameMode::ADNRaceGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	HUDClass = ADNRaceHUD::StaticClass();
 }
 
 void ADNRaceGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
@@ -132,13 +137,16 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 		return;
 	}
 
+	if (const APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		if (PC->WasInputKeyJustPressed(EKeys::R))
+		{
+			ResetRace();
+		}
+	}
 	SinceStartS += DeltaSeconds;
 	if (SinceStartS < CountdownS)
 	{
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(9300, 0.0f, FColor::Red, FString::Printf(TEXT("%d"), FMath::CeilToInt(CountdownS - SinceStartS)), false, FVector2D(4.0f));
-		}
 		if (bAuto)
 		{
 			if (UChaosWheeledVehicleMovementComponent* Hold = Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovement()))
@@ -206,7 +214,7 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 		{
 			bAllFinished &= R.State.bFinished;
 		}
-		if (bFinishedLogged && (bAllFinished || RaceTime - FinishedAt > 12.0f))
+		if (bFinishedLogged && RaceTime - FinishedAt > 4.0f && (bAllFinished || RaceTime - FinishedAt > 12.0f))
 		{
 			LogStandings(bAllFinished ? TEXT("todos chegaram") : TEXT("12 s depois do jogador"));
 			FPlatformMisc::RequestExit(false);
@@ -214,7 +222,6 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 	}
 	TickRivals(DeltaSeconds);
 	TickTakedowns(*Vehicle);
-	UpdateHud(*Vehicle);
 }
 
 void ADNRaceGameMode::TickRivals(float DeltaSeconds)
@@ -337,32 +344,6 @@ void ADNRaceGameMode::DriveAuto(ADNVehicle& Vehicle) const
 	Move->SetBrakeInput(Cmd.Brake);
 }
 
-void ADNRaceGameMode::UpdateHud(const ADNVehicle& Vehicle) const
-{
-	if (!GEngine)
-	{
-		return;
-	}
-	const float Scale = 1.6f;
-	const float Length = Course->GetLengthCm();
-	GEngine->AddOnScreenDebugMessage(9301, 0.0f, bFinishedLogged ? FColor::Green : FColor::White,
-		FString::Printf(TEXT("%s     Tempo: %.1f s"), bFinishedLogged ? TEXT("CHEGADA") : TEXT("CORRIDA"), bFinishedLogged ? FinishedAt : RaceTime), false, FVector2D(Scale));
-	TArray<FDNRacerState> All;
-	All.Add(Player);
-	for (const FRival& R : Rivals)
-	{
-		All.Add(R.State);
-	}
-	GEngine->AddOnScreenDebugMessage(9303, 0.0f, FColor::Cyan, FString::Printf(TEXT("Posicao: %d / %d"), FDNRace::Position(All, 0), All.Num()), false, FVector2D(Scale));
-	GEngine->AddOnScreenDebugMessage(9304, 0.0f, FColor::Orange, FString::Printf(TEXT("Takedowns: %d     Turbo: %.0f"), Takedowns, Vehicle.GetTurbo() ? Vehicle.GetTurbo()->GetBar() : 0.0f), false, FVector2D(Scale));
-	if (GetWorld()->GetTimeSeconds() - LastTakedownAt < 3.0)
-	{
-		GEngine->AddOnScreenDebugMessage(9305, 0.0f, FColor::Red, LastTakedownText, false, FVector2D(3.0f));
-	}
-	GEngine->AddOnScreenDebugMessage(9302, 0.0f, FColor::Yellow,
-		FString::Printf(TEXT("Percurso: %.0f de %.0f m (%.0f%%)     Ponto %d/%d"), Player.ProgressCm / 100.0f, Length / 100.0f, Length > 0.0f ? 100.0f * Player.ProgressCm / Length : 0.0f, NextMark, Course->GetMarks().Num() - 1), false, FVector2D(Scale));
-}
-
 void ADNRaceGameMode::OnPlayerHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	const ADNVehicle* PlayerCar = FindVehicle();
@@ -450,4 +431,84 @@ void ADNRaceGameMode::TickTakedowns(ADNVehicle& Vehicle)
 	{
 		PrevRivalVelocity[i] = Rivals[i].Car.IsValid() ? Rivals[i].Car->GetVelocity() : FVector::ZeroVector;
 	}
+}
+
+void ADNRaceGameMode::ResetRace()
+{
+	Player = FDNRacerState();
+	RaceTime = 0.0f;
+	SinceStartS = 0.0f;
+	NextMark = 0;
+	LastCheckpointAtS = 0.0f;
+	LastAdvanceAtS = 0.0f;
+	LastAdvanceCm = 0.0f;
+	bFinishedLogged = false;
+	FinishedAt = -1.0f;
+	Takedowns = 0;
+	LastTakedownAt = -100.0;
+	Pending.Reset();
+	for (int32 i = 0; i < Rivals.Num(); ++i)
+	{
+		FRival& R = Rivals[i];
+		R.State = FDNRacerState();
+		R.Wreck = FDNWreckState();
+		R.bWreckNow = false;
+		if (ADNVehicle* Car = R.Car.Get())
+		{
+			Car->RestartAt(Course->GridTransform(i, 120.0f));
+		}
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("DNRace: corrida reiniciada (tecla R)."));
+}
+
+FDNRaceHudData ADNRaceGameMode::BuildHudData() const
+{
+	FDNRaceHudData D;
+	const ADNVehicle* Vehicle = FindVehicle();
+	if (!Course || !Vehicle)
+	{
+		return D;
+	}
+	const float Length = FMath::Max(Course->GetLengthCm(), 1.0f);
+	TArray<FDNRacerState> All;
+	TArray<FString> Names;
+	All.Add(Player);
+	Names.Add(TEXT("Voce"));
+	for (const FRival& R : Rivals)
+	{
+		All.Add(R.State);
+		Names.Add(R.Name);
+		D.RivalProgress.Add(R.State.ProgressCm / Length);
+	}
+	D.Position = FDNRace::Position(All, 0);
+	D.Total = All.Num();
+	D.TimeS = bFinishedLogged ? FinishedAt : RaceTime;
+	D.SpeedKmh = Vehicle->SpeedKmh();
+	if (const UDNTurboComponent* Turbo = Vehicle->GetTurbo())
+	{
+		D.TurboBar = Turbo->GetBar();
+		D.TurboMax = Turbo->GetMaxBar();
+	}
+	D.Takedowns = Takedowns;
+	D.TakedownAgeS = static_cast<float>(GetWorld()->GetTimeSeconds() - LastTakedownAt);
+	D.TakedownText = LastTakedownText;
+	D.PlayerProgress = Player.ProgressCm / Length;
+	D.CountdownLeftS = FMath::Max(CountdownS - SinceStartS, 0.0f);
+	D.bFinished = bFinishedLogged;
+	D.bPlayerWrecked = Vehicle->GetDamage().bDestroyed && !bFinishedLogged;
+	if (D.bFinished || D.bPlayerWrecked)
+	{
+		const TArray<int32> Order = FDNRace::Order(All);
+		for (int32 Place = 0; Place < Order.Num(); ++Place)
+		{
+			const FDNRacerState& S = All[Order[Place]];
+			FDNRaceHudRow Row;
+			Row.Place = FDNRaceFormat::Place(Place + 1);
+			Row.Name = Names[Order[Place]];
+			Row.Value = S.bFinished ? FDNRaceFormat::Time(S.FinishTimeS) : FString::Printf(TEXT("%.0f m"), S.ProgressCm / 100.0f);
+			Row.bPlayer = Order[Place] == 0;
+			D.Rows.Add(Row);
+		}
+	}
+	return D;
 }
