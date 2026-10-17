@@ -100,20 +100,20 @@ void FDNCourseSpec::Define()
 
 	Describe("Erro de rumo (C6)", [this]()
 	{
-		It("alvo a esquerda e positivo, a direita negativo, em frente zero, atras 180", [this]()
+		It("alvo para +Y (direita no Unreal) e positivo, para -Y negativo, em frente zero, atras 180", [this]()
 		{
 			const FVector P(0, 0, 0), F(1, 0, 0);
 			TestEqual("frente", FDNCourse::HeadingErrorDeg(P, F, FVector(100, 0, 0)), 0.f, 0.01f);
-			TestEqual("esquerda (+Y)", FDNCourse::HeadingErrorDeg(P, F, FVector(0, 100, 0)), 90.f, 0.01f);
-			TestEqual("direita (-Y)", FDNCourse::HeadingErrorDeg(P, F, FVector(0, -100, 0)), -90.f, 0.01f);
-			TestEqual("45 a esquerda", FDNCourse::HeadingErrorDeg(P, F, FVector(100, 100, 0)), 45.f, 0.01f);
+			TestEqual("direita (+Y)", FDNCourse::HeadingErrorDeg(P, F, FVector(0, 100, 0)), 90.f, 0.01f);
+			TestEqual("esquerda (-Y)", FDNCourse::HeadingErrorDeg(P, F, FVector(0, -100, 0)), -90.f, 0.01f);
+			TestEqual("45 para +Y", FDNCourse::HeadingErrorDeg(P, F, FVector(100, 100, 0)), 45.f, 0.01f);
 			TestEqual("atras", FMath::Abs(FDNCourse::HeadingErrorDeg(P, F, FVector(-100, 0, 0))), 180.f, 0.01f);
 		});
 
 		It("ignora a altura e vale com a frente nao normalizada e a posicao fora da origem", [this]()
 		{
 			TestEqual("Z ignorado", FDNCourse::HeadingErrorDeg(FVector(10, 10, 5), FVector(0, 7, 3), FVector(10, 10, 900)), 0.f, 0.01f);
-			TestEqual("frente +Y, alvo -X: esquerda", FDNCourse::HeadingErrorDeg(FVector(10, 10, 0), FVector(0, 7, 0), FVector(-90, 10, 0)), 90.f, 0.01f);
+			TestEqual("frente +Y, alvo -X: +Y gira para -X", FDNCourse::HeadingErrorDeg(FVector(10, 10, 0), FVector(0, 7, 0), FVector(-90, 10, 0)), 90.f, 0.01f);
 		});
 
 		It("degenerado: zero", [this]()

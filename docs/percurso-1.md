@@ -28,3 +28,8 @@ captura aprovada pelo Felipe a cada passo. Orçamento total do City Sample no re
 
 - Montar prédios modulares ao longo de curvas dá encaixe feio; começamos com ruas de quarteirão reto e curvas de 90 graus em cruzamentos.
 - Texturas de prédio do City Sample são 4k: reduzir para 2k na migração (regra do lote 20).
+
+## Andamento
+
+- **a1 feito (17 out):** pista cinza gerada da linha de `Data/CoursePoints.csv` (percurso1, 1976 m), largada, 7 pontos de verificação e chegada, progresso e chegada pelo Core, piloto automático que completa em 80,9 s. Sinal do erro de rumo: positivo = lado +Y, que no Unreal é a direita (o mesmo do esterço).
+- **a2 e a3:** asfalto e calçada do City Sample, depois prédios e mobiliário; esperam o ok do Felipe sobre o rumo (seção Decisão).

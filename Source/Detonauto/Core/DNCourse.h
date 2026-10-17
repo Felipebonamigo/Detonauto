@@ -8,8 +8,9 @@
 //  C3 posição não finita, ou percurso inválido: devolve o Hint (o progresso anterior vale);
 //  C5 as marcas (largada, pontos de verificação, chegada) ficam a cada SpacingCm a partir da largada, e a última é sempre a chegada (o
 //     comprimento); espaçamento <= 0 ou não finito, ou comprimento <= 0: só a chegada se o comprimento é válido, senão nada;
-//  C6 o erro de rumo é o ângulo [graus, -180 a 180, positivo = alvo à esquerda do vetor frente] entre a frente do carro e a direção ao
-//     alvo, no plano horizontal; vetor ou alvo degenerado: 0.
+//  C6 o erro de rumo é o ângulo [graus, -180 a 180] entre a frente do carro e a direção ao alvo, no plano horizontal; positivo = o
+//     alvo está do lado +Y da frente, que no Unreal (X à frente, Y à direita) é a DIREITA, o mesmo sinal do esterço; vetor ou alvo
+//     degenerado: 0.
 //  C4 a projeção fica presa nas pontas: antes do início é 0, depois do fim é o comprimento.
 
 #pragma once
@@ -27,7 +28,7 @@ struct FDNCourse
 	/** C5: os progressos das marcas [cm], em ordem crescente; a última é a chegada. */
 	static TArray<float> Marks(float LengthCm, float SpacingCm);
 
-	/** C6: o quanto o carro precisa virar para apontar para Target [graus]; positivo = esquerda. */
+	/** C6: o quanto o carro precisa virar para apontar para Target [graus]; positivo = para a direita (+Y), como o esterço. */
 	static float HeadingErrorDeg(const FVector& Position, const FVector& Forward, const FVector& Target);
 
 	/** O ponto da linha no progresso dado (preso em 0 .. comprimento); ZeroVector se o percurso é inválido. */
