@@ -97,7 +97,7 @@ void ADNRaceHUD::DrawHUD()
 		const float PX = (W - PanelW) * 0.5f;
 		const float PY2 = H * 0.5f - PanelH * 0.5f;
 		DrawRect(FLinearColor(0, 0, 0, 0.72f), PX, PY2, PanelW, PanelH);
-		Text(D.bFinished ? TEXT("CHEGADA") : TEXT("CARRO DESTRUIDO"), W * 0.5f, PY2 + 20.0f * U, 2.2f * U, D.bFinished ? Green : Red, true);
+		Text(D.bFinished ? TEXT("CHEGADA") : TEXT("CARRO DESTRUÍDO"), W * 0.5f, PY2 + 20.0f * U, 2.2f * U, D.bFinished ? Green : Red, true);
 		float Y = PY2 + 110.0f * U;
 		for (const FDNRaceHudRow& Row : D.Rows)
 		{
@@ -107,6 +107,6 @@ void ADNRaceHUD::DrawHUD()
 			Text(Row.Value, PX + PanelW - 40.0f * U, Y, 1.3f * U, C, false, true);
 			Y += RowH;
 		}
-		Text(FString::Printf(TEXT("Detonas: %d     R: recomecar"), D.Takedowns), W * 0.5f, PY2 + PanelH - 60.0f * U, 1.0f * U, FLinearColor(0.85f, 0.85f, 0.85f, 1), true);
+		Text(FString::Printf(TEXT("Detonas: %d     R: recomeçar"), D.Takedowns), W * 0.5f, PY2 + PanelH - 60.0f * U, 1.0f * U, FLinearColor(0.85f, 0.85f, 0.85f, 1), true);
 	}
 }

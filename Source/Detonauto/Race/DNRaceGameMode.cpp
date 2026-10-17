@@ -410,7 +410,7 @@ void ADNRaceGameMode::TickTakedowns(ADNVehicle& Vehicle)
 				++Takedowns;
 				LastTakedownAt = Now;
 				Rivals[C.RivalIndex].bWreckNow = true;
-				LastTakedownText = FString::Printf(TEXT("DETONOU! %s (%s)"), *Rivals[C.RivalIndex].Name, FDNTakedown::ToString(Type));
+				LastTakedownText = FString::Printf(TEXT("DETONOU! %s (%s)"), *Rivals[C.RivalIndex].Name, Type == EDNTakedownType::FromBehind ? TEXT("por trás") : FDNTakedown::ToString(Type));
 				if (UDNTurboComponent* Turbo = Vehicle.GetTurbo())
 				{
 					FDNTurboFrameInput Fill;
@@ -478,7 +478,7 @@ FDNRaceHudData ADNRaceGameMode::BuildHudData() const
 	TArray<FDNRacerState> All;
 	TArray<FString> Names;
 	All.Add(Player);
-	Names.Add(TEXT("Voce"));
+	Names.Add(TEXT("Você"));
 	for (const FRival& R : Rivals)
 	{
 		All.Add(R.State);
