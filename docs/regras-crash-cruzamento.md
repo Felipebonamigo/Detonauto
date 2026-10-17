@@ -9,15 +9,19 @@ trilho que já existem. O que falta é o **mapa**, o **tráfego de verdade** e a
 
 ## Decisões que fecham as pendências
 
-1. **O modo do tráfego do Crash é o `Rail` com acordar.** O `Physics` de todos vira só
-   ferramenta de medição de custo. Motivo (hipótese do estado-atual, a provar no
-   primeiro passo): o `Physics` mantém 29,7 m/s em todos os carros até o primeiro
-   contato; o `Rail` acordado anda a 7,7 m/s porque segue o carro da frente. O
-   tráfego real de cruzamento anda devagar e para no semáforo.
-2. **Prova antes de fixar as medalhas:** log por carro com o Δv do primeiro impacto e
-   os pontos, por modo, no `C-130-40`. Se a diferença de 5 vezes vier só da
-   velocidade de aproximação, está explicado e o `Rail` vale. Se vier de outro
-   lugar, corrigir antes de seguir.
+1. **O modo do tráfego do Crash é o `Rail` com acordar E cascata** (revisado em 17 out depois da
+   prova em `docs/prova-crash-rail-physics.md`, que refutou a hipótese da velocidade). A diferença
+   de 5 vezes não vem do Δv por carro (no `Rail` ele é até maior: 9,7 contra 3,8 m/s), vem da
+   **quantidade de carros atingidos e da duração da rodada**: no `Physics` 19 a 29 carros
+   rendem pontos numa cascata de 25 a 30 s; no `Rail` só 2 a 6, e a rodada acaba em 6 a 12 s por
+   silêncio. Com o `Rail` de hoje o jogador não passa de bronze. Ajustes, nesta ordem:
+   - **densidade:** os 12 a 20 carros no trecho do cruzamento, não 40 espalhados;
+   - **carro acordado continua andando na faixa** em vez de se afastar, para a cascata se manter;
+   - **silêncio do fim de rodada** tolera a cascata (só vale depois que nada mais está batendo
+     em nada por `QuietSecondsToEnd`, contando carros acordados em movimento).
+   O `Physics` de todos continua só ferramenta de custo.
+2. **Medalhas só depois de medir de novo** em 80, 100, 120 e 140 km/h com os ajustes acima
+   (script `Tools/Unreal/crash-prova-lote20.ps1`). Os 3.000/8.000/15.000 abaixo são provisórios.
 3. **130 km/h rende menos que 100** é um defeito de design arcade. O carro é
    desviado no primeiro impacto. Duas alavancas, testar nesta ordem:
    - o jogador pesa mais que o tráfego nas batidas do Crash (razão de massa em
