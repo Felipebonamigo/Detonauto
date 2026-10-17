@@ -37,6 +37,7 @@ void UDNGameDataSubsystem::ApplyData(FDNData NewData, const TArray<FString>& Loa
 	bCarGlassValid = FDNDataValidation::ValidateCarGlass(Data.CarGlass).IsEmpty();
 	bEffectsValid = FDNDataValidation::ValidateEffects(Data.Effects, Data.Breakables).IsEmpty();
 	bEffectsSettingsValid = FDNDataValidation::ValidateEffectsSettings(Data.EffectsSettings).IsEmpty();
+	bCoursesValid = FDNDataValidation::ValidateCoursePoints(Data.CoursePoints).IsEmpty();
 	bDataValid = Errors.IsEmpty();
 
 	for (const FString& Error : Errors)
@@ -217,4 +218,32 @@ bool UDNGameDataSubsystem::GetEffect(EDNEffect Effect, FDNEffectSpec& Out) const
 FDNEffectsSettings UDNGameDataSubsystem::GetEffectsSettings() const
 {
 	return (bEffectsSettingsValid && Data.EffectsSettings.Num() == 1) ? Data.EffectsSettings[0].Row.ToSettings() : FDNEffectsSettings();
+}
+
+bool UDNGameDataSubsystem::GetCourse(const FString& CourseId, TArray<FVector>& OutPoints, float& OutWidthCm) const
+{
+	if (!bCoursesValid)
+	{
+		return false;
+	}
+	TArray<const FDNCoursePointRow*> Rows;
+	for (const FDNCoursePointEntry& E : Data.CoursePoints)
+	{
+		if (E.Row.Course.TrimStartAndEnd().Equals(CourseId.TrimStartAndEnd(), ESearchCase::IgnoreCase))
+		{
+			Rows.Add(&E.Row);
+		}
+	}
+	if (Rows.IsEmpty())
+	{
+		return false;
+	}
+	Rows.StableSort([](const FDNCoursePointRow& A, const FDNCoursePointRow& B) { return A.Order < B.Order; });
+	OutPoints.Reset();
+	for (const FDNCoursePointRow* R : Rows)
+	{
+		OutPoints.Add(FVector(R->XCm, R->YCm, R->ZCm));
+	}
+	OutWidthCm = Rows[0]->WidthCm;
+	return true;
 }

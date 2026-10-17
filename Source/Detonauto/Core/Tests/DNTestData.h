@@ -295,6 +295,24 @@ namespace DNTest
 		return R;
 	}
 
+	/** Um ponto de CoursePoints.csv. */
+	inline FDNCoursePointEntry CoursePoint(const TCHAR* Course, int32 Order, float X, float Y, float Width = 1400.f)
+	{
+		FDNCoursePointRow R;
+		R.Course = Course;
+		R.Order = Order;
+		R.XCm = X;
+		R.YCm = Y;
+		R.WidthCm = Width;
+		return Entry<FDNCoursePointEntry>(R, *FString::Printf(TEXT("%s-p%d"), Course, Order));
+	}
+
+	/** Um percurso válido em L (1000 cm para +X, 500 cm para +Y), fora de ordem de propósito no arquivo. */
+	inline TArray<FDNCoursePointEntry> CourseEntries()
+	{
+		return { CoursePoint(TEXT("rua"), 2, 1000.f, 500.f), CoursePoint(TEXT("rua"), 0, 0.f, 0.f), CoursePoint(TEXT("rua"), 1, 1000.f, 0.f) };
+	}
+
 	inline FDNTurboConfigEntry TurboEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTurboConfigEntry>(TurboRow(), Id); }
 	inline FDNCrashConfigEntry CrashEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNCrashConfigEntry>(CrashRow(), Id); }
 	inline FDNTakedownConfigEntry TakedownEntry(const TCHAR* Id = TEXT("padrao")) { return Entry<FDNTakedownConfigEntry>(TakedownRow(), Id); }

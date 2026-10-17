@@ -27,6 +27,7 @@
 //   Effects.csv         Id, Effect, TriggerMin, TriggerFull, MinSpeedKmh, CountMin, CountMax, CountPerUnit, Extra, LifeMinS, LifeMaxS,
 //                       SpeedMinMs, SpeedMaxMs, PoolMax, Props (um efeito por linha, cada um uma vez; lote 19, docs/regras-efeitos.md)
 //   EffectsSettings.csv Id + os campos de FDNEffectsSettings (uma linha, id "padrao")
+//   CoursePoints.csv    Id, Course, Order, XCm, YCm, ZCm, WidthCm (um ponto da linha central de um percurso por linha; docs/percurso-1.md)
 //
 // Ids: só letras sem acento, números, hífen e sublinhado; únicos sem diferenciar maiúsculas de minúsculas (como
 // o FName). As referências (RegionId, CityId) também ignoram a caixa. Validação em DNDataValidation.h.
@@ -777,6 +778,21 @@ struct FDNEffectsSettingsRow : public FTableRowBase
 	}
 };
 
+/** Data/CoursePoints.csv: um ponto da linha central de uma rua de corrida (docs/percurso-1.md). Course agrupa os pontos, Order os
+ *  ordena (da largada à chegada); WidthCm é a largura da pista e vale igual em todos os pontos do percurso. */
+USTRUCT(BlueprintType)
+struct FDNCoursePointRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Course;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 Order = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float XCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float YCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ZCm = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float WidthCm = 0.0f;
+};
+
 /** Uma linha lida: o id (primeira coluna) e os campos. O id fica como texto exato do arquivo. */
 template <typename RowType>
 struct TDNTableEntry
@@ -804,6 +820,7 @@ using FDNCarPartEntry = TDNTableEntry<FDNCarPartRow>;
 using FDNCarGlassEntry = TDNTableEntry<FDNCarGlassRow>;
 using FDNEffectEntry = TDNTableEntry<FDNEffectRow>;
 using FDNEffectsSettingsEntry = TDNTableEntry<FDNEffectsSettingsRow>;
+using FDNCoursePointEntry = TDNTableEntry<FDNCoursePointRow>;
 
 /** Todas as tabelas lidas. */
 struct FDNData
@@ -827,4 +844,5 @@ struct FDNData
 	TArray<FDNCarGlassEntry> CarGlass;
 	TArray<FDNEffectEntry> Effects;
 	TArray<FDNEffectsSettingsEntry> EffectsSettings;
+	TArray<FDNCoursePointEntry> CoursePoints;
 };

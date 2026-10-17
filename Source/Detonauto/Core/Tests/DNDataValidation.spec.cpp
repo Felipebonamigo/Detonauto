@@ -655,6 +655,7 @@ void FDNDataAllSpec::Define()
 			Data.CarGlass = { DNTest::Entry<FDNCarGlassEntry>(DNTest::CarGlassRow(), TEXT("vidro")) };
 			Data.Effects = DNTest::EffectEntries();
 			Data.EffectsSettings = { DNTest::Entry<FDNEffectsSettingsEntry>(DNTest::EffectsSettingsRow()) };
+			Data.CoursePoints = DNTest::CourseEntries();
 			ExpectClean(*this, TEXT("conjunto"), FDNDataValidation::ValidateAll(Data));
 		});
 
@@ -693,11 +694,14 @@ void FDNDataAllSpec::Define()
 			Data.Effects[0].Row.PoolMax = 0;
 			Data.EffectsSettings = { DNTest::Entry<FDNEffectsSettingsEntry>(DNTest::EffectsSettingsRow()) };
 			Data.EffectsSettings[0].Row.MaxSmokeSprites = 0;
+			Data.CoursePoints = DNTest::CourseEntries();
+			Data.CoursePoints[0].Row.WidthCm = 1.f;
 			const TArray<FString> Errors = FDNDataValidation::ValidateAll(Data);
 			ExpectError(*this, TEXT("efeitos"), Errors, { TEXT("Effects.csv"), TEXT("PoolMax") });
 			ExpectError(*this, TEXT("tetos dos efeitos"), Errors, { TEXT("EffectsSettings.csv"), TEXT("MaxSmokeSprites") });
 			ExpectError(*this, TEXT("pecas do carro"), Errors, { TEXT("CarParts.csv"), TEXT("MassKg") });
 			ExpectError(*this, TEXT("vidros do carro"), Errors, { TEXT("CarGlass.csv"), TEXT("CrackFrom") });
+			ExpectError(*this, TEXT("percurso"), Errors, { TEXT("CoursePoints.csv"), TEXT("WidthCm") });
 			ExpectError(*this, TEXT("config da camera"), Errors, { TEXT("CameraFx.csv"), TEXT("CrashCamTimeScale") });
 			ExpectError(*this, TEXT("mobiliario"), Errors, { TEXT("Breakables.csv"), TEXT("MinBreakSpeedKmh") });
 			ExpectError(*this, TEXT("config do mobiliario"), Errors, { TEXT("BreakableSettings.csv"), TEXT("MaxActiveProps") });

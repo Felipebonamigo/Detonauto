@@ -79,6 +79,9 @@ public:
 	bool GetEffect(EDNEffect Effect, FDNEffectSpec& Out) const;
 	/** Os tetos de Data/EffectsSettings.csv, ou o padrão da struct se a tabela é inválida. */
 	FDNEffectsSettings GetEffectsSettings() const;
+	/** A linha central do percurso CourseId (Data/CoursePoints.csv), na ordem de Order, e a largura da pista [cm]; sem diferenciar a caixa.
+	 *  Falso, sem mexer nas saídas, se o percurso não existe ou se a tabela é inválida. */
+	bool GetCourse(const FString& CourseId, TArray<FVector>& OutPoints, float& OutWidthCm) const;
 
 private:
 	FDNData Data;
@@ -99,4 +102,5 @@ private:
 	bool bCarGlassValid = false;
 	bool bEffectsValid = false;
 	bool bEffectsSettingsValid = false;
+	bool bCoursesValid = false;
 };

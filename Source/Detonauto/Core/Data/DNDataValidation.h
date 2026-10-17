@@ -77,6 +77,12 @@ struct FDNDataValidation
 	/** EffectsSettings.csv: uma linha; MaxGpuParticles [1, 100000], MaxSmokeSprites [1, 10000], SmokeFadeNearCm [0, 2000] e
 	 *  SmokeFadeFarCm (SmokeFadeNearCm, 5000]. */
 	static TArray<FString> ValidateEffectsSettings(const TArray<FDNEffectsSettingsEntry>& Rows);
+	/**
+	 *  CoursePoints.csv (linha central dos percursos, docs/percurso-1.md): pelo menos uma linha; Course não vazio; cada percurso com
+	 *  pelo menos 2 pontos; Order inteiro >= 0 e único no percurso; XCm, YCm, ZCm finitos em [-10 000 000, 10 000 000]; WidthCm em
+	 *  [400, 3000] e igual em todos os pontos do percurso; pontos vizinhos (na ordem) a pelo menos 100 cm um do outro.
+	 */
+	static TArray<FString> ValidateCoursePoints(const TArray<FDNCoursePointEntry>& Rows);
 
 	/**
 	 *  Um ou mais modos de câmera; "alta-longe" é obrigatória. Anchor Chase ou Car; Chase: distância 150 a 3000, Car: distância 0; os outros

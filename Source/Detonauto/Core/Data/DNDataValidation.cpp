@@ -650,6 +650,7 @@ TArray<FString> FDNDataValidation::ValidateAll(const FDNData& Data)
 	Errors.Append(ValidateCarGlass(Data.CarGlass));
 	Errors.Append(ValidateEffects(Data.Effects, Data.Breakables));
 	Errors.Append(ValidateEffectsSettings(Data.EffectsSettings));
+	Errors.Append(ValidateCoursePoints(Data.CoursePoints));
 	return Errors;
 }
 
@@ -988,6 +989,70 @@ TArray<FString> FDNDataValidation::ValidateEffectsSettings(const TArray<FDNEffec
 		CheckIntRange(File, E.Id, TEXT("MaxSmokeSprites"), R.MaxSmokeSprites, 1, 10000, Errors);
 		CheckRange(File, E.Id, TEXT("SmokeFadeNearCm"), R.SmokeFadeNearCm, 0.0f, true, 2000.0f, true, Errors);
 		CheckRange(File, E.Id, TEXT("SmokeFadeFarCm"), R.SmokeFadeFarCm, FMath::IsFinite(R.SmokeFadeNearCm) ? R.SmokeFadeNearCm : 0.0f, false, 5000.0f, true, Errors);
+	}
+	return Errors;
+}
+
+TArray<FString> FDNDataValidation::ValidateCoursePoints(const TArray<FDNCoursePointEntry>& Rows)
+{
+	constexpr const TCHAR* File = TEXT("CoursePoints.csv");
+	TArray<FString> Errors;
+	if (Rows.IsEmpty())
+	{
+		Errors.Add(FString::Printf(TEXT("%s: nenhuma linha (pelo menos um percurso com 2 pontos)."), File));
+	}
+	CheckIds(File, Rows, Errors);
+
+	constexpr float MaxCoordCm = 10000000.0f;
+	TMap<FString, TArray<const FDNCoursePointEntry*>> ByCourse;
+	for (const FDNCoursePointEntry& E : Rows)
+	{
+		const FDNCoursePointRow& R = E.Row;
+		const FString Course = R.Course.TrimStartAndEnd();
+		if (Course.IsEmpty())
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Course' está vazio."), File, *E.Id));
+			continue;
+		}
+		if (R.Order < 0)
+		{
+			Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'Order' precisa ser um inteiro >= 0 (veio %d)."), File, *E.Id, R.Order));
+		}
+		CheckRange(File, E.Id, TEXT("XCm"), R.XCm, -MaxCoordCm, true, MaxCoordCm, true, Errors);
+		CheckRange(File, E.Id, TEXT("YCm"), R.YCm, -MaxCoordCm, true, MaxCoordCm, true, Errors);
+		CheckRange(File, E.Id, TEXT("ZCm"), R.ZCm, -MaxCoordCm, true, MaxCoordCm, true, Errors);
+		CheckRange(File, E.Id, TEXT("WidthCm"), R.WidthCm, 400.0f, true, 3000.0f, true, Errors);
+		ByCourse.FindOrAdd(Course.ToLower()).Add(&E);
+	}
+
+	for (TPair<FString, TArray<const FDNCoursePointEntry*>>& Pair : ByCourse)
+	{
+		TArray<const FDNCoursePointEntry*>& Points = Pair.Value;
+		if (Points.Num() < 2)
+		{
+			Errors.Add(FString::Printf(TEXT("%s: o percurso '%s' precisa de pelo menos 2 pontos (veio %d)."), File, *Pair.Key, Points.Num()));
+			continue;
+		}
+		Points.StableSort([](const FDNCoursePointEntry& A, const FDNCoursePointEntry& B) { return A.Row.Order < B.Row.Order; });
+		for (int32 i = 1; i < Points.Num(); ++i)
+		{
+			const FDNCoursePointRow& Prev = Points[i - 1]->Row;
+			const FDNCoursePointRow& Cur = Points[i]->Row;
+			if (Cur.Order == Prev.Order)
+			{
+				Errors.Add(FString::Printf(TEXT("%s: o campo 'Order' %d aparece duas vezes no percurso '%s' (linhas '%s' e '%s')."), File, Cur.Order, *Pair.Key, *Points[i - 1]->Id, *Points[i]->Id));
+			}
+			if (Cur.WidthCm != Points[0]->Row.WidthCm)
+			{
+				Errors.Add(FString::Printf(TEXT("%s, linha '%s': o campo 'WidthCm' (%g) precisa ser igual ao do resto do percurso '%s' (%g)."), File, *Points[i]->Id, Cur.WidthCm, *Pair.Key, Points[0]->Row.WidthCm));
+			}
+			const FVector A(Prev.XCm, Prev.YCm, Prev.ZCm);
+			const FVector B(Cur.XCm, Cur.YCm, Cur.ZCm);
+			if (FMath::IsFinite(A.X + A.Y + A.Z + B.X + B.Y + B.Z) && FVector::Dist(A, B) < 100.0)
+			{
+				Errors.Add(FString::Printf(TEXT("%s, linha '%s': o ponto fica a menos de 100 cm do anterior no percurso '%s'."), File, *Points[i]->Id, *Pair.Key));
+			}
+		}
 	}
 	return Errors;
 }
