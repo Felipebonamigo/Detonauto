@@ -277,6 +277,8 @@ cartunizado (aqui é realismo). Esperar o desenho de lá e reaproveitar o que fo
 
 **Corrida, revisão do par (17 out):** carro do jogador destruído renasce na linha em 2,5 s (a corrida não acaba mais por isso); detona vale mesmo se o jogador também se destrói, desde que o rival tenha sido batido primeiro; rival tocado revida por 2 s; HUD nítido (fonte de contorno por distância). Regras novas W5 e W6 com teste e mutação; suíte: 814 de 814. **Diversão:** destruir o carro deixa de ser o fim da corrida e passa a ser um custo de tempo; o rival que revida dá o que fazer depois do detona. **Visual:** o texto do HUD ficou nítido (era o maior defeito visual do quadro); a rua segue igual (próximos passos do par: fachadas variadas, calçada, poste e árvore). Falta o Felipe jogar o `docs/roteiro-playtest-3.md`.
 
+**Visual da corrida, rodada 1 (17 out):** a rua ganhou fachadas de cores e alturas variadas, calçada de lajotas e meio-fio do City Sample (o branco estourado era o material liso de teste, não o do City Sample), postes, jacarandás e bancos destrutíveis pela calçada, e o HUD nítido. Capturas novas em `docs/img/corrida-1/` (olhadas): a cena lê como rua de cidade, com sombras e profundidade. **Diversão:** as árvores e os postes viram obstáculos que quebram, dão o que bater. **Visual:** salto grande sobre a rodada anterior; ainda faltam quinas, faixas no asfalto, nuvens, vitrines e o hidrante. Custo (quadros) não remedido depois desta rodada.
+
 **Maior buraco visual que resta (revisão do lote 18):** o carro de tráfego é uma caixa
 colorida. Batida no tráfego não dá para o Felipe julgar assim. O carro de verdade vem com o
 City Sample Vehicles (lote 20); o download no Fab é do Felipe.

@@ -11,6 +11,8 @@
 #include "Detonauto.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Engine/Engine.h"
+#include "Crash/DNBreakableProp.h"
+#include "Engine/StaticMesh.h"
 #include "Core/DNRaceFormat.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
@@ -74,6 +76,7 @@ void ADNRaceGameMode::InitGame(const FString& MapName, const FString& Options, F
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	Course = GetWorld()->SpawnActor<ADNCourseActor>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 	Course->Build(Points, WidthCm, CheckpointM * 100.0f);
+	SpawnStreetLife();
 	UE_LOG(LogDetonauto, Display, TEXT("DNRace: percurso '%s' com %d pontos, %.0f m, %.0f m de largura, %d marcas."), *CourseId, Points.Num(), Course->GetLengthCm() / 100.0f, WidthCm / 100.0f, Course->GetMarks().Num());
 }
 
@@ -565,4 +568,59 @@ FDNRaceHudData ADNRaceGameMode::BuildHudData() const
 		}
 	}
 	return D;
+}
+
+void ADNRaceGameMode::SpawnStreetLife()
+{
+	struct FKind
+	{
+		const TCHAR* Id;
+		const TCHAR* Base;
+		const TCHAR* Break;
+	};
+	// as malhas já estão no projeto (Content/Detonauto/Lookdev/Props), as mesmas da cena de aparência; sem elas a peça não nasce
+	static const FKind Kinds[] = {
+		{ TEXT("poste"), TEXT("/Game/Detonauto/Lookdev/Props/SM_dn_street_light_base.SM_dn_street_light_base"), TEXT("/Game/Detonauto/Lookdev/Props/SM_dn_street_light_top.SM_dn_street_light_top") },
+		{ TEXT("arvore"), TEXT("/Game/Detonauto/Lookdev/Props/SM_jacaranda_tree_stump.SM_jacaranda_tree_stump"), TEXT("/Game/Detonauto/Lookdev/Props/SM_jacaranda_tree_top.SM_jacaranda_tree_top") },
+		{ TEXT("banco"), nullptr, TEXT("/Game/Detonauto/Lookdev/Props/SM_modular_street_seating.SM_modular_street_seating") },
+	};
+	static const int32 Cycle[] = { 0, 1, 2, 0, 1, 0 };
+	const TArray<FVector>& Points = Course->GetPoints();
+	const float Length = Course->GetLengthCm();
+	const float Lateral = Course->GetWidthCm() * 0.5f + 15.0f + 75.0f; // o meio da calçada
+	int32 Spawned = 0;
+	for (int32 k = 0;; ++k)
+	{
+		const float S = 700.0f + 2200.0f * k;
+		if (S > Length - 500.0f)
+		{
+			break;
+		}
+		const FKind& Kind = Kinds[Cycle[k % UE_ARRAY_COUNT(Cycle)]];
+		const float Sign = (k % 2 == 0) ? -1.0f : 1.0f;
+		const FVector P = FDNCourse::LocationAt(Points, S);
+		const FVector Dir = (FDNCourse::LocationAt(Points, S + 50.0f) - FDNCourse::LocationAt(Points, S - 50.0f)).GetSafeNormal2D();
+		const FVector Side(-Dir.Y, Dir.X, 0.0f);
+		const FVector Where = P + Side * (Sign * Lateral) + FVector(0.0f, 0.0f, 20.0f); // a calçada tem ~21 cm de altura
+		// de frente para a pista
+		const FRotator Rot(0.0f, FMath::RadiansToDegrees(FMath::Atan2(-Sign * Side.Y, -Sign * Side.X)), 0.0f);
+		UStaticMesh* BreakMesh = LoadObject<UStaticMesh>(nullptr, Kind.Break);
+		if (!BreakMesh)
+		{
+			continue;
+		}
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ADNBreakableProp* Prop = GetWorld()->SpawnActorDeferred<ADNBreakableProp>(ADNBreakableProp::StaticClass(), FTransform(Rot, Where));
+		if (!Prop)
+		{
+			continue;
+		}
+		Prop->Kind = FName(Kind.Id);
+		Prop->BreakMesh = BreakMesh;
+		Prop->BaseMesh = Kind.Base ? LoadObject<UStaticMesh>(nullptr, Kind.Base) : nullptr;
+		Prop->FinishSpawning(FTransform(Rot, Where));
+		++Spawned;
+	}
+	UE_LOG(LogDetonauto, Display, TEXT("DNRace: %d peças de rua (poste, árvore e banco) na calçada."), Spawned);
 }

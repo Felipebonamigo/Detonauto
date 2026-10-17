@@ -88,6 +88,9 @@ ADNCourseActor::ADNCourseActor()
 	Curb = MakeInstances(TEXT("Curb"));
 	Sidewalk->SetStaticMesh(SidewalkMesh.Succeeded() ? SidewalkMesh.Object : nullptr);
 	Curb->SetStaticMesh(CurbMesh.Succeeded() ? CurbMesh.Object : nullptr);
+	// MakeInstances põe o material liso de teste em todo mundo; a calçada e o meio-fio usam os materiais do City Sample
+	Sidewalk->EmptyOverrideMaterials();
+	Curb->EmptyOverrideMaterials();
 	AsphaltMaterial = Asphalt.Succeeded() ? Asphalt.Object : nullptr;
 
 	// Luz: o mapa vazio não traz nenhuma (as mesmas da arena de teste).
@@ -257,10 +260,18 @@ void ADNCourseActor::AddSidewalks()
 			}
 		}
 	};
-	Place(Curb, 0.0f, true);
+	// o meio-fio entra 12 cm sob a borda do asfalto: sem isso aparece uma fresta de chão verde entre os dois
+	constexpr float CurbOverlapCm = 12.0f;
+	Place(Curb, -CurbOverlapCm, true);
 	const UStaticMesh* CurbMesh = Curb->GetStaticMesh();
 	const float CurbWidth = CurbMesh ? 2.0f * FMath::Min(CurbMesh->GetBounds().BoxExtent.X, CurbMesh->GetBounds().BoxExtent.Y) : 0.0f;
-	Place(Sidewalk, CurbWidth, true);
+	Place(Sidewalk, CurbWidth - CurbOverlapCm, true);
+	// o material do City Sample tem Albedo_Power 2 e tinta quente (1,4): uma tinta um pouco mais escura deixa a calçada cinza-bege médio
+	if (UMaterialInstanceDynamic* Concrete = Sidewalk->CreateAndSetMaterialInstanceDynamic(0))
+	{
+		Concrete->SetScalarParameterValue(TEXT("Albedo_Mult"), 1.0f);
+		Concrete->SetVectorParameterValue(TEXT("AlbedoTint"), FLinearColor(0.85f, 0.80f, 0.74f));
+	}
 }
 
 void ADNCourseActor::AddBuildings()
@@ -281,9 +292,40 @@ void ADNCourseActor::AddBuildings()
 	const float SidewalkDepthCm = 150.0f;
 	const float CurbCm = 15.0f;
 	constexpr float FloorCm = 325.0f; // a altura de um andar da peça
+	// as cores do prédio: o "Color Tint M1" do material de pedra (o padrão do kit é o bege quente, índice 0); cada prédio sorteia uma
+	static const FLinearColor Tints[] = {
+		FLinearColor(1.69f, 1.55f, 1.18f), // bege quente (o do kit)
+		FLinearColor(1.30f, 1.30f, 1.28f), // cinza claro
+		FLinearColor(1.15f, 0.85f, 0.70f), // terracota
+		FLinearColor(1.55f, 1.40f, 0.85f), // ocre
+		FLinearColor(0.95f, 1.05f, 1.20f), // cinza azulado
+		FLinearColor(0.90f, 0.86f, 0.80f)  // cinza escuro
+	};
+	constexpr int32 TintCount = UE_ARRAY_COUNT(Tints);
+	TArray<TArray<UInstancedStaticMeshComponent*>> Grid; // [variante][cor]
+	for (UInstancedStaticMeshComponent* Base : Variants)
+	{
+		TArray<UInstancedStaticMeshComponent*>& Row = Grid.AddDefaulted_GetRef();
+		Row.Add(Base);
+		for (int32 t = 1; t < TintCount; ++t)
+		{
+			UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
+			Ism->SetupAttachment(GetRootComponent());
+			Ism->SetMobility(EComponentMobility::Movable);
+			Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Ism->SetStaticMesh(Base->GetStaticMesh());
+			Ism->RegisterComponent();
+			if (UMaterialInstanceDynamic* Tinted = Ism->CreateAndSetMaterialInstanceDynamic(0))
+			{
+				Tinted->SetVectorParameterValue(TEXT("Color Tint M1"), Tints[t]);
+			}
+			Row.Add(Ism);
+		}
+	}
 	FRandomStream Seed(7);
 	for (const float Sign : { -1.0f, 1.0f })
 	{
+		int32 TintIndex = 0;
 		float S = 0.0f;
 		float BuildingLeftCm = 0.0f; // largura que falta para o prédio atual acabar; o número de andares vale para o prédio todo
 		int32 Floors = 5;
@@ -292,9 +334,11 @@ void ADNCourseActor::AddBuildings()
 			if (BuildingLeftCm <= 0.0f)
 			{
 				BuildingLeftCm = Seed.FRandRange(2500.0f, 4500.0f);
-				Floors = Seed.RandRange(4, 10);
+				Floors = Seed.RandRange(3, 12);
+				TintIndex = Seed.RandRange(0, TintCount - 1);
 			}
-			UInstancedStaticMeshComponent* Ism = Variants[Seed.RandRange(0, Variants.Num() - 1)];
+			const int32 VariantIndex = Seed.RandRange(0, Variants.Num() - 1);
+			UInstancedStaticMeshComponent* Ism = Grid[VariantIndex][TintIndex];
 			const FBoxSphereBounds B = Ism->GetStaticMesh()->GetBounds();
 			const bool bAlongX = B.BoxExtent.X >= B.BoxExtent.Y;
 			const float Len = 2.0f * (bAlongX ? B.BoxExtent.X : B.BoxExtent.Y);

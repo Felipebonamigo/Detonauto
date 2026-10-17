@@ -47,6 +47,9 @@ protected:
 private:
 	void DriveAuto(ADNVehicle& Vehicle) const;
 	void TickRivals(float DeltaSeconds);
+
+	/** Poste, árvore e banco pela calçada, a cada ~22 m, alternando os lados, em ritmo fixo: peças destrutíveis do mobiliário (Data/Breakables.csv). */
+	void SpawnStreetLife();
 	void TickTakedowns(ADNVehicle& Vehicle);
 
 	/** O jogador tocou em algo: se foi num rival, abre uma janela de takedown (FDNTakedown). */
