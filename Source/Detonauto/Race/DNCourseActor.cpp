@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/PostProcessComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/StaticMesh.h"
@@ -115,6 +116,15 @@ ADNCourseActor::ADNCourseActor()
 	UExponentialHeightFogComponent* Fog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("Fog"));
 	Fog->SetupAttachment(Root);
 	Fog->SetFogDensity(0.004f);
+
+	// a cena vinha lavada: exposição um pouco mais baixa e mais contraste (comparar com a L_Lookdev)
+	UPostProcessComponent* Grade = CreateDefaultSubobject<UPostProcessComponent>(TEXT("Grade"));
+	Grade->SetupAttachment(Root);
+	Grade->bUnbound = true;
+	Grade->Settings.bOverride_AutoExposureBias = true;
+	Grade->Settings.AutoExposureBias = -0.45f;
+	Grade->Settings.bOverride_ColorContrast = true;
+	Grade->Settings.ColorContrast = FVector4(1.08f, 1.08f, 1.08f, 1.0f);
 
 	USkyLightComponent* Sky = CreateDefaultSubobject<USkyLightComponent>(TEXT("Sky"));
 	Sky->SetupAttachment(Root);
@@ -294,12 +304,12 @@ void ADNCourseActor::AddBuildings()
 	constexpr float FloorCm = 325.0f; // a altura de um andar da peça
 	// as cores do prédio: o "Color Tint M1" do material de pedra (o padrão do kit é o bege quente, índice 0); cada prédio sorteia uma
 	static const FLinearColor Tints[] = {
-		FLinearColor(1.69f, 1.55f, 1.18f), // bege quente (o do kit)
-		FLinearColor(1.30f, 1.30f, 1.28f), // cinza claro
-		FLinearColor(1.15f, 0.85f, 0.70f), // terracota
-		FLinearColor(1.55f, 1.40f, 0.85f), // ocre
-		FLinearColor(0.95f, 1.05f, 1.20f), // cinza azulado
-		FLinearColor(0.90f, 0.86f, 0.80f)  // cinza escuro
+		FLinearColor(1.45f, 1.30f, 0.95f), // bege quente
+		FLinearColor(1.10f, 1.10f, 1.08f), // cinza claro
+		FLinearColor(0.95f, 0.55f, 0.42f), // terracota
+		FLinearColor(1.25f, 1.02f, 0.50f), // ocre
+		FLinearColor(0.62f, 0.72f, 0.88f), // cinza azulado
+		FLinearColor(0.52f, 0.50f, 0.47f)  // cinza escuro
 	};
 	constexpr int32 TintCount = UE_ARRAY_COUNT(Tints);
 	TArray<TArray<UInstancedStaticMeshComponent*>> Grid; // [variante][cor]
@@ -362,7 +372,8 @@ void ADNCourseActor::AddBuildings()
 			}
 			// miolo atrás da peça: caixa de 30 m de fundo, da altura do prédio, alinhada com a linha
 			constexpr float MassDepthCm = 3000.0f;
-			const FVector MassCenter = P + Side * (Sign * (WidthCm * 0.5f + CurbCm + SidewalkDepthCm + Depth + MassDepthCm * 0.5f)) + FVector(0.0f, 0.0f, Floors * FloorCm * 0.5f);
+			// a frente do miolo fica a 30% da profundidade da casca (e não atrás dela): as janelas mostram parede, não o chão do outro lado
+			const FVector MassCenter = P + Side * (Sign * (WidthCm * 0.5f + CurbCm + SidewalkDepthCm + Depth * 0.3f + MassDepthCm * 0.5f)) + FVector(0.0f, 0.0f, Floors * FloorCm * 0.5f);
 			BuildingMass->AddInstance(FTransform(FRotator(0.0f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.0f), MassCenter, FVector(Len + 40.0f, MassDepthCm, Floors * FloorCm) / 100.0f), true);
 			S += Len;
 			BuildingLeftCm -= Len;
