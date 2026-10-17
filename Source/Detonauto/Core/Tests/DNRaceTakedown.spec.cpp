@@ -44,6 +44,75 @@ void FDNRaceTakedownSpec::Define()
 		});
 	});
 
+	Describe("O jogador se destruiu primeiro? (W5)", [this]()
+	{
+		It("so se foi estritamente antes do rival", [this]()
+		{
+			TestTrue("antes", FDNRaceTakedown::PlayerDestroyedFirst(10.0f, 10.2f));
+			TestFalse("empate", FDNRaceTakedown::PlayerDestroyedFirst(10.2f, 10.2f));
+			TestFalse("depois", FDNRaceTakedown::PlayerDestroyedFirst(10.4f, 10.2f));
+		});
+
+		It("o jogador que nao se destruiu (-1) nunca foi primeiro", [this]()
+		{
+			TestFalse("-1", FDNRaceTakedown::PlayerDestroyedFirst(-1.0f, 10.2f));
+			TestFalse("-0,5", FDNRaceTakedown::PlayerDestroyedFirst(-0.5f, 10.2f));
+		});
+
+		It("zero e um instante valido", [this]()
+		{
+			TestTrue("0 antes de 0,1", FDNRaceTakedown::PlayerDestroyedFirst(0.0f, 0.1f));
+		});
+
+		It("valor nao finito nao conta", [this]()
+		{
+			TestFalse("jogador NaN", FDNRaceTakedown::PlayerDestroyedFirst(NaNf, 10.0f));
+			TestFalse("rival NaN", FDNRaceTakedown::PlayerDestroyedFirst(5.0f, NaNf));
+			TestFalse("jogador infinito", FDNRaceTakedown::PlayerDestroyedFirst(std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity()));
+			TestFalse("rival infinito", FDNRaceTakedown::PlayerDestroyedFirst(5.0f, std::numeric_limits<float>::infinity()));
+		});
+	});
+
+	Describe("Rival bravo (W6)", [this]()
+	{
+		It("o toque liga a braveza pela duracao toda", [this]()
+		{
+			TestEqual("toque", FDNRaceTakedown::AngerStep(0.0f, 0.016f, true, 2.0f), 2.0f);
+		});
+
+		It("sem toque a braveza conta para zero e para la", [this]()
+		{
+			TestEqual("2 -> 1,5", FDNRaceTakedown::AngerStep(2.0f, 0.5f, false, 2.0f), 1.5f, 0.0001f);
+			TestEqual("0,2 - 0,5 = 0", FDNRaceTakedown::AngerStep(0.2f, 0.5f, false, 2.0f), 0.0f);
+			TestEqual("zero fica zero", FDNRaceTakedown::AngerStep(0.0f, 0.5f, false, 2.0f), 0.0f);
+		});
+
+		It("novo toque renova a duracao", [this]()
+		{
+			TestEqual("renova", FDNRaceTakedown::AngerStep(0.3f, 0.016f, true, 2.0f), 2.0f);
+		});
+
+		It("tempo de quadro invalido nao anda a contagem", [this]()
+		{
+			TestEqual("negativo", FDNRaceTakedown::AngerStep(1.0f, -1.0f, false, 2.0f), 1.0f);
+			TestEqual("NaN", FDNRaceTakedown::AngerStep(1.0f, NaNf, false, 2.0f), 1.0f);
+			TestEqual("zero", FDNRaceTakedown::AngerStep(1.0f, 0.0f, false, 2.0f), 1.0f);
+		});
+
+		It("duracao invalida ou zero nunca deixa bravo", [this]()
+		{
+			TestEqual("zero", FDNRaceTakedown::AngerStep(0.0f, 0.016f, true, 0.0f), 0.0f);
+			TestEqual("negativa", FDNRaceTakedown::AngerStep(0.0f, 0.016f, true, -2.0f), 0.0f);
+			TestEqual("NaN", FDNRaceTakedown::AngerStep(0.0f, 0.016f, true, NaNf), 0.0f);
+		});
+
+		It("braveza invalida de entrada vira zero", [this]()
+		{
+			TestEqual("NaN", FDNRaceTakedown::AngerStep(NaNf, 0.5f, false, 2.0f), 0.0f);
+			TestEqual("negativa sem tempo vira zero", FDNRaceTakedown::AngerStep(-1.0f, 0.0f, false, 2.0f), 0.0f);
+		});
+	});
+
 	Describe("Rival destrocado (W2 a W4)", [this]()
 	{
 		It("sem derrubar, nada acontece", [this]()

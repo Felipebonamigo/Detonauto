@@ -7,7 +7,12 @@
 //  W2 o rival derrubado fica parado, destroçado, por WreckSeconds; passado esse tempo volta à pista, inteiro, no ponto da linha onde
 //     estava (o Step devolve verdadeiro uma vez, no quadro em que ele volta);
 //  W3 um novo derrubar enquanto já está destroçado não reinicia a contagem;
-//  W4 tempo de quadro negativo ou não finito não anda a contagem.
+//  W4 tempo de quadro negativo ou não finito não anda a contagem;
+//  W5 o jogador "se destruiu primeiro" só se o instante em que ele ficou destruído (>= 0; -1 = não ficou) é estritamente anterior ao em que
+//     o rival foi batido; empate vale o detona (a janela de dano fecha os dois carros no mesmo quadro). Só nesse caso a condição 3 do
+//     contrato (FDNTakedown::Qualifies) desqualifica;
+//  W6 rival tocado pelo jogador reage: fica "bravo" por DurationS (volta a valer DurationS a cada toque), contando para zero com o tempo;
+//     tempo de quadro inválido não anda a contagem; duração inválida ou <= 0 nunca deixa bravo.
 
 #pragma once
 
@@ -26,4 +31,10 @@ struct FDNRaceTakedown
 
 	/** W2 a W4: anda um quadro. bWreckNow marca o instante em que o rival foi derrubado. Devolve verdadeiro no quadro em que ele volta à pista. */
 	static bool Step(FDNWreckState& State, float DeltaS, bool bWreckNow, float WreckSeconds);
+
+	/** W5. */
+	static bool PlayerDestroyedFirst(float PlayerDestroyedAtS, float RivalCrashedAtS);
+
+	/** W6: o que falta de braveza [s] depois de um quadro. */
+	static float AngerStep(float LeftS, float DeltaS, bool bTouched, float DurationS);
 };

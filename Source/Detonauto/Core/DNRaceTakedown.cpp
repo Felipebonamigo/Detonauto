@@ -38,3 +38,30 @@ bool FDNRaceTakedown::Step(FDNWreckState& State, float DeltaS, bool bWreckNow, f
 	}
 	return false;
 }
+
+bool FDNRaceTakedown::PlayerDestroyedFirst(float PlayerDestroyedAtS, float RivalCrashedAtS)
+{
+	if (!FMath::IsFinite(PlayerDestroyedAtS) || !FMath::IsFinite(RivalCrashedAtS) || PlayerDestroyedAtS < 0.0f)
+	{
+		return false;
+	}
+	return PlayerDestroyedAtS < RivalCrashedAtS;
+}
+
+float FDNRaceTakedown::AngerStep(float LeftS, float DeltaS, bool bTouched, float DurationS)
+{
+	const float Duration = FMath::IsFinite(DurationS) ? FMath::Max(DurationS, 0.0f) : 0.0f;
+	if (bTouched)
+	{
+		return Duration;
+	}
+	if (!FMath::IsFinite(LeftS))
+	{
+		return 0.0f;
+	}
+	if (FMath::IsFinite(DeltaS) && DeltaS > 0.0f)
+	{
+		return FMath::Max(LeftS - DeltaS, 0.0f);
+	}
+	return FMath::Max(LeftS, 0.0f);
+}
