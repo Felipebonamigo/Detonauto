@@ -87,6 +87,9 @@ ADNCourseActor::ADNCourseActor()
 		}
 	}
 	BuildingMass = MakeInstances(TEXT("BuildingMass"));
+	// o miolo é a parede de verdade: o carro e o destroço (árvore, poste) batem nele; a casca da fachada segue só visual
+	BuildingMass->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	BuildingMass->SetCollisionProfileName(FName("BlockAll"));
 	Sidewalk = MakeInstances(TEXT("Sidewalk"));
 	Curb = MakeInstances(TEXT("Curb"));
 	Sidewalk->SetStaticMesh(SidewalkMesh.Succeeded() ? SidewalkMesh.Object : nullptr);
@@ -101,8 +104,10 @@ ADNCourseActor::ADNCourseActor()
 	Sun->SetupAttachment(Root);
 	Sun->SetMobility(EComponentMobility::Movable);
 	// luz de fim de tarde: sol mais baixo e quente (o céu da atmosfera segue o ângulo)
-	Sun->SetRelativeRotation(FRotator(-24.0f, -35.0f, 0.0f));
-	Sun->SetIntensity(7.0f);
+	// unidades físicas, como a L_Lookdev (100 000 lux e exposição manual de EV100 13,5): os efeitos do lote 19 foram calibrados nesse regime;
+	// com sol de 7 e exposição automática as faíscas e a fumaça saíam estouradas em branco
+	Sun->SetRelativeRotation(FRotator(-45.0f, -35.0f, 0.0f));
+	Sun->SetIntensity(100000.0f);
 	Sun->SetLightColor(FLinearColor(1.0f, 0.86f, 0.70f));
 	Sun->ForwardShadingPriority = 1;
 	Sun->SetAtmosphereSunLight(true);
@@ -111,7 +116,7 @@ ADNCourseActor::ADNCourseActor()
 	Fill->SetupAttachment(Root);
 	Fill->SetMobility(EComponentMobility::Movable);
 	Fill->SetRelativeRotation(FRotator(-35.0f, 145.0f, 0.0f));
-	Fill->SetIntensity(3.0f);
+	Fill->SetIntensity(0.0f); // o céu da atmosfera já enche as sombras no regime físico
 	Fill->SetCastShadows(false);
 
 	// céu e névoa: o mapa vazio é um fundo preto sem eles
@@ -133,8 +138,16 @@ ADNCourseActor::ADNCourseActor()
 	UPostProcessComponent* Grade = CreateDefaultSubobject<UPostProcessComponent>(TEXT("Grade"));
 	Grade->SetupAttachment(Root);
 	Grade->bUnbound = true;
-	Grade->Settings.bOverride_AutoExposureBias = true;
-	Grade->Settings.AutoExposureBias = -0.45f;
+	Grade->Settings.bOverride_AutoExposureMethod = true;
+	Grade->Settings.AutoExposureMethod = EAutoExposureMethod::AEM_Manual;
+	Grade->Settings.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
+	Grade->Settings.AutoExposureApplyPhysicalCameraExposure = true;
+	Grade->Settings.bOverride_DepthOfFieldFstop = true;
+	Grade->Settings.DepthOfFieldFstop = 8.0f;
+	Grade->Settings.bOverride_CameraShutterSpeed = true;
+	Grade->Settings.CameraShutterSpeed = 180.0f;
+	Grade->Settings.bOverride_CameraISO = true;
+	Grade->Settings.CameraISO = 100.0f;
 	Grade->Settings.bOverride_ColorContrast = true;
 	Grade->Settings.ColorContrast = FVector4(1.08f, 1.08f, 1.08f, 1.0f);
 
@@ -143,7 +156,7 @@ ADNCourseActor::ADNCourseActor()
 	Sky->SetMobility(EComponentMobility::Movable);
 	Sky->bLowerHemisphereIsBlack = false;
 	Sky->bRealTimeCapture = true;
-	Sky->SetIntensity(1.0f);
+	Sky->SetIntensity(2.5f); // regime físico: fecha as sombras do desfiladeiro de prédios
 }
 
 void ADNCourseActor::Build(const TArray<FVector>& InPoints, float InWidthCm, float SpacingCm)
@@ -322,7 +335,7 @@ void ADNCourseActor::AddBuildings()
 		FLinearColor(0.95f, 0.55f, 0.42f), // terracota
 		FLinearColor(1.25f, 1.02f, 0.50f), // ocre
 		FLinearColor(0.62f, 0.72f, 0.88f), // cinza azulado
-		FLinearColor(0.52f, 0.50f, 0.47f)  // cinza escuro
+		FLinearColor(0.80f, 0.77f, 0.72f)  // cinza escuro (o piso de luminância: 0,52 saía preto chapado)
 	};
 	constexpr int32 TintCount = UE_ARRAY_COUNT(Tints);
 	TArray<TArray<UInstancedStaticMeshComponent*>> Grid; // [variante][cor]

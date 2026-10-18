@@ -123,6 +123,15 @@ void ADNRaceGameMode::StartPlay()
 		R.Car = GetWorld()->SpawnActor<ADNVehicle>(ADNVehicle::StaticClass(), T.GetLocation(), T.Rotator(), Params);
 		R.Name = Defs[i].Key;
 		R.Config = Defs[i].Value;
+		// -DNRaceDummyKmh=N (e -DNRaceDummyIdx=I, padrão 0): o rival I anda a N km/h (teste: o jogador o alcança de trás em linha reta e dá o detona)
+		float DummyKmh = 0.0f;
+		int32 DummyIdx = 0;
+		FParse::Value(FCommandLine::Get(), TEXT("DNRaceDummyIdx="), DummyIdx);
+		if (i == DummyIdx && FParse::Value(FCommandLine::Get(), TEXT("DNRaceDummyKmh="), DummyKmh) && DummyKmh > 10.0f)
+		{
+			R.Config.StraightKmh = DummyKmh;
+			R.Config.CornerKmh = FMath::Min(R.Config.CornerKmh, DummyKmh);
+		}
 		if (R.Car.IsValid())
 		{
 			// sem controlador o Chaos ignora as entradas por padrão; quem dirige o rival é este GameMode
@@ -366,7 +375,7 @@ void ADNRaceGameMode::DriveAuto(ADNVehicle& Vehicle) const
 	const FVector Forward = Vehicle.GetActorForwardVector();
 	FVector NearTarget = FDNCourse::LocationAt(Points, Player.ProgressCm + LookAheadCm);
 	FVector FarTarget = FDNCourse::LocationAt(Points, Player.ProgressCm + 2.0f * LookAheadCm);
-	if (bHunt)
+	if (bHunt && Player.ProgressCm > 3000.0f) // só caça depois de 30 m: na largada o carro segue a linha e não bate nos prédios
 	{
 		// só para provar o takedown: mira no rival mais perto, à frente e a menos de 80 m, em vez de seguir a linha
 		double Best = 8000.0;
