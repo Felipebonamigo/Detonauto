@@ -166,12 +166,15 @@ void ADNRaceGameMode::Tick(float DeltaSeconds)
 	{
 		if (bAuto)
 		{
-			if (UChaosWheeledVehicleMovementComponent* Hold = Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovement()))
-			{
-				Hold->SetBrakeInput(1.0f);
-			}
+			// freio de mão, não o pedal: com o pedal em um carro parado o Chaos engata a ré e o piloto automático saía andando para trás
+			Vehicle->SetHandbrake(true);
 		}
 		return;
+	}
+	if (bAuto && !bHandbrakeReleased)
+	{
+		bHandbrakeReleased = true;
+		Vehicle->SetHandbrake(false);
 	}
 	RaceTime += DeltaSeconds;
 	if (!bPlayerHitBound)
@@ -510,6 +513,7 @@ void ADNRaceGameMode::ResetRace()
 	PlayerWreck = FDNWreckState();
 	PlayerDestroyedAtS = -1.0;
 	Pending.Reset();
+	bHandbrakeReleased = false;
 	for (int32 i = 0; i < Rivals.Num(); ++i)
 	{
 		FRival& R = Rivals[i];
@@ -592,15 +596,17 @@ void ADNRaceGameMode::SpawnStreetLife()
 		{ TEXT("poste"), TEXT("/Game/Detonauto/Lookdev/Props/SM_dn_street_light_base.SM_dn_street_light_base"), TEXT("/Game/Detonauto/Lookdev/Props/SM_dn_street_light_top.SM_dn_street_light_top") },
 		{ TEXT("arvore"), TEXT("/Game/Detonauto/Lookdev/Props/SM_jacaranda_tree_stump.SM_jacaranda_tree_stump"), TEXT("/Game/Detonauto/Lookdev/Props/SM_jacaranda_tree_top.SM_jacaranda_tree_top") },
 		{ TEXT("banco"), nullptr, TEXT("/Game/Detonauto/Lookdev/Props/SM_modular_street_seating.SM_modular_street_seating") },
+		{ TEXT("hidrante"), nullptr, TEXT("/Game/Detonauto/Lookdev/Props/SM_fire_hydrant.SM_fire_hydrant") },
+		{ TEXT("lixeira"), nullptr, TEXT("/Game/Detonauto/Lookdev/Props/SM_metal_trash_can.SM_metal_trash_can") },
 	};
-	static const int32 Cycle[] = { 0, 1, 2, 0, 1, 0 };
+	static const int32 Cycle[] = { 0, 1, 3, 2, 0, 1, 4, 0, 1, 3, 2, 4 };
 	const TArray<FVector>& Points = Course->GetPoints();
 	const float Length = Course->GetLengthCm();
 	const float Lateral = Course->GetWidthCm() * 0.5f + 15.0f + 75.0f; // o meio da calçada
 	int32 Spawned = 0;
 	for (int32 k = 0;; ++k)
 	{
-		const float S = 700.0f + 2200.0f * k;
+		const float S = 700.0f + 1500.0f * k;
 		if (S > Length - 500.0f)
 		{
 			break;
@@ -631,5 +637,5 @@ void ADNRaceGameMode::SpawnStreetLife()
 		Prop->FinishSpawning(FTransform(Rot, Where));
 		++Spawned;
 	}
-	UE_LOG(LogDetonauto, Display, TEXT("DNRace: %d peças de rua (poste, árvore e banco) na calçada."), Spawned);
+	UE_LOG(LogDetonauto, Display, TEXT("DNRace: %d peças de rua (poste, árvore, banco, hidrante e lixeira) na calçada."), Spawned);
 }
